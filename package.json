@@ -1,0 +1,37 @@
+{
+  "name": "ikunnect-crm-integration",
+  "version": "1.0.0",
+  "description": "iKunnect to iKunnect CRM integration POC using MCP API",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kevin-Shelton/iKunnect-crm-integration.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Kevin-Shelton/iKunnect-crm-integration/issues"
+  },
+  "homepage": "https://github.com/Kevin-Shelton/iKunnect-crm-integration#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.3.0",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}
