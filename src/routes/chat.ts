@@ -1,5 +1,5 @@
 import express from 'express';
-import { createCRMClient } from '../lib/crmMcp';
+import { createCRMClient } from '../lib/ghlMcp';
 import {
   ChatSessionInput,
   ChatSessionResponse,

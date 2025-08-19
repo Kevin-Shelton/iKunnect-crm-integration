@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
-import { createCRMClient } from './lib/crmMcp';
+import { createCRMClient } from './lib/ghlMcp';
 import { errorHandler } from './middleware/errorHandler';
 import { securityMiddleware, rateLimitMiddleware } from './middleware/security';
 import chatRoutes from './routes/chat';

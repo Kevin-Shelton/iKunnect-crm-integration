@@ -1,5 +1,5 @@
 // Simple Bot Logic Framework
-import { GHLMCPClient } from './crmMcp';
+import { GHLMCPClient } from './ghlMcp';
 import { Contact, Message } from '../types/crm';
 
 export interface BotContext {

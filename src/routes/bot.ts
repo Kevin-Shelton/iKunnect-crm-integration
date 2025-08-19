@@ -1,6 +1,6 @@
 // Bot Routes for Automated Chat Responses
 import { Router, Request, Response } from 'express';
-import { GHLMCPClient } from '../lib/crmMcp';
+import { GHLMCPClient } from '../lib/ghlMcp';
 import SimpleBotLogic, { BotContext } from '../lib/botLogic';
 import { 
   asyncHandler, 
