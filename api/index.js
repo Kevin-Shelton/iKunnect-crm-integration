@@ -5,65 +5,74 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Helper function to make CRM API calls with correct headers
-async function callCRMAPI(endpoint, method = 'GET', data = null) {
+// Helper function to make MCP JSON-RPC calls
+async function callMCPAPI(method, params = {}) {
   const fetch = require('node-fetch');
   
-  const baseUrl = process.env.CRM_MCP_URL || 'https://services.leadconnectorhq.com/';
-  const url = `${baseUrl}${endpoint}`;
+  const url = process.env.CRM_MCP_URL || 'https://services.leadconnectorhq.com/mcp/';
+  
+  // JSON-RPC 2.0 format
+  const requestBody = {
+    jsonrpc: "2.0",
+    method: method,
+    params: params,
+    id: Date.now() // Unique request ID
+  };
   
   const options = {
-    method: method,
+    method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.CRM_PIT}`,
       'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream',
-      'Version': '2021-07-28',
-      'User-Agent': 'iKunnect-CRM-Integration/1.0'
-    }
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify(requestBody)
   };
   
-  if (data && method !== 'GET') {
-    options.body = JSON.stringify(data);
-  }
-  
-  console.log(`[CRM API] ${method} ${url}`, data ? JSON.stringify(data, null, 2) : '');
+  console.log(`[MCP API] ${method}:`, JSON.stringify(requestBody, null, 2));
   
   const response = await fetch(url, options);
   const responseData = await response.json();
   
-  console.log(`[CRM API Response] ${response.status}:`, JSON.stringify(responseData, null, 2));
+  console.log(`[MCP API Response] ${response.status}:`, JSON.stringify(responseData, null, 2));
   
   if (!response.ok) {
-    throw new Error(`CRM API Error: ${response.status} - ${JSON.stringify(responseData)}`);
+    throw new Error(`MCP API Error: ${response.status} - ${JSON.stringify(responseData)}`);
   }
   
-  return responseData;
+  // Check for JSON-RPC error
+  if (responseData.error) {
+    throw new Error(`MCP RPC Error: ${responseData.error.code} - ${responseData.error.message}`);
+  }
+  
+  return responseData.result;
 }
 
-// Health check with CRM connection test
+// Health check with MCP connection test
 app.get('/api/health', async (req, res) => {
   try {
-    // Test CRM connection with simple location lookup
-    const locationResponse = await callCRMAPI(`locations/${process.env.CRM_LOCATION_ID}`);
+    // Test MCP connection with a simple method
+    const result = await callMCPAPI('locations.get', {
+      locationId: process.env.CRM_LOCATION_ID
+    });
     
     res.json({
       success: true,
-      message: 'API is healthy and CRM is connected',
+      message: 'API is healthy and MCP is connected',
       timestamp: new Date().toISOString(),
-      crm: {
+      mcp: {
         connected: true,
-        locationName: locationResponse.location?.name || 'Unknown',
+        locationName: result?.name || 'Unknown',
         locationId: process.env.CRM_LOCATION_ID
       }
     });
   } catch (error) {
     res.json({
       success: false,
-      message: 'API is running but CRM connection failed',
+      message: 'API is running but MCP connection failed',
       timestamp: new Date().toISOString(),
       error: error.message,
-      crm: {
+      mcp: {
         connected: false,
         mcpUrl: process.env.CRM_MCP_URL ? 'configured' : 'missing',
         token: process.env.CRM_PIT ? 'configured' : 'missing',
@@ -73,7 +82,7 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Real CRM chat session endpoint with proper API calls
+// Real MCP chat session endpoint
 app.post('/api/chat/session', async (req, res) => {
   try {
     const { name, email, phone } = req.body;
@@ -85,20 +94,21 @@ app.post('/api/chat/session', async (req, res) => {
       });
     }
 
-    // Try to find existing contact by email using the contacts endpoint
+    // Try to find existing contact by email
     let contact = null;
     let isNewContact = false;
     
     try {
-      // Search for existing contact
-      const searchResponse = await callCRMAPI(`contacts?locationId=${process.env.CRM_LOCATION_ID}&email=${encodeURIComponent(email)}`);
-      const contacts = searchResponse.contacts || [];
+      const searchResult = await callMCPAPI('contacts.search', {
+        locationId: process.env.CRM_LOCATION_ID,
+        email: email
+      });
       
-      if (contacts.length > 0) {
-        contact = contacts[0];
+      if (searchResult && searchResult.contacts && searchResult.contacts.length > 0) {
+        contact = searchResult.contacts[0];
       }
     } catch (searchError) {
-      console.log('[CRM] Contact search failed, will create new:', searchError.message);
+      console.log('[MCP] Contact search failed, will create new:', searchError.message);
     }
     
     // If no existing contact found, create new one
@@ -107,19 +117,18 @@ app.post('/api/chat/session', async (req, res) => {
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
       
-      const contactData = {
+      const contactParams = {
+        locationId: process.env.CRM_LOCATION_ID,
         firstName: firstName,
         lastName: lastName,
-        name: name,
         email: email,
         phone: phone || '',
-        locationId: process.env.CRM_LOCATION_ID,
         source: 'iKunnect Chat Widget',
         tags: ['Vercel Deployment', 'Live Chat', 'Web Visitor']
       };
 
-      const createResponse = await callCRMAPI('contacts', 'POST', contactData);
-      contact = createResponse.contact;
+      const createResult = await callMCPAPI('contacts.create', contactParams);
+      contact = createResult.contact || createResult;
       isNewContact = true;
     }
     
@@ -140,16 +149,16 @@ app.post('/api/chat/session', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[CRM Session Error]:', error);
+    console.error('[MCP Session Error]:', error);
     res.status(500).json({
       success: false,
-      error: `CRM integration failed: ${error.message}`,
-      details: 'Check your CRM credentials and try again'
+      error: `MCP integration failed: ${error.message}`,
+      details: 'Check your MCP credentials and try again'
     });
   }
 });
 
-// Real CRM conversation thread endpoint
+// Real MCP conversation thread endpoint
 app.post('/api/chat/thread', async (req, res) => {
   try {
     const { contactId } = req.body;
@@ -166,28 +175,28 @@ app.post('/api/chat/thread', async (req, res) => {
     let isNewConversation = false;
     
     try {
-      const conversationsResponse = await callCRMAPI(`conversations?contactId=${contactId}&locationId=${process.env.CRM_LOCATION_ID}`);
-      const conversations = conversationsResponse.conversations || [];
+      const searchResult = await callMCPAPI('conversations.search', {
+        locationId: process.env.CRM_LOCATION_ID,
+        contactId: contactId
+      });
       
-      // Find the most recent conversation
-      if (conversations.length > 0) {
-        conversation = conversations[0];
+      if (searchResult && searchResult.conversations && searchResult.conversations.length > 0) {
+        conversation = searchResult.conversations[0];
       }
     } catch (searchError) {
-      console.log('[CRM] Conversation search failed, will create new:', searchError.message);
+      console.log('[MCP] Conversation search failed, will create new:', searchError.message);
     }
     
     // If no existing conversation, create new one
     if (!conversation) {
-      const conversationData = {
+      const conversationParams = {
         locationId: process.env.CRM_LOCATION_ID,
         contactId: contactId,
-        type: 'Chat',
-        inbox: 'chat'
+        type: 'Chat'
       };
 
-      const createResponse = await callCRMAPI('conversations', 'POST', conversationData);
-      conversation = createResponse.conversation;
+      const createResult = await callMCPAPI('conversations.create', conversationParams);
+      conversation = createResult.conversation || createResult;
       isNewConversation = true;
     }
     
@@ -206,16 +215,16 @@ app.post('/api/chat/thread', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[CRM Thread Error]:', error);
+    console.error('[MCP Thread Error]:', error);
     res.status(500).json({
       success: false,
-      error: `CRM conversation creation failed: ${error.message}`,
-      details: 'Check your CRM credentials and contact ID'
+      error: `MCP conversation creation failed: ${error.message}`,
+      details: 'Check your MCP credentials and contact ID'
     });
   }
 });
 
-// Real CRM message sending endpoint
+// Real MCP message sending endpoint
 app.post('/api/chat/send', async (req, res) => {
   try {
     const { conversationId, body } = req.body;
@@ -227,21 +236,20 @@ app.post('/api/chat/send', async (req, res) => {
       });
     }
 
-    const messageData = {
+    const messageParams = {
+      locationId: process.env.CRM_LOCATION_ID,
+      conversationId: conversationId,
       type: 'Chat',
       body: body,
-      direction: 'inbound',
-      status: 'delivered',
-      conversationId: conversationId,
-      locationId: process.env.CRM_LOCATION_ID
+      direction: 'inbound'
     };
 
-    const messageResponse = await callCRMAPI('conversations/messages', 'POST', messageData);
+    const messageResult = await callMCPAPI('conversations.messages.create', messageParams);
     
     res.json({
       success: true,
       data: {
-        messageId: messageResponse.message?.id || messageResponse.id,
+        messageId: messageResult.message?.id || messageResult.id,
         conversationId: conversationId,
         body: body,
         timestamp: new Date().toISOString(),
@@ -251,16 +259,16 @@ app.post('/api/chat/send', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[CRM Send Error]:', error);
+    console.error('[MCP Send Error]:', error);
     res.status(500).json({
       success: false,
-      error: `CRM message sending failed: ${error.message}`,
+      error: `MCP message sending failed: ${error.message}`,
       details: 'Check your conversation ID and try again'
     });
   }
 });
 
-// Enhanced bot process endpoint
+// Enhanced bot process endpoint with MCP context
 app.post('/api/bot/process', async (req, res) => {
   try {
     const { message, contactId, conversationId } = req.body;
@@ -276,15 +284,18 @@ app.post('/api/bot/process', async (req, res) => {
     let contactInfo = null;
     if (contactId) {
       try {
-        const contactResponse = await callCRMAPI(`contacts/${contactId}`);
-        contactInfo = contactResponse.contact;
+        const contactResult = await callMCPAPI('contacts.get', {
+          locationId: process.env.CRM_LOCATION_ID,
+          contactId: contactId
+        });
+        contactInfo = contactResult.contact || contactResult;
       } catch (error) {
         console.log('[Bot] Could not fetch contact info:', error.message);
       }
     }
 
     // Enhanced bot logic
-    let response = `Thank you for your message${contactInfo?.firstName ? `, ${contactInfo.firstName}` : ''}! I'm your AI assistant and I'm connected to the CRM system.`;
+    let response = `Thank you for your message${contactInfo?.firstName ? `, ${contactInfo.firstName}` : ''}! I'm your AI assistant and I'm connected to the MCP system.`;
     let action = "acknowledged";
     let confidence = 0.8;
 
@@ -308,21 +319,20 @@ app.post('/api/bot/process', async (req, res) => {
       confidence = 0.95;
     }
 
-    // Send bot response back to CRM
+    // Send bot response back to MCP
     if (conversationId) {
       try {
-        const botMessageData = {
+        const botMessageParams = {
+          locationId: process.env.CRM_LOCATION_ID,
+          conversationId: conversationId,
           type: 'Chat',
           body: response,
-          direction: 'outbound',
-          status: 'delivered',
-          conversationId: conversationId,
-          locationId: process.env.CRM_LOCATION_ID
+          direction: 'outbound'
         };
         
-        await callCRMAPI('conversations/messages', 'POST', botMessageData);
+        await callMCPAPI('conversations.messages.create', botMessageParams);
       } catch (error) {
-        console.log('[Bot] Could not send response to CRM:', error.message);
+        console.log('[Bot] Could not send response to MCP:', error.message);
       }
     }
 
@@ -355,18 +365,20 @@ app.post('/api/bot/process', async (req, res) => {
   }
 });
 
-// Test endpoint to verify CRM connection
-app.get('/api/crm-test', async (req, res) => {
+// Test endpoint to verify MCP connection
+app.get('/api/mcp-test', async (req, res) => {
   try {
-    const locationResponse = await callCRMAPI(`locations/${process.env.CRM_LOCATION_ID}`);
+    const locationResult = await callMCPAPI('locations.get', {
+      locationId: process.env.CRM_LOCATION_ID
+    });
     
     res.json({
       success: true,
-      message: 'CRM connection successful!',
+      message: 'MCP connection successful!',
       location: {
-        id: locationResponse.location?.id,
-        name: locationResponse.location?.name,
-        website: locationResponse.location?.website
+        id: locationResult?.id,
+        name: locationResult?.name,
+        website: locationResult?.website
       },
       credentials: {
         mcpUrl: process.env.CRM_MCP_URL,
@@ -398,14 +410,14 @@ app.get('/api/hello', (req, res) => {
 
 app.get('/api', (req, res) => {
   res.json({
-    name: 'iKunnect CRM Integration API',
-    version: '2.1.0',
-    description: 'Full CRM integration with GoHighLevel - Fixed Headers',
+    name: 'iKunnect MCP Integration API',
+    version: '3.0.0',
+    description: 'Full MCP integration with GoHighLevel using JSON-RPC 2.0',
     status: 'operational',
     timestamp: new Date().toISOString(),
     endpoints: {
       health: 'GET /api/health',
-      crmTest: 'GET /api/crm-test',
+      mcpTest: 'GET /api/mcp-test',
       chatSession: 'POST /api/chat/session',
       chatThread: 'POST /api/chat/thread',
       chatSend: 'POST /api/chat/send',
