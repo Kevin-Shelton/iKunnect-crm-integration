@@ -5,168 +5,72 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Helper function to make MCP JSON-RPC calls with debugging
-async function callMCPAPI(method, params = {}) {
+// Helper function to make GoHighLevel REST API calls
+async function callGHLAPI(endpoint, method = 'GET', data = null) {
   const fetch = require('node-fetch');
   
-  // Try different possible MCP endpoints
-  const possibleUrls = [
-    'https://services.leadconnectorhq.com/mcp/',
-    'https://services.leadconnectorhq.com/mcp',
-    'https://services.leadconnectorhq.com/api/v1/mcp/',
-    'https://services.leadconnectorhq.com/api/v1/mcp',
-    process.env.CRM_MCP_URL
-  ].filter(Boolean);
-  
-  const url = possibleUrls[0]; // Start with the first one
-  
-  // JSON-RPC 2.0 format
-  const requestBody = {
-    jsonrpc: "2.0",
-    method: method,
-    params: params,
-    id: Date.now()
-  };
+  const baseUrl = 'https://services.leadconnectorhq.com/';
+  const url = `${baseUrl}${endpoint}`;
   
   const options = {
-    method: 'POST',
+    method: method,
     headers: {
       'Authorization': `Bearer ${process.env.CRM_PIT}`,
       'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream',
-      'User-Agent': 'iKunnect-MCP-Integration/1.0'
-    },
-    body: JSON.stringify(requestBody)
+      'Accept': 'application/json',
+      'Version': '2021-07-28'
+    }
   };
   
-  console.log(`[MCP DEBUG] URL: ${url}`);
-  console.log(`[MCP DEBUG] Request:`, JSON.stringify(requestBody, null, 2));
-  console.log(`[MCP DEBUG] Headers:`, JSON.stringify(options.headers, null, 2));
-  
-  try {
-    const response = await fetch(url, options);
-    
-    console.log(`[MCP DEBUG] Response Status: ${response.status}`);
-    console.log(`[MCP DEBUG] Response Headers:`, JSON.stringify([...response.headers.entries()], null, 2));
-    
-    // Get response as text first to see what we're getting
-    const responseText = await response.text();
-    console.log(`[MCP DEBUG] Response Text (first 500 chars):`, responseText.substring(0, 500));
-    
-    // Try to parse as JSON
-    let responseData;
-    try {
-      responseData = JSON.parse(responseText);
-    } catch (parseError) {
-      console.log(`[MCP DEBUG] JSON Parse Error:`, parseError.message);
-      throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}...`);
-    }
-    
-    console.log(`[MCP DEBUG] Parsed Response:`, JSON.stringify(responseData, null, 2));
-    
-    if (!response.ok) {
-      throw new Error(`MCP API Error: ${response.status} - ${JSON.stringify(responseData)}`);
-    }
-    
-    // Check for JSON-RPC error
-    if (responseData.error) {
-      throw new Error(`MCP RPC Error: ${responseData.error.code} - ${responseData.error.message}`);
-    }
-    
-    return responseData.result;
-  } catch (fetchError) {
-    console.log(`[MCP DEBUG] Fetch Error:`, fetchError.message);
-    throw fetchError;
+  if (data && method !== 'GET') {
+    options.body = JSON.stringify(data);
   }
+  
+  console.log(`[GHL API] ${method} ${url}`, data ? JSON.stringify(data, null, 2) : '');
+  
+  const response = await fetch(url, options);
+  const responseText = await response.text();
+  
+  console.log(`[GHL API Response] ${response.status}:`, responseText.substring(0, 500));
+  
+  let responseData;
+  try {
+    responseData = JSON.parse(responseText);
+  } catch (parseError) {
+    throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}...`);
+  }
+  
+  if (!response.ok) {
+    throw new Error(`GHL API Error: ${response.status} - ${JSON.stringify(responseData)}`);
+  }
+  
+  return responseData;
 }
 
-// Debug endpoint to test MCP connection
-app.get('/api/debug-mcp', async (req, res) => {
+// Health check with GHL REST API
+app.get('/api/health', async (req, res) => {
   try {
-    console.log('[DEBUG] Testing MCP connection...');
-    console.log('[DEBUG] Environment variables:');
-    console.log('  CRM_MCP_URL:', process.env.CRM_MCP_URL);
-    console.log('  CRM_PIT exists:', !!process.env.CRM_PIT);
-    console.log('  CRM_LOCATION_ID:', process.env.CRM_LOCATION_ID);
-    
-    // Try a simple method first
-    const result = await callMCPAPI('locations.get', {
-      locationId: process.env.CRM_LOCATION_ID
-    });
+    const locationData = await callGHLAPI(`locations/${process.env.CRM_LOCATION_ID}`);
     
     res.json({
       success: true,
-      message: 'MCP connection successful!',
-      result: result,
-      debug: {
-        url: process.env.CRM_MCP_URL,
-        hasToken: !!process.env.CRM_PIT,
-        locationId: process.env.CRM_LOCATION_ID
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      debug: {
-        url: process.env.CRM_MCP_URL,
-        hasToken: !!process.env.CRM_PIT,
+      message: 'API is healthy and GoHighLevel is connected',
+      timestamp: new Date().toISOString(),
+      ghl: {
+        connected: true,
+        locationName: locationData.location?.name || 'Unknown',
         locationId: process.env.CRM_LOCATION_ID,
-        errorType: error.constructor.name
-      }
-    });
-  }
-});
-
-// Test with REST API instead of MCP
-app.get('/api/test-rest', async (req, res) => {
-  try {
-    const fetch = require('node-fetch');
-    
-    // Try GoHighLevel REST API instead
-    const url = `https://services.leadconnectorhq.com/locations/${process.env.CRM_LOCATION_ID}`;
-    
-    const options = {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${process.env.CRM_PIT}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Version': '2021-07-28'
-      }
-    };
-    
-    console.log(`[REST DEBUG] URL: ${url}`);
-    console.log(`[REST DEBUG] Headers:`, JSON.stringify(options.headers, null, 2));
-    
-    const response = await fetch(url, options);
-    const responseText = await response.text();
-    
-    console.log(`[REST DEBUG] Response Status: ${response.status}`);
-    console.log(`[REST DEBUG] Response Text:`, responseText.substring(0, 500));
-    
-    let responseData;
-    try {
-      responseData = JSON.parse(responseText);
-    } catch (parseError) {
-      throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}...`);
-    }
-    
-    res.json({
-      success: response.ok,
-      status: response.status,
-      data: responseData,
-      debug: {
-        url: url,
-        hasToken: !!process.env.CRM_PIT,
-        locationId: process.env.CRM_LOCATION_ID
+        companyId: locationData.location?.companyId
       }
     });
   } catch (error) {
-    res.status(500).json({
+    res.json({
       success: false,
+      message: 'API is running but GoHighLevel connection failed',
+      timestamp: new Date().toISOString(),
       error: error.message,
-      debug: {
+      ghl: {
+        connected: false,
         hasToken: !!process.env.CRM_PIT,
         locationId: process.env.CRM_LOCATION_ID
       }
@@ -174,7 +78,7 @@ app.get('/api/test-rest', async (req, res) => {
   }
 });
 
-// Simplified chat session using REST API
+// Real GoHighLevel chat session endpoint
 app.post('/api/chat/session', async (req, res) => {
   try {
     const { name, email, phone } = req.body;
@@ -186,62 +90,43 @@ app.post('/api/chat/session', async (req, res) => {
       });
     }
 
-    const fetch = require('node-fetch');
+    // Try to find existing contact by email first
+    let contact = null;
+    let isNewContact = false;
     
-    // Try creating contact using REST API
-    const nameParts = name.trim().split(' ');
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ') || '';
-    
-    const contactData = {
-      firstName: firstName,
-      lastName: lastName,
-      email: email,
-      phone: phone || '',
-      locationId: process.env.CRM_LOCATION_ID,
-      source: 'iKunnect Chat Widget',
-      tags: ['Vercel Deployment', 'Live Chat', 'Web Visitor']
-    };
-
-    const url = 'https://services.leadconnectorhq.com/contacts/';
-    const options = {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.CRM_PIT}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Version': '2021-07-28'
-      },
-      body: JSON.stringify(contactData)
-    };
-
-    console.log(`[REST Contact] URL: ${url}`);
-    console.log(`[REST Contact] Data:`, JSON.stringify(contactData, null, 2));
-
-    const response = await fetch(url, options);
-    const responseText = await response.text();
-    
-    console.log(`[REST Contact] Response Status: ${response.status}`);
-    console.log(`[REST Contact] Response:`, responseText.substring(0, 500));
-
-    let responseData;
     try {
-      responseData = JSON.parse(responseText);
-    } catch (parseError) {
-      throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}...`);
+      const searchData = await callGHLAPI(`contacts/search/duplicate?locationId=${process.env.CRM_LOCATION_ID}&email=${encodeURIComponent(email)}`);
+      contact = searchData.contact;
+    } catch (searchError) {
+      console.log('[GHL] Contact search failed, will create new:', searchError.message);
     }
+    
+    // If no existing contact found, create new one
+    if (!contact) {
+      const nameParts = name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      const contactData = {
+        firstName: firstName,
+        lastName: lastName,
+        email: email,
+        phone: phone || '',
+        locationId: process.env.CRM_LOCATION_ID,
+        source: 'iKunnect Chat Widget',
+        tags: ['Vercel Deployment', 'Live Chat', 'Web Visitor']
+      };
 
-    if (!response.ok) {
-      throw new Error(`REST API Error: ${response.status} - ${JSON.stringify(responseData)}`);
+      const createData = await callGHLAPI('contacts/', 'POST', contactData);
+      contact = createData.contact;
+      isNewContact = true;
     }
-
-    const contact = responseData.contact || responseData;
     
     res.json({
       success: true,
       data: {
         contactId: contact.id,
-        isNewContact: true,
+        isNewContact: isNewContact,
         contact: {
           id: contact.id,
           name: contact.name || name,
@@ -254,49 +139,249 @@ app.post('/api/chat/session', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[REST Session Error]:', error);
+    console.error('[GHL Session Error]:', error);
     res.status(500).json({
       success: false,
-      error: `REST integration failed: ${error.message}`,
-      details: 'Check your REST API credentials and try again'
+      error: `GoHighLevel integration failed: ${error.message}`,
+      details: 'Check your GoHighLevel credentials and try again'
     });
   }
 });
 
-// Keep other endpoints simple for now
-app.post('/api/chat/thread', (req, res) => {
-  res.json({
-    success: true,
-    data: {
-      conversationId: `conv-${Date.now()}`,
-      isNewConversation: true,
-      contactId: req.body.contactId
+// Real GoHighLevel conversation thread endpoint
+app.post('/api/chat/thread', async (req, res) => {
+  try {
+    const { contactId } = req.body;
+    
+    if (!contactId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Contact ID is required'
+      });
     }
-  });
+
+    // Check for existing conversations
+    let conversation = null;
+    let isNewConversation = false;
+    
+    try {
+      const conversationsData = await callGHLAPI(`conversations/search?contactId=${contactId}&locationId=${process.env.CRM_LOCATION_ID}`);
+      const conversations = conversationsData.conversations || [];
+      
+      if (conversations.length > 0) {
+        conversation = conversations[0];
+      }
+    } catch (searchError) {
+      console.log('[GHL] Conversation search failed, will create new:', searchError.message);
+    }
+    
+    // If no existing conversation, create new one
+    if (!conversation) {
+      const conversationData = {
+        locationId: process.env.CRM_LOCATION_ID,
+        contactId: contactId,
+        type: 'Chat'
+      };
+
+      const createData = await callGHLAPI('conversations/', 'POST', conversationData);
+      conversation = createData.conversation;
+      isNewConversation = true;
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        conversationId: conversation.id,
+        isNewConversation: isNewConversation,
+        contactId: contactId,
+        conversation: {
+          id: conversation.id,
+          type: conversation.type,
+          status: conversation.status
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('[GHL Thread Error]:', error);
+    res.status(500).json({
+      success: false,
+      error: `GoHighLevel conversation creation failed: ${error.message}`,
+      details: 'Check your GoHighLevel credentials and contact ID'
+    });
+  }
 });
 
-app.post('/api/chat/send', (req, res) => {
-  res.json({
-    success: true,
-    data: {
-      messageId: `msg-${Date.now()}`,
-      conversationId: req.body.conversationId,
-      body: req.body.body,
-      timestamp: new Date().toISOString()
+// Real GoHighLevel message sending endpoint
+app.post('/api/chat/send', async (req, res) => {
+  try {
+    const { conversationId, body } = req.body;
+    
+    if (!conversationId || !body) {
+      return res.status(400).json({
+        success: false,
+        error: 'Conversation ID and message body are required'
+      });
     }
-  });
+
+    const messageData = {
+      type: 'Chat',
+      body: body,
+      direction: 'inbound',
+      status: 'delivered',
+      conversationId: conversationId,
+      locationId: process.env.CRM_LOCATION_ID
+    };
+
+    const messageResponse = await callGHLAPI('conversations/messages', 'POST', messageData);
+    
+    res.json({
+      success: true,
+      data: {
+        messageId: messageResponse.message?.id || messageResponse.id,
+        conversationId: conversationId,
+        body: body,
+        timestamp: new Date().toISOString(),
+        status: 'delivered',
+        direction: 'inbound'
+      }
+    });
+    
+  } catch (error) {
+    console.error('[GHL Send Error]:', error);
+    res.status(500).json({
+      success: false,
+      error: `GoHighLevel message sending failed: ${error.message}`,
+      details: 'Check your conversation ID and try again'
+    });
+  }
 });
 
-app.post('/api/bot/process', (req, res) => {
-  res.json({
-    success: true,
-    data: {
-      response: "Hello! I'm testing the REST API integration.",
-      action: "greeting",
-      confidence: 0.9,
-      timestamp: new Date().toISOString()
+// Enhanced bot process endpoint with GoHighLevel context
+app.post('/api/bot/process', async (req, res) => {
+  try {
+    const { message, contactId, conversationId } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        error: 'Message is required'
+      });
     }
-  });
+
+    // Get contact info for personalized responses
+    let contactInfo = null;
+    if (contactId) {
+      try {
+        const contactData = await callGHLAPI(`contacts/${contactId}`);
+        contactInfo = contactData.contact;
+      } catch (error) {
+        console.log('[Bot] Could not fetch contact info:', error.message);
+      }
+    }
+
+    // Enhanced bot logic with personalization
+    let response = `Thank you for your message${contactInfo?.firstName ? `, ${contactInfo.firstName}` : ''}! I'm your AI assistant and I'm connected to your GoHighLevel CRM.`;
+    let action = "acknowledged";
+    let confidence = 0.8;
+
+    const lowerMessage = message.toLowerCase();
+    
+    if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
+      response = `Hello${contactInfo?.firstName ? ` ${contactInfo.firstName}` : ''}! Welcome to ${contactInfo?.locationName || 'our'} chat system. Your information is now in our CRM and I'm here to help you.`;
+      action = "greeting";
+      confidence = 0.9;
+    } else if (lowerMessage.includes('help')) {
+      response = "I'm here to help! I can assist you with questions about our services. Your conversation is being tracked in our CRM system for better support.";
+      action = "help_request";
+      confidence = 0.85;
+    } else if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('pricing')) {
+      response = "I'd be happy to help you with pricing information. Let me connect you with our sales team who can provide detailed pricing based on your needs.";
+      action = "pricing_inquiry";
+      confidence = 0.9;
+    } else if (lowerMessage.includes('demo') || lowerMessage.includes('trial')) {
+      response = "Great! I can help you schedule a demo. Your interest has been noted in our CRM system and someone from our team will reach out to you soon.";
+      action = "demo_request";
+      confidence = 0.95;
+    }
+
+    // Send bot response back to GoHighLevel
+    if (conversationId) {
+      try {
+        const botMessageData = {
+          type: 'Chat',
+          body: response,
+          direction: 'outbound',
+          status: 'delivered',
+          conversationId: conversationId,
+          locationId: process.env.CRM_LOCATION_ID
+        };
+        
+        await callGHLAPI('conversations/messages', 'POST', botMessageData);
+      } catch (error) {
+        console.log('[Bot] Could not send response to GoHighLevel:', error.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        response: response,
+        action: action,
+        confidence: confidence,
+        timestamp: new Date().toISOString(),
+        contactInfo: contactInfo ? {
+          name: contactInfo.name,
+          firstName: contactInfo.firstName,
+          locationName: contactInfo.locationName
+        } : null
+      }
+    });
+    
+  } catch (error) {
+    console.error('[Bot Process Error]:', error);
+    res.json({
+      success: true,
+      data: {
+        response: "I'm experiencing some technical difficulties, but your message has been received and logged.",
+        action: "error_fallback",
+        confidence: 0.5,
+        timestamp: new Date().toISOString(),
+        error: error.message
+      }
+    });
+  }
+});
+
+// Test endpoint to verify GoHighLevel connection
+app.get('/api/ghl-test', async (req, res) => {
+  try {
+    const locationData = await callGHLAPI(`locations/${process.env.CRM_LOCATION_ID}`);
+    
+    res.json({
+      success: true,
+      message: 'GoHighLevel connection successful!',
+      location: {
+        id: locationData.location?.id,
+        name: locationData.location?.name,
+        website: locationData.location?.website,
+        companyId: locationData.location?.companyId
+      },
+      credentials: {
+        hasToken: !!process.env.CRM_PIT,
+        locationId: process.env.CRM_LOCATION_ID
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      credentials: {
+        hasToken: !!process.env.CRM_PIT,
+        locationId: process.env.CRM_LOCATION_ID
+      }
+    });
+  }
 });
 
 // Keep existing endpoints
@@ -310,15 +395,18 @@ app.get('/api/hello', (req, res) => {
 
 app.get('/api', (req, res) => {
   res.json({
-    name: 'iKunnect Debug API',
-    version: '4.0.0',
-    description: 'Debug version to test GoHighLevel integration',
+    name: 'iKunnect GoHighLevel Integration API',
+    version: '5.0.0',
+    description: 'Full GoHighLevel integration using REST API',
     status: 'operational',
     timestamp: new Date().toISOString(),
     endpoints: {
-      debugMcp: 'GET /api/debug-mcp',
-      testRest: 'GET /api/test-rest',
-      chatSession: 'POST /api/chat/session'
+      health: 'GET /api/health',
+      ghlTest: 'GET /api/ghl-test',
+      chatSession: 'POST /api/chat/session',
+      chatThread: 'POST /api/chat/thread',
+      chatSend: 'POST /api/chat/send',
+      botProcess: 'POST /api/bot/process'
     }
   });
 });
