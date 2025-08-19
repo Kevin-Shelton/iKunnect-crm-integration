@@ -5,21 +5,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Helper function to make GoHighLevel MCP Server calls with proper JSON-RPC 2.0 format
-async function callGHLMCP(method, params) {
+// Helper function to make GoHighLevel MCP Server calls using exact documentation format
+async function callGHLMCP(tool, input) {
   const fetch = require('node-fetch');
   
   const url = 'https://services.leadconnectorhq.com/mcp/';
   
-  // Generate unique ID for JSON-RPC request
-  const requestId = Date.now().toString();
-  
-  // Proper JSON-RPC 2.0 format
-  const jsonRpcRequest = {
-    jsonrpc: "2.0",
-    id: requestId,
-    method: method,
-    params: params || {}
+  // Use exact format from GoHighLevel documentation
+  const requestData = {
+    tool: tool,
+    input: input || {}
   };
   
   const options = {
@@ -30,21 +25,38 @@ async function callGHLMCP(method, params) {
       'Content-Type': 'application/json',
       'Accept': 'application/json, text/event-stream'
     },
-    body: JSON.stringify(jsonRpcRequest)
+    body: JSON.stringify(requestData)
   };
   
-  console.log(`[GHL MCP] JSON-RPC Request:`, JSON.stringify(jsonRpcRequest, null, 2));
+  console.log(`[GHL MCP] Request (Documentation Format):`, JSON.stringify(requestData, null, 2));
   
   const response = await fetch(url, options);
   const responseText = await response.text();
   
   console.log(`[GHL MCP Response] ${response.status}:`, responseText.substring(0, 500));
   
+  // Handle Server-Sent Events format
+  if (responseText.startsWith('event: message\ndata: ')) {
+    const jsonPart = responseText.replace('event: message\ndata: ', '').trim();
+    try {
+      const responseData = JSON.parse(jsonPart);
+      
+      if (responseData.error) {
+        throw new Error(`MCP Server Error: ${responseData.error.code} - ${responseData.error.message}`);
+      }
+      
+      return responseData.result;
+    } catch (parseError) {
+      throw new Error(`Failed to parse SSE response: ${jsonPart.substring(0, 200)}...`);
+    }
+  }
+  
+  // Handle regular JSON response
   let responseData;
   try {
     responseData = JSON.parse(responseText);
   } catch (parseError) {
-    throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}...`);
+    throw new Error(`Invalid response format: ${responseText.substring(0, 200)}...`);
   }
   
   if (!response.ok) {
@@ -53,11 +65,11 @@ async function callGHLMCP(method, params) {
   
   // Handle JSON-RPC error response
   if (responseData.error) {
-    throw new Error(`JSON-RPC Error: ${responseData.error.code} - ${responseData.error.message}`);
+    throw new Error(`MCP Server Error: ${responseData.error.code} - ${responseData.error.message}`);
   }
   
-  // Return the result from JSON-RPC response
-  return responseData.result;
+  // Return the result
+  return responseData.result || responseData;
 }
 
 // Health check with GHL MCP Server
@@ -76,7 +88,7 @@ app.get('/api/health', async (req, res) => {
         locationName: locationData.name || 'Unknown',
         locationId: process.env.CRM_LOCATION_ID,
         mcpServer: 'https://services.leadconnectorhq.com/mcp/',
-        protocol: 'JSON-RPC 2.0'
+        format: 'Documentation Format'
       }
     });
   } catch (error) {
@@ -114,7 +126,7 @@ app.post('/api/chat/session', async (req, res) => {
     let isNewContact = false;
     
     try {
-      // Try to upsert contact using proper JSON-RPC method
+      // Try to upsert contact using documentation format
       const contactData = await callGHLMCP('contacts_upsert-contact', {
         firstName: firstName,
         lastName: lastName,
@@ -124,7 +136,7 @@ app.post('/api/chat/session', async (req, res) => {
         tags: ['Live Chat', 'Web Visitor', 'iKunnect Integration']
       });
       
-      contact = contactData.contact;
+      contact = contactData.contact || contactData;
       isNewContact = contactData.isNew || false;
       console.log('[GHL MCP] Contact upserted:', contact?.id);
       
@@ -179,7 +191,7 @@ app.post('/api/chat/thread', async (req, res) => {
     let isNewConversation = false;
     
     try {
-      // Search for existing conversations using proper JSON-RPC method
+      // Search for existing conversations using documentation format
       const searchData = await callGHLMCP('conversations_search-conversation', {
         contactId: contactId,
         locationId: process.env.CRM_LOCATION_ID
@@ -243,7 +255,7 @@ app.post('/api/chat/thread', async (req, res) => {
   }
 });
 
-// Send message using MCP Server with proper JSON-RPC format
+// Send message using MCP Server with documentation format
 app.post('/api/chat/send', async (req, res) => {
   try {
     const { conversationId, body, contactId } = req.body;
@@ -256,7 +268,7 @@ app.post('/api/chat/send', async (req, res) => {
     }
 
     try {
-      // Use proper JSON-RPC method to send a new message
+      // Use documentation format to send a new message
       const messageData = await callGHLMCP('conversations_send-a-new-message', {
         contactId: contactId,
         message: body,
@@ -284,8 +296,8 @@ app.post('/api/chat/send', async (req, res) => {
           timestamp: new Date().toISOString(),
           status: 'delivered',
           messageType: 'Live_Chat',
-          protocol: 'JSON-RPC 2.0',
-          note: 'Message sent via GoHighLevel MCP Server using proper JSON-RPC format'
+          format: 'Documentation Format',
+          note: 'Message sent via GoHighLevel MCP Server using documentation format'
         }
       });
       
@@ -313,12 +325,12 @@ app.post('/api/bot/process', (req, res) => {
       action: "deprecated",
       confidence: 1.0,
       timestamp: new Date().toISOString(),
-      note: "Messages are now sent via GoHighLevel MCP Server using JSON-RPC 2.0 protocol."
+      note: "Messages are now sent via GoHighLevel MCP Server using documentation format."
     }
   });
 });
 
-// Test MCP Server connection with proper JSON-RPC
+// Test MCP Server connection with documentation format
 app.get('/api/ghl-test', async (req, res) => {
   try {
     const locationData = await callGHLMCP('locations_get-location', {
@@ -327,7 +339,7 @@ app.get('/api/ghl-test', async (req, res) => {
     
     res.json({
       success: true,
-      message: 'GoHighLevel MCP Server connection successful with JSON-RPC 2.0!',
+      message: 'GoHighLevel MCP Server connection successful with documentation format!',
       location: {
         id: locationData.id,
         name: locationData.name,
@@ -336,7 +348,7 @@ app.get('/api/ghl-test', async (req, res) => {
       },
       mcp: {
         endpoint: 'https://services.leadconnectorhq.com/mcp/',
-        protocol: 'JSON-RPC 2.0',
+        format: 'Documentation Format (tool + input)',
         hasToken: !!process.env.CRM_PIT,
         locationId: process.env.CRM_LOCATION_ID
       }
@@ -347,7 +359,7 @@ app.get('/api/ghl-test', async (req, res) => {
       error: error.message,
       mcp: {
         endpoint: 'https://services.leadconnectorhq.com/mcp/',
-        protocol: 'JSON-RPC 2.0',
+        format: 'Documentation Format (tool + input)',
         hasToken: !!process.env.CRM_PIT,
         locationId: process.env.CRM_LOCATION_ID
       }
@@ -367,28 +379,27 @@ app.get('/api/hello', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'iKunnect GoHighLevel MCP Integration API',
-    version: '20.0.0',
-    description: 'Fixed to use proper JSON-RPC 2.0 format for GoHighLevel MCP Server',
+    version: '21.0.0',
+    description: 'Using exact format from GoHighLevel MCP documentation with SSE response handling',
     status: 'operational',
     timestamp: new Date().toISOString(),
-    note: 'Now using correct JSON-RPC 2.0 protocol with proper method, params, id, and jsonrpc fields',
+    note: 'Now using exact documentation format: {tool: "tool_name", input: {...}}',
     endpoints: {
       health: 'GET /api/health (MCP Server health check)',
       ghlTest: 'GET /api/ghl-test (MCP Server connection test)',
-      chatSession: 'POST /api/chat/session (JSON-RPC contacts_upsert-contact)',
-      chatThread: 'POST /api/chat/thread (JSON-RPC conversations_search-conversation)',
-      chatSend: 'POST /api/chat/send (JSON-RPC conversations_send-a-new-message)',
+      chatSession: 'POST /api/chat/session (contacts_upsert-contact)',
+      chatThread: 'POST /api/chat/thread (conversations_search-conversation)',
+      chatSend: 'POST /api/chat/send (conversations_send-a-new-message)',
       botProcess: 'POST /api/bot/process (deprecated - returns success for compatibility)'
     },
     mcp: {
       server: 'https://services.leadconnectorhq.com/mcp/',
-      protocol: 'JSON-RPC 2.0',
-      format: {
-        jsonrpc: '2.0',
-        id: 'unique_request_id',
-        method: 'tool_name',
-        params: 'tool_parameters'
+      format: 'Documentation Format',
+      request: {
+        tool: 'tool_name',
+        input: 'tool_parameters'
       },
+      response: 'Server-Sent Events or JSON',
       tools_used: [
         'locations_get-location',
         'contacts_upsert-contact', 
