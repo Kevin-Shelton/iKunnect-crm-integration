@@ -47,40 +47,6 @@ async function callGHLAPI(endpoint, method = 'GET', data = null) {
   return responseData;
 }
 
-// Helper function to get assigned agent name
-async function getAssignedAgentName(conversationId) {
-  try {
-    // Get conversation details to find assignedTo
-    const conversationData = await callGHLAPI(`conversations/${conversationId}`);
-    const assignedTo = conversationData.conversation?.assignedTo;
-    
-    if (!assignedTo) {
-      return null; // No agent assigned
-    }
-    
-    // Get user details to get the agent's name
-    const userData = await callGHLAPI(`users/${assignedTo}`);
-    const agentName = userData.name || userData.firstName || 'Agent';
-    
-    return agentName;
-  } catch (error) {
-    console.log('[Agent Name] Could not fetch assigned agent:', error.message);
-    return null;
-  }
-}
-
-// Helper function to get conversation provider ID
-async function getConversationProviderId(conversationId) {
-  try {
-    // For now, we'll use a default provider ID
-    // In a real implementation, you'd fetch this from the conversation details
-    return process.env.CRM_CONVERSATION_PROVIDER_ID || 'default_provider_id';
-  } catch (error) {
-    console.log('[Provider ID] Could not fetch provider ID:', error.message);
-    return 'default_provider_id';
-  }
-}
-
 // Health check with GHL REST API
 app.get('/api/health', async (req, res) => {
   try {
@@ -247,7 +213,7 @@ app.post('/api/chat/thread', async (req, res) => {
   }
 });
 
-// CUSTOMER MESSAGE - Use inbound endpoint
+// CUSTOMER MESSAGE - Send to GoHighLevel and let Conversation AI handle it
 app.post('/api/chat/send', async (req, res) => {
   try {
     const { conversationId, body, contactId } = req.body;
@@ -266,27 +232,24 @@ app.post('/api/chat/send', async (req, res) => {
       });
     }
 
-    // Get conversation provider ID
-    const conversationProviderId = await getConversationProviderId(conversationId);
-
-    // Customer message - Use INBOUND endpoint
+    // Send customer message to GoHighLevel using regular endpoint
+    // GoHighLevel's Conversation AI will automatically detect this as an inbound message
+    // and respond if the AI bot is enabled and set to Auto-Pilot mode
     const messageData = {
       type: 'Live_Chat',
       message: body,
-      conversationId: conversationId,
-      conversationProviderId: conversationProviderId,
-      direction: 'inbound',  // Explicitly set as inbound
-      date: new Date().toISOString()
+      contactId: contactId,
+      conversationId: conversationId
     };
 
-    // Use the INBOUND message endpoint for customer messages
-    const messageResponse = await callGHLAPI('conversations/messages/inbound', 'POST', messageData);
+    const messageResponse = await callGHLAPI('conversations/messages', 'POST', messageData);
     
-    // Better handling of message response structure
     const messageId = messageResponse.messageId || 
                      messageResponse.message?.id || 
                      messageResponse.id || 
                      'message_created';
+    
+    console.log('[Customer Message] Sent to GoHighLevel - Conversation AI will handle response');
     
     res.json({
       success: true,
@@ -297,8 +260,8 @@ app.post('/api/chat/send', async (req, res) => {
         body: body,
         timestamp: new Date().toISOString(),
         status: 'delivered',
-        direction: 'inbound',  // Customer message
-        fullResponse: messageResponse // Debug info
+        note: 'Message sent to GoHighLevel. Conversation AI will respond automatically if enabled.',
+        fullResponse: messageResponse
       }
     });
     
@@ -312,163 +275,12 @@ app.post('/api/chat/send', async (req, res) => {
   }
 });
 
-// Enhanced bot process endpoint - BOT RESPONSES (outbound)
-app.post('/api/bot/process', async (req, res) => {
-  try {
-    const { message, contactId, conversationId } = req.body;
-    
-    if (!message) {
-      return res.status(400).json({
-        success: false,
-        error: 'Message is required'
-      });
-    }
-
-    // Get contact info for personalized responses
-    let contactInfo = null;
-    if (contactId) {
-      try {
-        const contactData = await callGHLAPI(`contacts/${contactId}`);
-        contactInfo = contactData.contact;
-      } catch (error) {
-        console.log('[Bot] Could not fetch contact info:', error.message);
-      }
-    }
-
-    // Get assigned agent name from conversation
-    let agentName = 'your assistant';
-    if (conversationId) {
-      const assignedAgentName = await getAssignedAgentName(conversationId);
-      if (assignedAgentName) {
-        agentName = assignedAgentName;
-      }
-    }
-
-    // Intelligent bot logic with real agent name
-    let response = '';
-    let action = '';
-    let confidence = 0.8;
-
-    const lowerMessage = message.toLowerCase();
-    const firstName = contactInfo?.firstName || 'there';
-    
-    // Greeting responses
-    if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
-      response = `Hello ${firstName}! I'm ${agentName} from iKunnect. I'm here to help you with any questions about our services. What can I assist you with today?`;
-      action = "greeting";
-      confidence = 0.95;
-    }
-    
-    // Name questions - Use real agent name
-    else if (lowerMessage.includes('name') || lowerMessage.includes('who are you')) {
-      response = `Hi ${firstName}! I'm ${agentName}, your assigned agent at iKunnect. I'm here to help you with our contact center platform and services. What would you like to know?`;
-      action = "introduction";
-      confidence = 0.9;
-    }
-    
-    // Company/business questions
-    else if (lowerMessage.includes('company') || lowerMessage.includes('business') || lowerMessage.includes('what do you do') || lowerMessage.includes('services')) {
-      response = `Great question, ${firstName}! I'm ${agentName} and I work for iKunnect, a comprehensive contact center platform (CCaaS). We help businesses manage customer communications through live chat widgets, phone systems, CRM integration, and AI-powered customer service solutions. We're powered by OneMeta technology and specialize in improving customer experience. Would you like to know more about any specific service?`;
-      action = "company_info";
-      confidence = 0.95;
-    }
-    
-    // Help requests
-    else if (lowerMessage.includes('help') || lowerMessage.includes('assist') || lowerMessage.includes('support')) {
-      response = `I'm here to help, ${firstName}! I'm ${agentName}, and I can assist you with information about our contact center solutions, live chat services, CRM integrations, or answer any questions about iKunnect. What specific area would you like to know more about?`;
-      action = "help_request";
-      confidence = 0.9;
-    }
-    
-    // Legal/lawyer questions (legacy from previous setup)
-    else if (lowerMessage.includes('lawyer') || lowerMessage.includes('legal')) {
-      response = `I think there might be some confusion, ${firstName}. I'm ${agentName} from iKunnect, which is actually a contact center and customer communication platform, not a legal service. We help businesses manage their customer interactions through live chat, phone systems, and CRM integration. Is there something about our communication services I can help you with?`;
-      action = "clarification";
-      confidence = 0.85;
-    }
-    
-    // Pricing questions
-    else if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('pricing')) {
-      response = `Thanks for your interest in our pricing, ${firstName}! I'm ${agentName}, and I'd love to help you understand our iKunnect platform pricing. We offer flexible pricing based on your business needs. I can connect you with our sales team who can provide detailed pricing information tailored to your requirements. Would you like me to arrange a consultation?`;
-      action = "pricing_inquiry";
-      confidence = 0.9;
-    }
-    
-    // Demo/consultation requests
-    else if (lowerMessage.includes('demo') || lowerMessage.includes('consultation') || lowerMessage.includes('meeting') || lowerMessage.includes('call')) {
-      response = `Excellent, ${firstName}! I'm ${agentName}, and I'd be happy to arrange a demo or consultation for you. Our team can show you exactly how iKunnect can improve your customer communication workflows. I've noted your interest and someone from our team will reach out to schedule a convenient time. Is there a preferred time of day that works best for you?`;
-      action = "demo_request";
-      confidence = 0.95;
-    }
-    
-    // Features questions
-    else if (lowerMessage.includes('feature') || lowerMessage.includes('capability') || lowerMessage.includes('can you') || lowerMessage.includes('able to')) {
-      response = `Great question, ${firstName}! I'm ${agentName}, and I'm excited to tell you about iKunnect's powerful features: live chat widgets (like this one!), omnichannel communication, CRM integration, AI-powered responses, call center management, and real-time analytics. We're also powered by OneMeta's advanced AI technology. Which specific feature interests you most?`;
-      action = "features_inquiry";
-      confidence = 0.9;
-    }
-    
-    // Integration questions
-    else if (lowerMessage.includes('integrate') || lowerMessage.includes('crm') || lowerMessage.includes('api')) {
-      response = `Absolutely, ${firstName}! I'm ${agentName}, and integration is one of our strengths at iKunnect. We integrate seamlessly with popular CRMs like GoHighLevel, Salesforce, HubSpot, and many others. We also offer robust APIs for custom integrations. This chat conversation, for example, is being automatically saved to our CRM system. Would you like to know more about specific integrations?`;
-      action = "integration_inquiry";
-      confidence = 0.95;
-    }
-    
-    // Default intelligent response
-    else {
-      response = `Thanks for your message, ${firstName}! I'm ${agentName} from iKunnect, and I want to make sure I give you the most helpful response. Could you tell me a bit more about what you're looking for? Are you interested in our contact center platform, live chat solutions, CRM integrations, or something else? I'm here to help!`;
-      action = "clarification_request";
-      confidence = 0.7;
-    }
-
-    // Send bot response back to GoHighLevel using OUTBOUND endpoint
-    if (conversationId && contactId) {
-      try {
-        // Bot response - Use OUTBOUND endpoint (regular messages endpoint)
-        const botMessageData = {
-          type: 'Live_Chat',
-          message: response,
-          contactId: contactId,
-          conversationId: conversationId
-        };
-        
-        // Use the regular messages endpoint for outbound (agent/bot) messages
-        await callGHLAPI('conversations/messages', 'POST', botMessageData);
-      } catch (error) {
-        console.log('[Bot] Could not send response to GoHighLevel:', error.message);
-      }
-    }
-
-    res.json({
-      success: true,
-      data: {
-        response: response,
-        action: action,
-        confidence: confidence,
-        timestamp: new Date().toISOString(),
-        agentName: agentName,
-        contactInfo: contactInfo ? {
-          name: contactInfo.name,
-          firstName: contactInfo.firstName
-        } : null
-      }
-    });
-    
-  } catch (error) {
-    console.error('[Bot Process Error]:', error);
-    res.json({
-      success: true,
-      data: {
-        response: "I'm experiencing some technical difficulties, but your message has been received. Let me try to help you anyway - what can I assist you with today?",
-        action: "error_fallback",
-        confidence: 0.5,
-        timestamp: new Date().toISOString(),
-        error: error.message
-      }
-    });
-  }
-});
+// REMOVED: Bot process endpoint - GoHighLevel's Conversation AI handles this automatically
+// The /api/bot/process endpoint has been removed because:
+// 1. GoHighLevel's Conversation AI automatically responds to inbound messages
+// 2. We don't need to create our own bot logic
+// 3. The CRM's AI agent is more intelligent and properly trained
+// 4. Responses come directly from the assigned agent's AI configuration
 
 // Test endpoint to verify GoHighLevel connection
 app.get('/api/ghl-test', async (req, res) => {
@@ -513,17 +325,22 @@ app.get('/api/hello', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'iKunnect GoHighLevel Integration API',
-    version: '13.0.0',
-    description: 'Fixed conversation direction using correct GoHighLevel endpoints - inbound for customers, outbound for agents',
+    version: '15.0.0',
+    description: 'Proper integration with GoHighLevel Conversation AI - no hardcoded responses',
     status: 'operational',
     timestamp: new Date().toISOString(),
+    note: 'This API sends messages to GoHighLevel and lets the CRM\'s Conversation AI handle responses automatically',
     endpoints: {
       health: 'GET /api/health',
       ghlTest: 'GET /api/ghl-test',
       chatSession: 'POST /api/chat/session',
       chatThread: 'POST /api/chat/thread',
-      chatSend: 'POST /api/chat/send (uses inbound endpoint)',
-      botProcess: 'POST /api/bot/process (uses outbound endpoint)'
+      chatSend: 'POST /api/chat/send (GoHighLevel AI responds automatically)'
+    },
+    requirements: {
+      ghl_setup: 'Conversation AI must be enabled and configured in GoHighLevel',
+      ai_mode: 'Set Conversation AI to Auto-Pilot mode for automatic responses',
+      channels: 'Live_Chat channel must be enabled for the Conversation AI bot'
     }
   });
 });
