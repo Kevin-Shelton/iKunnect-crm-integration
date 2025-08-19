@@ -5,33 +5,32 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Helper function to make GoHighLevel REST API calls
-async function callGHLAPI(endpoint, method = 'GET', data = null) {
+// Helper function to make GoHighLevel MCP Server calls
+async function callGHLMCP(tool, input) {
   const fetch = require('node-fetch');
   
-  const baseUrl = 'https://services.leadconnectorhq.com/';
-  const url = `${baseUrl}${endpoint}`;
+  const url = 'https://services.leadconnectorhq.com/mcp/';
   
   const options = {
-    method: method,
+    method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.CRM_PIT}`,
+      'locationId': process.env.CRM_LOCATION_ID,
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Version': '2021-04-15'
-    }
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify({
+      tool: tool,
+      input: input
+    })
   };
   
-  if (data && method !== 'GET') {
-    options.body = JSON.stringify(data);
-  }
-  
-  console.log(`[GHL API] ${method} ${url}`, data ? JSON.stringify(data, null, 2) : '');
+  console.log(`[GHL MCP] Calling tool: ${tool}`, JSON.stringify(input, null, 2));
   
   const response = await fetch(url, options);
   const responseText = await response.text();
   
-  console.log(`[GHL API Response] ${response.status}:`, responseText.substring(0, 500));
+  console.log(`[GHL MCP Response] ${response.status}:`, responseText.substring(0, 500));
   
   let responseData;
   try {
@@ -41,42 +40,34 @@ async function callGHLAPI(endpoint, method = 'GET', data = null) {
   }
   
   if (!response.ok) {
-    // Special handling for duplicate contact error
-    if (response.status === 400 && responseData.message && responseData.message.includes('duplicated contacts')) {
-      // Return the error with contact ID so we can use the existing contact
-      const duplicateError = new Error(`Duplicate contact: ${responseData.message}`);
-      duplicateError.isDuplicate = true;
-      duplicateError.existingContactId = responseData.meta?.contactId;
-      duplicateError.matchingField = responseData.meta?.matchingField;
-      throw duplicateError;
-    }
-    
-    throw new Error(`GHL API Error: ${response.status} - ${JSON.stringify(responseData)}`);
+    throw new Error(`GHL MCP Error: ${response.status} - ${JSON.stringify(responseData)}`);
   }
   
   return responseData;
 }
 
-// Health check with GHL REST API
+// Health check with GHL MCP Server
 app.get('/api/health', async (req, res) => {
   try {
-    const locationData = await callGHLAPI(`locations/${process.env.CRM_LOCATION_ID}`);
+    const locationData = await callGHLMCP('locations_get-location', {
+      locationId: process.env.CRM_LOCATION_ID
+    });
     
     res.json({
       success: true,
-      message: 'API is healthy and GoHighLevel is connected',
+      message: 'API is healthy and GoHighLevel MCP is connected',
       timestamp: new Date().toISOString(),
       ghl: {
         connected: true,
-        locationName: locationData.location?.name || 'Unknown',
+        locationName: locationData.name || 'Unknown',
         locationId: process.env.CRM_LOCATION_ID,
-        companyId: locationData.location?.companyId
+        mcpServer: 'https://services.leadconnectorhq.com/mcp/'
       }
     });
   } catch (error) {
     res.json({
       success: false,
-      message: 'API is running but GoHighLevel connection failed',
+      message: 'API is running but GoHighLevel MCP connection failed',
       timestamp: new Date().toISOString(),
       error: error.message,
       ghl: {
@@ -88,7 +79,7 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Real GoHighLevel chat session endpoint with duplicate contact handling
+// Create or find contact using MCP Server
 app.post('/api/chat/session', async (req, res) => {
   try {
     const { name, email, phone } = req.body;
@@ -100,73 +91,31 @@ app.post('/api/chat/session', async (req, res) => {
       });
     }
 
-    // Try to find existing contact by email first
+    const nameParts = name.trim().split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    
     let contact = null;
     let isNewContact = false;
     
     try {
-      const searchData = await callGHLAPI(`contacts/search/duplicate?locationId=${process.env.CRM_LOCATION_ID}&email=${encodeURIComponent(email)}`);
-      contact = searchData.contact;
-      console.log('[GHL] Found existing contact by email:', contact?.id);
-    } catch (searchError) {
-      console.log('[GHL] Contact search by email failed, will try to create new:', searchError.message);
-    }
-    
-    // If no existing contact found, try to create new one
-    if (!contact) {
-      const nameParts = name.trim().split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-      
-      const contactData = {
+      // Try to upsert contact (create or update if exists)
+      const contactData = await callGHLMCP('contacts_upsert-contact', {
         firstName: firstName,
         lastName: lastName,
         email: email,
         phone: phone || '',
-        locationId: process.env.CRM_LOCATION_ID,
         source: 'iKunnect Live Chat Widget',
         tags: ['Live Chat', 'Web Visitor', 'iKunnect Integration']
-      };
-
-      try {
-        const createData = await callGHLAPI('contacts/', 'POST', contactData);
-        contact = createData.contact;
-        isNewContact = true;
-        console.log('[GHL] Created new contact:', contact?.id);
-      } catch (createError) {
-        // Handle duplicate contact error
-        if (createError.isDuplicate && createError.existingContactId) {
-          console.log('[GHL] Duplicate contact detected, using existing contact:', createError.existingContactId);
-          
-          // Get the existing contact details
-          try {
-            const existingContactData = await callGHLAPI(`contacts/${createError.existingContactId}`);
-            contact = existingContactData.contact;
-            isNewContact = false;
-            
-            // Update the existing contact with new information if needed
-            const updateData = {
-              firstName: firstName,
-              lastName: lastName,
-              email: email,
-              source: 'iKunnect Live Chat Widget - Updated',
-              tags: ['Live Chat', 'Web Visitor', 'iKunnect Integration', 'Returning Visitor']
-            };
-            
-            try {
-              await callGHLAPI(`contacts/${contact.id}`, 'PUT', updateData);
-              console.log('[GHL] Updated existing contact with new info');
-            } catch (updateError) {
-              console.log('[GHL] Could not update existing contact:', updateError.message);
-            }
-            
-          } catch (fetchError) {
-            throw new Error(`Could not fetch existing contact: ${fetchError.message}`);
-          }
-        } else {
-          throw createError;
-        }
-      }
+      });
+      
+      contact = contactData.contact;
+      isNewContact = contactData.isNew || false;
+      console.log('[GHL MCP] Contact upserted:', contact?.id);
+      
+    } catch (error) {
+      console.error('[GHL MCP] Contact upsert failed:', error.message);
+      throw error;
     }
     
     if (!contact || !contact.id) {
@@ -190,16 +139,16 @@ app.post('/api/chat/session', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[GHL Session Error]:', error);
+    console.error('[GHL MCP Session Error]:', error);
     res.status(500).json({
       success: false,
-      error: `GoHighLevel integration failed: ${error.message}`,
-      details: 'Check your GoHighLevel credentials and try again'
+      error: `GoHighLevel MCP integration failed: ${error.message}`,
+      details: 'Check your GoHighLevel MCP credentials and try again'
     });
   }
 });
 
-// Real GoHighLevel conversation thread endpoint - FIXED FOR LIVE CHAT
+// Find or create conversation using MCP Server
 app.post('/api/chat/thread', async (req, res) => {
   try {
     const { contactId } = req.body;
@@ -211,15 +160,19 @@ app.post('/api/chat/thread', async (req, res) => {
       });
     }
 
-    // Check for existing Live Chat conversations
     let conversation = null;
     let isNewConversation = false;
     
     try {
-      const conversationsData = await callGHLAPI(`conversations/search?contactId=${contactId}&locationId=${process.env.CRM_LOCATION_ID}`);
-      const conversations = conversationsData.conversations || [];
+      // Search for existing conversations for this contact
+      const searchData = await callGHLMCP('conversations_search-conversation', {
+        contactId: contactId,
+        locationId: process.env.CRM_LOCATION_ID
+      });
       
-      // Look for existing Live Chat conversation specifically
+      const conversations = searchData.conversations || [];
+      
+      // Look for existing Live Chat conversation
       const liveChatConversation = conversations.find(conv => 
         conv.type === 'Live_Chat' || 
         conv.type === 'LiveChat' || 
@@ -228,26 +181,28 @@ app.post('/api/chat/thread', async (req, res) => {
       
       if (liveChatConversation) {
         conversation = liveChatConversation;
-        console.log('[GHL] Found existing Live Chat conversation:', conversation.id);
+        console.log('[GHL MCP] Found existing Live Chat conversation:', conversation.id);
+      } else if (conversations.length > 0) {
+        // Use the first conversation if no Live Chat specific one found
+        conversation = conversations[0];
+        console.log('[GHL MCP] Using existing conversation:', conversation.id);
       }
+      
     } catch (searchError) {
-      console.log('[GHL] Conversation search failed, will create new:', searchError.message);
+      console.log('[GHL MCP] Conversation search failed:', searchError.message);
     }
     
-    // If no existing Live Chat conversation, create new one
+    // If no conversation found, we'll create one when sending the first message
+    // The MCP server doesn't have a direct conversation creation tool
     if (!conversation) {
-      // NOTE: The conversation creation API doesn't have a 'type' parameter
-      // The conversation type is determined by the first message sent to it
-      // We'll create a basic conversation and the first message will set it as Live Chat
-      const conversationData = {
-        locationId: process.env.CRM_LOCATION_ID,
-        contactId: contactId
+      // We'll use a placeholder conversation ID and create it with the first message
+      conversation = {
+        id: `pending_${contactId}_${Date.now()}`,
+        type: 'Live_Chat',
+        status: 'pending'
       };
-
-      const createData = await callGHLAPI('conversations/', 'POST', conversationData);
-      conversation = createData.conversation;
       isNewConversation = true;
-      console.log('[GHL] Created new conversation (will become Live Chat):', conversation.id);
+      console.log('[GHL MCP] Will create conversation with first message');
     }
     
     res.json({
@@ -266,107 +221,108 @@ app.post('/api/chat/thread', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[GHL Thread Error]:', error);
+    console.error('[GHL MCP Thread Error]:', error);
     res.status(500).json({
       success: false,
-      error: `GoHighLevel conversation creation failed: ${error.message}`,
-      details: 'Check your GoHighLevel credentials and contact ID'
+      error: `GoHighLevel MCP conversation search failed: ${error.message}`,
+      details: 'Check your GoHighLevel MCP credentials and contact ID'
     });
   }
 });
 
-// CUSTOMER MESSAGE - Use WebChat type to ensure Live Chat display
+// Send message using MCP Server - this should create Live Chat properly
 app.post('/api/chat/send', async (req, res) => {
   try {
     const { conversationId, body, contactId } = req.body;
     
-    if (!conversationId || !body) {
+    if (!body || !contactId) {
       return res.status(400).json({
         success: false,
-        error: 'Conversation ID and message body are required'
+        error: 'Message body and contact ID are required'
       });
     }
 
-    if (!contactId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Contact ID is required for message sending'
-      });
-    }
-
-    // Send customer message to GoHighLevel using WebChat type
-    // This should ensure the message appears as Live Chat, not SMS
-    const messageData = {
-      type: 'WebChat',  // Try WebChat instead of Live_Chat
-      message: body,
-      contactId: contactId,
-      conversationId: conversationId
-    };
-
-    console.log('[Customer Message] Sending with WebChat type to ensure Live Chat display');
-    
-    const messageResponse = await callGHLAPI('conversations/messages', 'POST', messageData);
-    
-    const messageId = messageResponse.messageId || 
-                     messageResponse.message?.id || 
-                     messageResponse.id || 
-                     'message_created';
-    
-    console.log('[Customer Message] Sent to GoHighLevel as WebChat - AI will respond automatically');
-    
-    res.json({
-      success: true,
-      data: {
-        messageId: messageId,
-        conversationId: conversationId,
+    try {
+      // Use the MCP Server to send a new message
+      // This should automatically create the conversation as Live Chat if it doesn't exist
+      const messageData = await callGHLMCP('conversations_send-a-new-message', {
         contactId: contactId,
-        body: body,
-        timestamp: new Date().toISOString(),
-        status: 'delivered',
-        messageType: 'WebChat',
-        note: 'Message sent as WebChat type to ensure Live Chat display in GoHighLevel.'
-      }
-    });
+        message: body,
+        type: 'Live_Chat'  // Specify Live Chat type
+      });
+      
+      console.log('[GHL MCP] Message sent successfully:', messageData);
+      
+      const messageId = messageData.messageId || 
+                       messageData.message?.id || 
+                       messageData.id || 
+                       'message_created';
+      
+      const actualConversationId = messageData.conversationId || 
+                                  messageData.conversation?.id || 
+                                  conversationId;
+      
+      res.json({
+        success: true,
+        data: {
+          messageId: messageId,
+          conversationId: actualConversationId,
+          contactId: contactId,
+          body: body,
+          timestamp: new Date().toISOString(),
+          status: 'delivered',
+          messageType: 'Live_Chat',
+          note: 'Message sent via GoHighLevel MCP Server - should appear as Live Chat'
+        }
+      });
+      
+    } catch (mcpError) {
+      console.error('[GHL MCP Send Error]:', mcpError);
+      throw mcpError;
+    }
     
   } catch (error) {
-    console.error('[GHL Send Error]:', error);
+    console.error('[GHL MCP Send Error]:', error);
     res.status(500).json({
       success: false,
-      error: `GoHighLevel message sending failed: ${error.message}`,
+      error: `GoHighLevel MCP message sending failed: ${error.message}`,
       details: 'Check your conversation ID and contact ID'
     });
   }
 });
 
-// Legacy bot endpoint for backward compatibility - returns success but does nothing
+// Legacy bot endpoint for backward compatibility
 app.post('/api/bot/process', (req, res) => {
   res.json({
     success: true,
     data: {
-      response: "This endpoint is deprecated. GoHighLevel Conversation AI handles responses automatically.",
+      response: "This endpoint is deprecated. GoHighLevel Conversation AI handles responses automatically via MCP Server.",
       action: "deprecated",
       confidence: 1.0,
       timestamp: new Date().toISOString(),
-      note: "Please update your frontend to remove calls to this endpoint."
+      note: "Messages are now sent via GoHighLevel MCP Server for proper Live Chat integration."
     }
   });
 });
 
-// Test endpoint to verify GoHighLevel connection
+// Test MCP Server connection
 app.get('/api/ghl-test', async (req, res) => {
   try {
-    const locationData = await callGHLAPI(`locations/${process.env.CRM_LOCATION_ID}`);
+    const locationData = await callGHLMCP('locations_get-location', {
+      locationId: process.env.CRM_LOCATION_ID
+    });
     
     res.json({
       success: true,
-      message: 'GoHighLevel connection successful!',
+      message: 'GoHighLevel MCP Server connection successful!',
       location: {
-        id: locationData.location?.id,
-        name: locationData.location?.name,
-        website: locationData.location?.website,
-        companyId: locationData.location?.companyId
+        id: locationData.id,
+        name: locationData.name,
+        website: locationData.website,
+        companyId: locationData.companyId
       },
-      credentials: {
+      mcp: {
+        endpoint: 'https://services.leadconnectorhq.com/mcp/',
         hasToken: !!process.env.CRM_PIT,
         locationId: process.env.CRM_LOCATION_ID
       }
@@ -375,7 +331,8 @@ app.get('/api/ghl-test', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message,
-      credentials: {
+      mcp: {
+        endpoint: 'https://services.leadconnectorhq.com/mcp/',
         hasToken: !!process.env.CRM_PIT,
         locationId: process.env.CRM_LOCATION_ID
       }
@@ -394,24 +351,34 @@ app.get('/api/hello', (req, res) => {
 
 app.get('/api', (req, res) => {
   res.json({
-    name: 'iKunnect GoHighLevel Integration API',
-    version: '17.0.0',
-    description: 'Fixed to use WebChat message type for proper Live Chat display in GoHighLevel',
+    name: 'iKunnect GoHighLevel MCP Integration API',
+    version: '18.0.0',
+    description: 'Using GoHighLevel MCP Server for proper Live Chat integration',
     status: 'operational',
     timestamp: new Date().toISOString(),
-    note: 'Messages now use WebChat type to appear as Live Chat instead of SMS',
+    note: 'Now using GoHighLevel MCP Server for all operations',
     endpoints: {
-      health: 'GET /api/health',
-      ghlTest: 'GET /api/ghl-test',
-      chatSession: 'POST /api/chat/session (handles duplicate contacts)',
-      chatThread: 'POST /api/chat/thread (creates Live Chat conversations)',
-      chatSend: 'POST /api/chat/send (uses WebChat type for Live Chat display)',
+      health: 'GET /api/health (MCP Server health check)',
+      ghlTest: 'GET /api/ghl-test (MCP Server connection test)',
+      chatSession: 'POST /api/chat/session (MCP contacts_upsert-contact)',
+      chatThread: 'POST /api/chat/thread (MCP conversations_search-conversation)',
+      chatSend: 'POST /api/chat/send (MCP conversations_send-a-new-message)',
       botProcess: 'POST /api/bot/process (deprecated - returns success for compatibility)'
+    },
+    mcp: {
+      server: 'https://services.leadconnectorhq.com/mcp/',
+      tools_used: [
+        'locations_get-location',
+        'contacts_upsert-contact', 
+        'conversations_search-conversation',
+        'conversations_send-a-new-message'
+      ]
     },
     requirements: {
       ghl_setup: 'Chat Widget must be configured with Chat Type set to Live Chat',
       ai_mode: 'Set Conversation AI to Auto-Pilot mode for automatic responses',
-      channels: 'WebChat/Live_Chat channel must be enabled for the Conversation AI bot'
+      channels: 'Live_Chat channel must be enabled for the Conversation AI bot',
+      mcp_scopes: 'PIT must include View/Edit Contacts, Conversations, and Messages scopes'
     }
   });
 });
