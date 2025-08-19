@@ -5,7 +5,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Helper function to make CRM API calls
+// Helper function to make CRM API calls with correct headers
 async function callCRMAPI(endpoint, method = 'GET', data = null) {
   const fetch = require('node-fetch');
   
@@ -17,7 +17,9 @@ async function callCRMAPI(endpoint, method = 'GET', data = null) {
     headers: {
       'Authorization': `Bearer ${process.env.CRM_PIT}`,
       'Content-Type': 'application/json',
-      'Version': '2021-07-28'
+      'Accept': 'application/json, text/event-stream',
+      'Version': '2021-07-28',
+      'User-Agent': 'iKunnect-CRM-Integration/1.0'
     }
   };
   
@@ -42,7 +44,7 @@ async function callCRMAPI(endpoint, method = 'GET', data = null) {
 // Health check with CRM connection test
 app.get('/api/health', async (req, res) => {
   try {
-    // Test CRM connection
+    // Test CRM connection with simple location lookup
     const locationResponse = await callCRMAPI(`locations/${process.env.CRM_LOCATION_ID}`);
     
     res.json({
@@ -71,7 +73,7 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Real CRM chat session endpoint
+// Real CRM chat session endpoint with proper API calls
 app.post('/api/chat/session', async (req, res) => {
   try {
     const { name, email, phone } = req.body;
@@ -83,13 +85,18 @@ app.post('/api/chat/session', async (req, res) => {
       });
     }
 
-    // First, try to find existing contact by email
+    // Try to find existing contact by email using the contacts endpoint
     let contact = null;
     let isNewContact = false;
     
     try {
-      const searchResponse = await callCRMAPI(`contacts/search/duplicate?locationId=${process.env.CRM_LOCATION_ID}&email=${encodeURIComponent(email)}`);
-      contact = searchResponse.contact;
+      // Search for existing contact
+      const searchResponse = await callCRMAPI(`contacts?locationId=${process.env.CRM_LOCATION_ID}&email=${encodeURIComponent(email)}`);
+      const contacts = searchResponse.contacts || [];
+      
+      if (contacts.length > 0) {
+        contact = contacts[0];
+      }
     } catch (searchError) {
       console.log('[CRM] Contact search failed, will create new:', searchError.message);
     }
@@ -154,12 +161,12 @@ app.post('/api/chat/thread', async (req, res) => {
       });
     }
 
-    // Check for existing conversation
+    // Check for existing conversations
     let conversation = null;
     let isNewConversation = false;
     
     try {
-      const conversationsResponse = await callCRMAPI(`conversations/search?contactId=${contactId}&locationId=${process.env.CRM_LOCATION_ID}`);
+      const conversationsResponse = await callCRMAPI(`conversations?contactId=${contactId}&locationId=${process.env.CRM_LOCATION_ID}`);
       const conversations = conversationsResponse.conversations || [];
       
       // Find the most recent conversation
@@ -253,7 +260,7 @@ app.post('/api/chat/send', async (req, res) => {
   }
 });
 
-// Enhanced bot process endpoint with CRM context
+// Enhanced bot process endpoint
 app.post('/api/bot/process', async (req, res) => {
   try {
     const { message, contactId, conversationId } = req.body;
@@ -276,7 +283,7 @@ app.post('/api/bot/process', async (req, res) => {
       }
     }
 
-    // Enhanced bot logic with CRM context
+    // Enhanced bot logic
     let response = `Thank you for your message${contactInfo?.firstName ? `, ${contactInfo.firstName}` : ''}! I'm your AI assistant and I'm connected to the CRM system.`;
     let action = "acknowledged";
     let confidence = 0.8;
@@ -301,7 +308,7 @@ app.post('/api/bot/process', async (req, res) => {
       confidence = 0.95;
     }
 
-    // Send bot response back to CRM as outbound message
+    // Send bot response back to CRM
     if (conversationId) {
       try {
         const botMessageData = {
@@ -392,8 +399,8 @@ app.get('/api/hello', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'iKunnect CRM Integration API',
-    version: '2.0.0',
-    description: 'Full CRM integration with GoHighLevel',
+    version: '2.1.0',
+    description: 'Full CRM integration with GoHighLevel - Fixed Headers',
     status: 'operational',
     timestamp: new Date().toISOString(),
     endpoints: {
