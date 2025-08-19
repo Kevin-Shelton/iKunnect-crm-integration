@@ -235,7 +235,7 @@ app.post('/api/chat/thread', async (req, res) => {
   }
 });
 
-// Fixed message sending endpoint with better error handling
+// Fixed message sending endpoint - CUSTOMER MESSAGES (inbound)
 app.post('/api/chat/send', async (req, res) => {
   try {
     const { conversationId, body, contactId } = req.body;
@@ -254,11 +254,11 @@ app.post('/api/chat/send', async (req, res) => {
       });
     }
 
-    // Create message with Live_Chat type
+    // Customer message - INBOUND direction (from customer TO business)
     const messageData = {
       type: 'Live_Chat',
       message: body,
-      direction: 'inbound',
+      direction: 'inbound',  // Customer messages are INBOUND
       status: 'delivered',
       conversationId: conversationId,
       contactId: contactId,
@@ -282,7 +282,7 @@ app.post('/api/chat/send', async (req, res) => {
         body: body,
         timestamp: new Date().toISOString(),
         status: 'delivered',
-        direction: 'inbound',
+        direction: 'inbound',  // Customer message
         fullResponse: messageResponse // Debug info
       }
     });
@@ -297,7 +297,7 @@ app.post('/api/chat/send', async (req, res) => {
   }
 });
 
-// Enhanced bot process endpoint with real agent name detection
+// Enhanced bot process endpoint - BOT RESPONSES (outbound)
 app.post('/api/bot/process', async (req, res) => {
   try {
     const { message, contactId, conversationId } = req.body;
@@ -407,13 +407,13 @@ app.post('/api/bot/process', async (req, res) => {
       confidence = 0.7;
     }
 
-    // Send bot response back to GoHighLevel
+    // Send bot response back to GoHighLevel - OUTBOUND direction (from business TO customer)
     if (conversationId && contactId) {
       try {
         const botMessageData = {
           type: 'Live_Chat',
           message: response,
-          direction: 'outbound',
+          direction: 'outbound',  // Bot responses are OUTBOUND (from business to customer)
           status: 'delivered',
           conversationId: conversationId,
           contactId: contactId,
@@ -499,8 +499,8 @@ app.get('/api/hello', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'iKunnect GoHighLevel Integration API',
-    version: '11.0.0',
-    description: 'Enhanced GoHighLevel integration with real assigned agent name detection and Live_Chat message type',
+    version: '12.0.0',
+    description: 'Fixed conversation direction - customer messages inbound, bot responses outbound',
     status: 'operational',
     timestamp: new Date().toISOString(),
     endpoints: {
