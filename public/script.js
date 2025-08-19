@@ -6,12 +6,6 @@ let apiBaseUrl = window.location.origin;
 // Initialize the chat interface
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Chat interface loaded');
-    
-    // Auto-detect API URL
-    if (window.location.hostname.includes('vercel.app')) {
-        apiBaseUrl = window.location.origin;
-    }
-    
     console.log('API Base URL:', apiBaseUrl);
 });
 
@@ -75,10 +69,7 @@ async function startChat() {
         
         addMessage('system', `Conversation ${currentThread.isNewConversation ? 'created' : 'found'}: ${currentThread.conversationId}`);
         
-        // Enable chat interface
-        document.getElementById('chatForm').style.display = 'block';
-        document.getElementById('setupForm').style.display = 'none';
-        
+        // Show success message
         addMessage('bot', `Hello ${currentSession.contact.firstName || currentSession.contact.name}! I'm ready to help you. Your information has been saved to our CRM system.`);
         
     } catch (error) {
@@ -169,6 +160,11 @@ async function sendMessage(messageText = null) {
 // Add message to chat display
 function addMessage(type, content) {
     const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) {
+        console.error('chatMessages element not found');
+        return;
+    }
+    
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}`;
     
