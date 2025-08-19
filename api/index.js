@@ -1,4 +1,4 @@
-// GoHighLevel MCP Integration API for Vercel with Environment Variable Debugging
+// GoHighLevel MCP Integration API - Duplicate Contact Safe Version
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -14,36 +14,16 @@ export default async function handler(req, res) {
   const { method, url } = req;
   const path = url.split('?')[0];
 
-  // Debug environment variables
-  const envDebug = {
-    CRM_PIT: process.env.CRM_PIT ? `${process.env.CRM_PIT.substring(0, 10)}...` : 'NOT SET',
-    CRM_LOCATION_ID: process.env.CRM_LOCATION_ID || 'NOT SET',
-    CRM_MCP_URL: process.env.CRM_MCP_URL || 'NOT SET',
-    NODE_ENV: process.env.NODE_ENV || 'NOT SET'
-  };
-
-  console.log('[ENV DEBUG] Environment variables:', envDebug);
-
-  // Helper function to make GoHighLevel MCP Server calls using environment variables
+  // Helper function to make GoHighLevel MCP Server calls
   async function callGHLMCP(toolName, arguments_) {
     const fetch = (await import('node-fetch')).default;
     
-    // Use CRM_MCP_URL from environment or fallback to default
     const mcpUrl = process.env.CRM_MCP_URL || 'https://services.leadconnectorhq.com/mcp/';
     const pit = process.env.CRM_PIT;
     const locationId = process.env.CRM_LOCATION_ID;
     
-    console.log('[ENV DEBUG] Using values:');
-    console.log(`[ENV DEBUG] MCP URL: ${mcpUrl}`);
-    console.log(`[ENV DEBUG] PIT: ${pit ? `${pit.substring(0, 10)}...` : 'MISSING'}`);
-    console.log(`[ENV DEBUG] Location ID: ${locationId || 'MISSING'}`);
-    
-    if (!pit) {
-      throw new Error('CRM_PIT environment variable is not set');
-    }
-    
-    if (!locationId) {
-      throw new Error('CRM_LOCATION_ID environment variable is not set');
+    if (!pit || !locationId) {
+      throw new Error('Missing required environment variables: CRM_PIT or CRM_LOCATION_ID');
     }
     
     const requestId = Date.now().toString();
@@ -70,18 +50,12 @@ export default async function handler(req, res) {
     };
     
     console.log(`[GHL MCP] Calling tool: ${toolName}`);
-    console.log(`[GHL MCP] Request headers:`, {
-      'Authorization': `Bearer ${pit.substring(0, 10)}...`,
-      'locationId': locationId,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream'
-    });
     
     const response = await fetch(mcpUrl, options);
     const responseText = await response.text();
     
     console.log(`[GHL MCP] Response status: ${response.status}`);
-    console.log(`[GHL MCP] Response: ${responseText.substring(0, 500)}...`);
+    console.log(`[GHL MCP] Response: ${responseText.substring(0, 300)}...`);
     
     // Handle Server-Sent Events format
     if (responseText.startsWith('event: message\ndata: ')) {
@@ -90,13 +64,11 @@ export default async function handler(req, res) {
         const responseData = JSON.parse(jsonPart);
         
         if (responseData.error) {
-          console.log(`[GHL MCP] MCP Error:`, responseData.error);
           throw new Error(`MCP Error: ${responseData.error.code} - ${responseData.error.message}`);
         }
         
         return responseData.result;
       } catch (parseError) {
-        console.log(`[GHL MCP] Parse Error:`, parseError.message);
         throw new Error(`Failed to parse SSE response: ${parseError.message}`);
       }
     }
@@ -106,21 +78,139 @@ export default async function handler(req, res) {
     try {
       responseData = JSON.parse(responseText);
     } catch (parseError) {
-      console.log(`[GHL MCP] JSON Parse Error:`, parseError.message);
       throw new Error(`Invalid response format: ${responseText.substring(0, 200)}...`);
     }
     
     if (!response.ok) {
-      console.log(`[GHL MCP] HTTP Error:`, responseData);
       throw new Error(`GHL MCP Error: ${response.status} - ${JSON.stringify(responseData)}`);
     }
     
     if (responseData.error) {
-      console.log(`[GHL MCP] Response Error:`, responseData.error);
       throw new Error(`MCP Error: ${responseData.error.code} - ${responseData.error.message}`);
     }
     
     return responseData.result;
+  }
+
+  // Helper function to extract contact data from MCP response
+  function extractContactFromMCPResponse(mcpResult) {
+    if (!mcpResult) return null;
+    
+    // Handle nested content structure
+    if (mcpResult.content && mcpResult.content[0]) {
+      const content = mcpResult.content[0];
+      if (content.type === 'text') {
+        try {
+          const parsed = JSON.parse(content.text);
+          
+          // Handle double-nested structure
+          if (parsed.content && parsed.content[0] && parsed.content[0].text) {
+            const innerParsed = JSON.parse(parsed.content[0].text);
+            
+            if (innerParsed.success === false) {
+              throw new Error(innerParsed.data?.message || innerParsed.message || 'Operation failed');
+            }
+            
+            return innerParsed.data?.contact || innerParsed.contact || innerParsed.data;
+          }
+          
+          if (parsed.success === false) {
+            throw new Error(parsed.data?.message || parsed.message || 'Operation failed');
+          }
+          
+          return parsed.data?.contact || parsed.contact || parsed.data || parsed;
+        } catch (parseError) {
+          console.log('[GHL MCP] Parse error:', parseError.message);
+          return null;
+        }
+      }
+    }
+    
+    // Handle direct contact structure
+    return mcpResult.contact || mcpResult.data || mcpResult;
+  }
+
+  // Helper function to find existing contact by email
+  async function findExistingContact(email, phone) {
+    try {
+      console.log(`[CONTACT SEARCH] Looking for existing contact: ${email}`);
+      
+      const searchResult = await callGHLMCP('contacts_get-contacts', {
+        locationId: process.env.CRM_LOCATION_ID,
+        query: email,
+        limit: 10
+      });
+      
+      console.log('[CONTACT SEARCH] Search result:', JSON.stringify(searchResult, null, 2));
+      
+      // Extract contacts from MCP response
+      let contacts = [];
+      if (searchResult.content && searchResult.content[0]) {
+        const content = searchResult.content[0];
+        if (content.type === 'text') {
+          try {
+            const parsed = JSON.parse(content.text);
+            if (parsed.content && parsed.content[0] && parsed.content[0].text) {
+              const innerParsed = JSON.parse(parsed.content[0].text);
+              contacts = innerParsed.data?.contacts || innerParsed.contacts || [];
+            } else {
+              contacts = parsed.data?.contacts || parsed.contacts || [];
+            }
+          } catch {
+            contacts = [];
+          }
+        }
+      } else {
+        contacts = searchResult.contacts || searchResult.data?.contacts || [];
+      }
+      
+      // Find exact match by email or phone
+      const exactMatch = contacts.find(contact => 
+        contact.email === email || 
+        (phone && contact.phone === phone)
+      );
+      
+      if (exactMatch) {
+        console.log(`[CONTACT SEARCH] Found existing contact: ${exactMatch.id}`);
+        return exactMatch;
+      }
+      
+      console.log('[CONTACT SEARCH] No existing contact found');
+      return null;
+      
+    } catch (error) {
+      console.log('[CONTACT SEARCH] Search failed:', error.message);
+      return null;
+    }
+  }
+
+  // Helper function to create new contact
+  async function createNewContact(firstName, lastName, email, phone) {
+    try {
+      console.log(`[CONTACT CREATE] Creating new contact: ${firstName} ${lastName}`);
+      
+      const createResult = await callGHLMCP('contacts_create-contact', {
+        firstName: firstName,
+        lastName: lastName,
+        email: email,
+        phone: phone || '',
+        source: 'iKunnect Live Chat Widget',
+        tags: ['Live Chat', 'Web Visitor', 'iKunnect Integration']
+      });
+      
+      const contact = extractContactFromMCPResponse(createResult);
+      
+      if (contact && contact.id) {
+        console.log(`[CONTACT CREATE] Successfully created contact: ${contact.id}`);
+        return contact;
+      }
+      
+      throw new Error('Failed to create contact - no ID returned');
+      
+    } catch (error) {
+      console.log('[CONTACT CREATE] Creation failed:', error.message);
+      throw error;
+    }
   }
 
   try {
@@ -128,18 +218,16 @@ export default async function handler(req, res) {
     if (method === 'GET' && path === '/api') {
       return res.json({
         name: 'iKunnect GoHighLevel MCP Integration API',
-        version: '27.0.0 - ENV DEBUG',
-        description: 'GoHighLevel MCP Server integration with environment variable debugging',
+        version: '28.0.0 - DUPLICATE SAFE',
+        description: 'GoHighLevel MCP Server integration with duplicate contact handling',
         status: 'operational',
         timestamp: new Date().toISOString(),
-        environment: envDebug,
-        endpoints: {
-          health: 'GET /api/health',
-          chatSession: 'POST /api/chat/session',
-          chatThread: 'POST /api/chat/thread', 
-          chatSend: 'POST /api/chat/send',
-          ghlTest: 'GET /api/ghl-test'
-        }
+        features: [
+          'Duplicate contact detection',
+          'Smart contact search and creation',
+          'Live Chat message integration',
+          'GoHighLevel Conversation AI compatibility'
+        ]
       });
     }
 
@@ -147,8 +235,7 @@ export default async function handler(req, res) {
       return res.json({ 
         message: 'Hello World!', 
         timestamp: new Date().toISOString(),
-        status: 'working',
-        environment: envDebug
+        status: 'working'
       });
     }
 
@@ -162,7 +249,6 @@ export default async function handler(req, res) {
           success: true,
           message: 'GoHighLevel MCP Server connected successfully',
           timestamp: new Date().toISOString(),
-          environment: envDebug,
           ghl: {
             connected: true,
             locationId: process.env.CRM_LOCATION_ID,
@@ -174,44 +260,13 @@ export default async function handler(req, res) {
           success: false,
           message: 'MCP Server connection failed',
           timestamp: new Date().toISOString(),
-          error: error.message,
-          environment: envDebug,
-          ghl: {
-            connected: false,
-            hasToken: !!process.env.CRM_PIT,
-            locationId: process.env.CRM_LOCATION_ID
-          }
-        });
-      }
-    }
-
-    if (method === 'GET' && path === '/api/ghl-test') {
-      try {
-        const locationData = await callGHLMCP('locations_get-location', {
-          locationId: process.env.CRM_LOCATION_ID
-        });
-        
-        return res.json({
-          success: true,
-          message: 'GoHighLevel MCP Server test successful',
-          result: locationData,
-          timestamp: new Date().toISOString(),
-          environment: envDebug
-        });
-      } catch (error) {
-        return res.status(500).json({
-          success: false,
-          error: error.message,
-          timestamp: new Date().toISOString(),
-          environment: envDebug
+          error: error.message
         });
       }
     }
 
     if (method === 'POST' && path === '/api/chat/session') {
       const { name, email, phone } = req.body;
-      
-      console.log(`[SESSION] Creating session for: ${name} (${email})`);
       
       if (!name || !email) {
         return res.status(400).json({
@@ -225,80 +280,32 @@ export default async function handler(req, res) {
       const lastName = nameParts.slice(1).join(' ') || '';
       
       try {
-        const contactData = await callGHLMCP('contacts_upsert-contact', {
-          firstName: firstName,
-          lastName: lastName,
-          email: email,
-          phone: phone || '',
-          source: 'iKunnect Live Chat Widget',
-          tags: ['Live Chat', 'Web Visitor', 'iKunnect Integration']
-        });
+        console.log(`[SESSION] Starting session for: ${firstName} ${lastName} (${email})`);
         
-        console.log('[GHL MCP] Contact upsert result:', JSON.stringify(contactData, null, 2));
+        // Step 1: Try to find existing contact
+        let contact = await findExistingContact(email, phone);
+        let isNewContact = false;
         
-        // Handle MCP result format
-        let contact = null;
-        if (contactData.content && contactData.content[0]) {
-          const content = contactData.content[0];
-          if (content.type === 'text') {
-            try {
-              const parsed = JSON.parse(content.text);
-              // Handle nested content structure
-              if (parsed.content && parsed.content[0] && parsed.content[0].text) {
-                const innerParsed = JSON.parse(parsed.content[0].text);
-                console.log('[GHL MCP] Inner parsed result:', innerParsed);
-                if (innerParsed.success === false) {
-                  return res.status(500).json({
-                    success: false,
-                    error: `Contact creation failed: ${innerParsed.data?.message || innerParsed.message || 'Unknown error'}`,
-                    ghlError: innerParsed,
-                    environment: envDebug
-                  });
-                }
-                contact = innerParsed.contact || innerParsed.data;
-              } else {
-                contact = parsed.contact || parsed.data || parsed;
-              }
-            } catch (parseError) {
-              console.log('[GHL MCP] Parse error, using fallback contact');
-              contact = { 
-                id: `contact_${Date.now()}`, 
-                firstName: firstName,
-                lastName: lastName,
-                email: email,
-                phone: phone
-              };
-            }
-          }
-        } else if (contactData.contact) {
-          contact = contactData.contact;
-        } else if (contactData.id) {
-          contact = contactData;
-        } else {
-          contact = { 
-            id: `contact_${Date.now()}`, 
-            firstName: firstName,
-            lastName: lastName,
-            email: email,
-            phone: phone
-          };
+        // Step 2: If no existing contact, create new one
+        if (!contact) {
+          contact = await createNewContact(firstName, lastName, email, phone);
+          isNewContact = true;
         }
         
         if (!contact || !contact.id) {
           return res.status(500).json({
             success: false,
-            error: 'Failed to create or find contact - no valid ID returned',
-            environment: envDebug
+            error: 'Failed to create or find contact - no valid ID returned'
           });
         }
         
-        console.log('[GHL MCP] Final contact:', contact);
+        console.log(`[SESSION] Using contact: ${contact.id} (${isNewContact ? 'new' : 'existing'})`);
         
         return res.json({
           success: true,
           data: {
             contactId: contact.id,
-            isNewContact: true,
+            isNewContact: isNewContact,
             contact: {
               id: contact.id,
               name: `${contact.firstName || firstName} ${contact.lastName || lastName}`.trim(),
@@ -311,11 +318,10 @@ export default async function handler(req, res) {
         });
         
       } catch (error) {
-        console.error('[GHL MCP Session Error]:', error);
+        console.error('[SESSION ERROR]:', error);
         return res.status(500).json({
           success: false,
-          error: `Contact creation failed: ${error.message}`,
-          environment: envDebug
+          error: `Contact handling failed: ${error.message}`
         });
       }
     }
@@ -356,13 +362,15 @@ export default async function handler(req, res) {
       }
 
       try {
+        console.log(`[MESSAGE] Sending message to contact ${contactId}: ${body}`);
+        
         const messageData = await callGHLMCP('conversations_send-a-new-message', {
           contactId: contactId,
           message: body,
           type: 'Live_Chat'
         });
         
-        console.log('[GHL MCP] Message sent successfully:', JSON.stringify(messageData, null, 2));
+        console.log('[MESSAGE] Message sent successfully:', JSON.stringify(messageData, null, 2));
         
         // Handle MCP result format
         let messageResult = messageData;
@@ -376,9 +384,7 @@ export default async function handler(req, res) {
                 if (innerParsed.success === false) {
                   return res.status(500).json({
                     success: false,
-                    error: `Message sending failed: ${innerParsed.data?.message || innerParsed.message || 'Unknown error'}`,
-                    ghlError: innerParsed,
-                    environment: envDebug
+                    error: `Message sending failed: ${innerParsed.data?.message || innerParsed.message || 'Unknown error'}`
                   });
                 }
                 messageResult = innerParsed;
@@ -414,11 +420,10 @@ export default async function handler(req, res) {
         });
         
       } catch (mcpError) {
-        console.error('[GHL MCP Send Error]:', mcpError);
+        console.error('[MESSAGE ERROR]:', mcpError);
         return res.status(500).json({
           success: false,
-          error: `Message sending failed: ${mcpError.message}`,
-          environment: envDebug
+          error: `Message sending failed: ${mcpError.message}`
         });
       }
     }
@@ -440,8 +445,7 @@ export default async function handler(req, res) {
       success: false,
       error: 'API endpoint not found',
       path: path,
-      method: method,
-      environment: envDebug
+      method: method
     });
 
   } catch (error) {
@@ -449,8 +453,7 @@ export default async function handler(req, res) {
     return res.status(500).json({
       success: false,
       error: 'Internal server error',
-      message: error.message,
-      environment: envDebug
+      message: error.message
     });
   }
 }
