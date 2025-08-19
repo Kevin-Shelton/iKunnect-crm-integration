@@ -5,7 +5,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Helper function to make MCP JSON-RPC calls
+// Helper function to make MCP JSON-RPC calls with correct headers
 async function callMCPAPI(method, params = {}) {
   const fetch = require('node-fetch');
   
@@ -24,7 +24,8 @@ async function callMCPAPI(method, params = {}) {
     headers: {
       'Authorization': `Bearer ${process.env.CRM_PIT}`,
       'Content-Type': 'application/json',
-      'Accept': 'application/json'
+      'Accept': 'application/json, text/event-stream',
+      'User-Agent': 'iKunnect-MCP-Integration/1.0'
     },
     body: JSON.stringify(requestBody)
   };
@@ -411,8 +412,8 @@ app.get('/api/hello', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'iKunnect MCP Integration API',
-    version: '3.0.0',
-    description: 'Full MCP integration with GoHighLevel using JSON-RPC 2.0',
+    version: '3.1.0',
+    description: 'Full MCP integration with GoHighLevel using JSON-RPC 2.0 and correct headers',
     status: 'operational',
     timestamp: new Date().toISOString(),
     endpoints: {
