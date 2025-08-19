@@ -1,4 +1,4 @@
-// GoHighLevel MCP Integration API - Duplicate Contact Safe Version
+// GoHighLevel MCP Integration API - Fixed Message Contact ID
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -50,12 +50,13 @@ export default async function handler(req, res) {
     };
     
     console.log(`[GHL MCP] Calling tool: ${toolName}`);
+    console.log(`[GHL MCP] Arguments:`, JSON.stringify(arguments_, null, 2));
     
     const response = await fetch(mcpUrl, options);
     const responseText = await response.text();
     
     console.log(`[GHL MCP] Response status: ${response.status}`);
-    console.log(`[GHL MCP] Response: ${responseText.substring(0, 300)}...`);
+    console.log(`[GHL MCP] Response: ${responseText.substring(0, 500)}...`);
     
     // Handle Server-Sent Events format
     if (responseText.startsWith('event: message\ndata: ')) {
@@ -218,16 +219,10 @@ export default async function handler(req, res) {
     if (method === 'GET' && path === '/api') {
       return res.json({
         name: 'iKunnect GoHighLevel MCP Integration API',
-        version: '28.0.0 - DUPLICATE SAFE',
-        description: 'GoHighLevel MCP Server integration with duplicate contact handling',
+        version: '29.0.0 - FIXED MESSAGE CONTACT ID',
+        description: 'GoHighLevel MCP Server integration with fixed message contact ID parameter',
         status: 'operational',
-        timestamp: new Date().toISOString(),
-        features: [
-          'Duplicate contact detection',
-          'Smart contact search and creation',
-          'Live Chat message integration',
-          'GoHighLevel Conversation AI compatibility'
-        ]
+        timestamp: new Date().toISOString()
       });
     }
 
@@ -364,11 +359,27 @@ export default async function handler(req, res) {
       try {
         console.log(`[MESSAGE] Sending message to contact ${contactId}: ${body}`);
         
-        const messageData = await callGHLMCP('conversations_send-a-new-message', {
+        // Try different parameter formats for the MCP Server
+        const messageParams = {
+          // Try the exact contact ID format
           contactId: contactId,
+          // Also try alternative parameter names
+          contact_id: contactId,
+          id: contactId,
+          // Message content
           message: body,
-          type: 'Live_Chat'
-        });
+          body: body,
+          text: body,
+          // Message type
+          type: 'Live_Chat',
+          messageType: 'Live_Chat',
+          // Location context
+          locationId: process.env.CRM_LOCATION_ID
+        };
+        
+        console.log('[MESSAGE] Using parameters:', JSON.stringify(messageParams, null, 2));
+        
+        const messageData = await callGHLMCP('conversations_send-a-new-message', messageParams);
         
         console.log('[MESSAGE] Message sent successfully:', JSON.stringify(messageData, null, 2));
         
