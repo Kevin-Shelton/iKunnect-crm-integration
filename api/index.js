@@ -5,18 +5,27 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Helper function to make MCP JSON-RPC calls with correct headers
+// Helper function to make MCP JSON-RPC calls with debugging
 async function callMCPAPI(method, params = {}) {
   const fetch = require('node-fetch');
   
-  const url = process.env.CRM_MCP_URL || 'https://services.leadconnectorhq.com/mcp/';
+  // Try different possible MCP endpoints
+  const possibleUrls = [
+    'https://services.leadconnectorhq.com/mcp/',
+    'https://services.leadconnectorhq.com/mcp',
+    'https://services.leadconnectorhq.com/api/v1/mcp/',
+    'https://services.leadconnectorhq.com/api/v1/mcp',
+    process.env.CRM_MCP_URL
+  ].filter(Boolean);
+  
+  const url = possibleUrls[0]; // Start with the first one
   
   // JSON-RPC 2.0 format
   const requestBody = {
     jsonrpc: "2.0",
     method: method,
     params: params,
-    id: Date.now() // Unique request ID
+    id: Date.now()
   };
   
   const options = {
@@ -30,60 +39,142 @@ async function callMCPAPI(method, params = {}) {
     body: JSON.stringify(requestBody)
   };
   
-  console.log(`[MCP API] ${method}:`, JSON.stringify(requestBody, null, 2));
+  console.log(`[MCP DEBUG] URL: ${url}`);
+  console.log(`[MCP DEBUG] Request:`, JSON.stringify(requestBody, null, 2));
+  console.log(`[MCP DEBUG] Headers:`, JSON.stringify(options.headers, null, 2));
   
-  const response = await fetch(url, options);
-  const responseData = await response.json();
-  
-  console.log(`[MCP API Response] ${response.status}:`, JSON.stringify(responseData, null, 2));
-  
-  if (!response.ok) {
-    throw new Error(`MCP API Error: ${response.status} - ${JSON.stringify(responseData)}`);
+  try {
+    const response = await fetch(url, options);
+    
+    console.log(`[MCP DEBUG] Response Status: ${response.status}`);
+    console.log(`[MCP DEBUG] Response Headers:`, JSON.stringify([...response.headers.entries()], null, 2));
+    
+    // Get response as text first to see what we're getting
+    const responseText = await response.text();
+    console.log(`[MCP DEBUG] Response Text (first 500 chars):`, responseText.substring(0, 500));
+    
+    // Try to parse as JSON
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (parseError) {
+      console.log(`[MCP DEBUG] JSON Parse Error:`, parseError.message);
+      throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}...`);
+    }
+    
+    console.log(`[MCP DEBUG] Parsed Response:`, JSON.stringify(responseData, null, 2));
+    
+    if (!response.ok) {
+      throw new Error(`MCP API Error: ${response.status} - ${JSON.stringify(responseData)}`);
+    }
+    
+    // Check for JSON-RPC error
+    if (responseData.error) {
+      throw new Error(`MCP RPC Error: ${responseData.error.code} - ${responseData.error.message}`);
+    }
+    
+    return responseData.result;
+  } catch (fetchError) {
+    console.log(`[MCP DEBUG] Fetch Error:`, fetchError.message);
+    throw fetchError;
   }
-  
-  // Check for JSON-RPC error
-  if (responseData.error) {
-    throw new Error(`MCP RPC Error: ${responseData.error.code} - ${responseData.error.message}`);
-  }
-  
-  return responseData.result;
 }
 
-// Health check with MCP connection test
-app.get('/api/health', async (req, res) => {
+// Debug endpoint to test MCP connection
+app.get('/api/debug-mcp', async (req, res) => {
   try {
-    // Test MCP connection with a simple method
+    console.log('[DEBUG] Testing MCP connection...');
+    console.log('[DEBUG] Environment variables:');
+    console.log('  CRM_MCP_URL:', process.env.CRM_MCP_URL);
+    console.log('  CRM_PIT exists:', !!process.env.CRM_PIT);
+    console.log('  CRM_LOCATION_ID:', process.env.CRM_LOCATION_ID);
+    
+    // Try a simple method first
     const result = await callMCPAPI('locations.get', {
       locationId: process.env.CRM_LOCATION_ID
     });
     
     res.json({
       success: true,
-      message: 'API is healthy and MCP is connected',
-      timestamp: new Date().toISOString(),
-      mcp: {
-        connected: true,
-        locationName: result?.name || 'Unknown',
+      message: 'MCP connection successful!',
+      result: result,
+      debug: {
+        url: process.env.CRM_MCP_URL,
+        hasToken: !!process.env.CRM_PIT,
         locationId: process.env.CRM_LOCATION_ID
       }
     });
   } catch (error) {
-    res.json({
+    res.status(500).json({
       success: false,
-      message: 'API is running but MCP connection failed',
-      timestamp: new Date().toISOString(),
       error: error.message,
-      mcp: {
-        connected: false,
-        mcpUrl: process.env.CRM_MCP_URL ? 'configured' : 'missing',
-        token: process.env.CRM_PIT ? 'configured' : 'missing',
-        locationId: process.env.CRM_LOCATION_ID ? 'configured' : 'missing'
+      debug: {
+        url: process.env.CRM_MCP_URL,
+        hasToken: !!process.env.CRM_PIT,
+        locationId: process.env.CRM_LOCATION_ID,
+        errorType: error.constructor.name
       }
     });
   }
 });
 
-// Real MCP chat session endpoint
+// Test with REST API instead of MCP
+app.get('/api/test-rest', async (req, res) => {
+  try {
+    const fetch = require('node-fetch');
+    
+    // Try GoHighLevel REST API instead
+    const url = `https://services.leadconnectorhq.com/locations/${process.env.CRM_LOCATION_ID}`;
+    
+    const options = {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${process.env.CRM_PIT}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Version': '2021-07-28'
+      }
+    };
+    
+    console.log(`[REST DEBUG] URL: ${url}`);
+    console.log(`[REST DEBUG] Headers:`, JSON.stringify(options.headers, null, 2));
+    
+    const response = await fetch(url, options);
+    const responseText = await response.text();
+    
+    console.log(`[REST DEBUG] Response Status: ${response.status}`);
+    console.log(`[REST DEBUG] Response Text:`, responseText.substring(0, 500));
+    
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (parseError) {
+      throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}...`);
+    }
+    
+    res.json({
+      success: response.ok,
+      status: response.status,
+      data: responseData,
+      debug: {
+        url: url,
+        hasToken: !!process.env.CRM_PIT,
+        locationId: process.env.CRM_LOCATION_ID
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      debug: {
+        hasToken: !!process.env.CRM_PIT,
+        locationId: process.env.CRM_LOCATION_ID
+      }
+    });
+  }
+});
+
+// Simplified chat session using REST API
 app.post('/api/chat/session', async (req, res) => {
   try {
     const { name, email, phone } = req.body;
@@ -95,49 +186,62 @@ app.post('/api/chat/session', async (req, res) => {
       });
     }
 
-    // Try to find existing contact by email
-    let contact = null;
-    let isNewContact = false;
+    const fetch = require('node-fetch');
     
-    try {
-      const searchResult = await callMCPAPI('contacts.search', {
-        locationId: process.env.CRM_LOCATION_ID,
-        email: email
-      });
-      
-      if (searchResult && searchResult.contacts && searchResult.contacts.length > 0) {
-        contact = searchResult.contacts[0];
-      }
-    } catch (searchError) {
-      console.log('[MCP] Contact search failed, will create new:', searchError.message);
-    }
+    // Try creating contact using REST API
+    const nameParts = name.trim().split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
     
-    // If no existing contact found, create new one
-    if (!contact) {
-      const nameParts = name.trim().split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-      
-      const contactParams = {
-        locationId: process.env.CRM_LOCATION_ID,
-        firstName: firstName,
-        lastName: lastName,
-        email: email,
-        phone: phone || '',
-        source: 'iKunnect Chat Widget',
-        tags: ['Vercel Deployment', 'Live Chat', 'Web Visitor']
-      };
+    const contactData = {
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+      phone: phone || '',
+      locationId: process.env.CRM_LOCATION_ID,
+      source: 'iKunnect Chat Widget',
+      tags: ['Vercel Deployment', 'Live Chat', 'Web Visitor']
+    };
 
-      const createResult = await callMCPAPI('contacts.create', contactParams);
-      contact = createResult.contact || createResult;
-      isNewContact = true;
+    const url = 'https://services.leadconnectorhq.com/contacts/';
+    const options = {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.CRM_PIT}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Version': '2021-07-28'
+      },
+      body: JSON.stringify(contactData)
+    };
+
+    console.log(`[REST Contact] URL: ${url}`);
+    console.log(`[REST Contact] Data:`, JSON.stringify(contactData, null, 2));
+
+    const response = await fetch(url, options);
+    const responseText = await response.text();
+    
+    console.log(`[REST Contact] Response Status: ${response.status}`);
+    console.log(`[REST Contact] Response:`, responseText.substring(0, 500));
+
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (parseError) {
+      throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}...`);
     }
+
+    if (!response.ok) {
+      throw new Error(`REST API Error: ${response.status} - ${JSON.stringify(responseData)}`);
+    }
+
+    const contact = responseData.contact || responseData;
     
     res.json({
       success: true,
       data: {
         contactId: contact.id,
-        isNewContact: isNewContact,
+        isNewContact: true,
         contact: {
           id: contact.id,
           name: contact.name || name,
@@ -150,254 +254,49 @@ app.post('/api/chat/session', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[MCP Session Error]:', error);
+    console.error('[REST Session Error]:', error);
     res.status(500).json({
       success: false,
-      error: `MCP integration failed: ${error.message}`,
-      details: 'Check your MCP credentials and try again'
+      error: `REST integration failed: ${error.message}`,
+      details: 'Check your REST API credentials and try again'
     });
   }
 });
 
-// Real MCP conversation thread endpoint
-app.post('/api/chat/thread', async (req, res) => {
-  try {
-    const { contactId } = req.body;
-    
-    if (!contactId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Contact ID is required'
-      });
+// Keep other endpoints simple for now
+app.post('/api/chat/thread', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      conversationId: `conv-${Date.now()}`,
+      isNewConversation: true,
+      contactId: req.body.contactId
     }
-
-    // Check for existing conversations
-    let conversation = null;
-    let isNewConversation = false;
-    
-    try {
-      const searchResult = await callMCPAPI('conversations.search', {
-        locationId: process.env.CRM_LOCATION_ID,
-        contactId: contactId
-      });
-      
-      if (searchResult && searchResult.conversations && searchResult.conversations.length > 0) {
-        conversation = searchResult.conversations[0];
-      }
-    } catch (searchError) {
-      console.log('[MCP] Conversation search failed, will create new:', searchError.message);
-    }
-    
-    // If no existing conversation, create new one
-    if (!conversation) {
-      const conversationParams = {
-        locationId: process.env.CRM_LOCATION_ID,
-        contactId: contactId,
-        type: 'Chat'
-      };
-
-      const createResult = await callMCPAPI('conversations.create', conversationParams);
-      conversation = createResult.conversation || createResult;
-      isNewConversation = true;
-    }
-    
-    res.json({
-      success: true,
-      data: {
-        conversationId: conversation.id,
-        isNewConversation: isNewConversation,
-        contactId: contactId,
-        conversation: {
-          id: conversation.id,
-          type: conversation.type,
-          status: conversation.status
-        }
-      }
-    });
-    
-  } catch (error) {
-    console.error('[MCP Thread Error]:', error);
-    res.status(500).json({
-      success: false,
-      error: `MCP conversation creation failed: ${error.message}`,
-      details: 'Check your MCP credentials and contact ID'
-    });
-  }
+  });
 });
 
-// Real MCP message sending endpoint
-app.post('/api/chat/send', async (req, res) => {
-  try {
-    const { conversationId, body } = req.body;
-    
-    if (!conversationId || !body) {
-      return res.status(400).json({
-        success: false,
-        error: 'Conversation ID and message body are required'
-      });
+app.post('/api/chat/send', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      messageId: `msg-${Date.now()}`,
+      conversationId: req.body.conversationId,
+      body: req.body.body,
+      timestamp: new Date().toISOString()
     }
-
-    const messageParams = {
-      locationId: process.env.CRM_LOCATION_ID,
-      conversationId: conversationId,
-      type: 'Chat',
-      body: body,
-      direction: 'inbound'
-    };
-
-    const messageResult = await callMCPAPI('conversations.messages.create', messageParams);
-    
-    res.json({
-      success: true,
-      data: {
-        messageId: messageResult.message?.id || messageResult.id,
-        conversationId: conversationId,
-        body: body,
-        timestamp: new Date().toISOString(),
-        status: 'delivered',
-        direction: 'inbound'
-      }
-    });
-    
-  } catch (error) {
-    console.error('[MCP Send Error]:', error);
-    res.status(500).json({
-      success: false,
-      error: `MCP message sending failed: ${error.message}`,
-      details: 'Check your conversation ID and try again'
-    });
-  }
+  });
 });
 
-// Enhanced bot process endpoint with MCP context
-app.post('/api/bot/process', async (req, res) => {
-  try {
-    const { message, contactId, conversationId } = req.body;
-    
-    if (!message) {
-      return res.status(400).json({
-        success: false,
-        error: 'Message is required'
-      });
+app.post('/api/bot/process', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      response: "Hello! I'm testing the REST API integration.",
+      action: "greeting",
+      confidence: 0.9,
+      timestamp: new Date().toISOString()
     }
-
-    // Get contact info for personalized responses
-    let contactInfo = null;
-    if (contactId) {
-      try {
-        const contactResult = await callMCPAPI('contacts.get', {
-          locationId: process.env.CRM_LOCATION_ID,
-          contactId: contactId
-        });
-        contactInfo = contactResult.contact || contactResult;
-      } catch (error) {
-        console.log('[Bot] Could not fetch contact info:', error.message);
-      }
-    }
-
-    // Enhanced bot logic
-    let response = `Thank you for your message${contactInfo?.firstName ? `, ${contactInfo.firstName}` : ''}! I'm your AI assistant and I'm connected to the MCP system.`;
-    let action = "acknowledged";
-    let confidence = 0.8;
-
-    const lowerMessage = message.toLowerCase();
-    
-    if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
-      response = `Hello${contactInfo?.firstName ? ` ${contactInfo.firstName}` : ''}! Welcome to our chat system. Your information is now in our CRM and I'm here to help you.`;
-      action = "greeting";
-      confidence = 0.9;
-    } else if (lowerMessage.includes('help')) {
-      response = "I'm here to help! I can assist you with questions about our services. Your conversation is being tracked in our CRM system for better support.";
-      action = "help_request";
-      confidence = 0.85;
-    } else if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('pricing')) {
-      response = "I'd be happy to help you with pricing information. Let me connect you with our sales team who can provide detailed pricing based on your needs.";
-      action = "pricing_inquiry";
-      confidence = 0.9;
-    } else if (lowerMessage.includes('demo') || lowerMessage.includes('trial')) {
-      response = "Great! I can help you schedule a demo. Your interest has been noted in our CRM system and someone from our team will reach out to you soon.";
-      action = "demo_request";
-      confidence = 0.95;
-    }
-
-    // Send bot response back to MCP
-    if (conversationId) {
-      try {
-        const botMessageParams = {
-          locationId: process.env.CRM_LOCATION_ID,
-          conversationId: conversationId,
-          type: 'Chat',
-          body: response,
-          direction: 'outbound'
-        };
-        
-        await callMCPAPI('conversations.messages.create', botMessageParams);
-      } catch (error) {
-        console.log('[Bot] Could not send response to MCP:', error.message);
-      }
-    }
-
-    res.json({
-      success: true,
-      data: {
-        response: response,
-        action: action,
-        confidence: confidence,
-        timestamp: new Date().toISOString(),
-        contactInfo: contactInfo ? {
-          name: contactInfo.name,
-          firstName: contactInfo.firstName
-        } : null
-      }
-    });
-    
-  } catch (error) {
-    console.error('[Bot Process Error]:', error);
-    res.json({
-      success: true,
-      data: {
-        response: "I'm experiencing some technical difficulties, but your message has been received and logged.",
-        action: "error_fallback",
-        confidence: 0.5,
-        timestamp: new Date().toISOString(),
-        error: error.message
-      }
-    });
-  }
-});
-
-// Test endpoint to verify MCP connection
-app.get('/api/mcp-test', async (req, res) => {
-  try {
-    const locationResult = await callMCPAPI('locations.get', {
-      locationId: process.env.CRM_LOCATION_ID
-    });
-    
-    res.json({
-      success: true,
-      message: 'MCP connection successful!',
-      location: {
-        id: locationResult?.id,
-        name: locationResult?.name,
-        website: locationResult?.website
-      },
-      credentials: {
-        mcpUrl: process.env.CRM_MCP_URL,
-        hasToken: !!process.env.CRM_PIT,
-        locationId: process.env.CRM_LOCATION_ID
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      credentials: {
-        mcpUrl: process.env.CRM_MCP_URL ? 'configured' : 'missing',
-        hasToken: !!process.env.CRM_PIT,
-        locationId: process.env.CRM_LOCATION_ID ? 'configured' : 'missing'
-      }
-    });
-  }
+  });
 });
 
 // Keep existing endpoints
@@ -411,18 +310,15 @@ app.get('/api/hello', (req, res) => {
 
 app.get('/api', (req, res) => {
   res.json({
-    name: 'iKunnect MCP Integration API',
-    version: '3.1.0',
-    description: 'Full MCP integration with GoHighLevel using JSON-RPC 2.0 and correct headers',
+    name: 'iKunnect Debug API',
+    version: '4.0.0',
+    description: 'Debug version to test GoHighLevel integration',
     status: 'operational',
     timestamp: new Date().toISOString(),
     endpoints: {
-      health: 'GET /api/health',
-      mcpTest: 'GET /api/mcp-test',
-      chatSession: 'POST /api/chat/session',
-      chatThread: 'POST /api/chat/thread',
-      chatSend: 'POST /api/chat/send',
-      botProcess: 'POST /api/bot/process'
+      debugMcp: 'GET /api/debug-mcp',
+      testRest: 'GET /api/test-rest',
+      chatSession: 'POST /api/chat/session'
     }
   });
 });
