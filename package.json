@@ -1,7 +1,7 @@
 {
   "name": "ikunnect-crm-integration",
-  "version": "1.0.0",
-  "description": "iKunnect CRM Integration",
+  "version": "2.0.0",
+  "description": "iKunnect CRM Integration with GoHighLevel",
   "main": "api/index.js",
   "engines": {
     "node": "18.x"
@@ -12,12 +12,12 @@
   },
   "dependencies": {
     "express": "^4.18.2",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "node-fetch": "^2.6.12"
   },
   "devDependencies": {},
-  "keywords": ["vercel", "api", "crm"],
+  "keywords": ["vercel", "api", "crm", "gohighlevel"],
   "author": "Kevin Shelton",
   "license": "MIT"
 }
-
 
