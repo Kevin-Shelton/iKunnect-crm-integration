@@ -212,10 +212,10 @@ app.post('/api/chat/thread', async (req, res) => {
   }
 });
 
-// Real GoHighLevel message sending endpoint
+// Fixed message sending endpoint with proper contact ID
 app.post('/api/chat/send', async (req, res) => {
   try {
-    const { conversationId, body } = req.body;
+    const { conversationId, body, contactId } = req.body;
     
     if (!conversationId || !body) {
       return res.status(400).json({
@@ -224,12 +224,21 @@ app.post('/api/chat/send', async (req, res) => {
       });
     }
 
+    if (!contactId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Contact ID is required for message sending'
+      });
+    }
+
+    // Create message with all required fields
     const messageData = {
       type: 'Chat',
       body: body,
       direction: 'inbound',
       status: 'delivered',
       conversationId: conversationId,
+      contactId: contactId,  // This was missing!
       locationId: process.env.CRM_LOCATION_ID
     };
 
@@ -240,6 +249,7 @@ app.post('/api/chat/send', async (req, res) => {
       data: {
         messageId: messageResponse.message?.id || messageResponse.id,
         conversationId: conversationId,
+        contactId: contactId,
         body: body,
         timestamp: new Date().toISOString(),
         status: 'delivered',
@@ -252,12 +262,12 @@ app.post('/api/chat/send', async (req, res) => {
     res.status(500).json({
       success: false,
       error: `GoHighLevel message sending failed: ${error.message}`,
-      details: 'Check your conversation ID and try again'
+      details: 'Check your conversation ID and contact ID'
     });
   }
 });
 
-// Enhanced bot process endpoint with GoHighLevel context
+// Enhanced bot process endpoint with proper message creation
 app.post('/api/bot/process', async (req, res) => {
   try {
     const { message, contactId, conversationId } = req.body;
@@ -281,32 +291,32 @@ app.post('/api/bot/process', async (req, res) => {
     }
 
     // Enhanced bot logic with personalization
-    let response = `Thank you for your message${contactInfo?.firstName ? `, ${contactInfo.firstName}` : ''}! I'm your AI assistant and I'm connected to your GoHighLevel CRM.`;
+    let response = `Thank you for your message${contactInfo?.firstName ? `, ${contactInfo.firstName}` : ''}! I'm your AI assistant and your information has been saved to our CRM.`;
     let action = "acknowledged";
     let confidence = 0.8;
 
     const lowerMessage = message.toLowerCase();
     
     if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
-      response = `Hello${contactInfo?.firstName ? ` ${contactInfo.firstName}` : ''}! Welcome to ${contactInfo?.locationName || 'our'} chat system. Your information is now in our CRM and I'm here to help you.`;
+      response = `Hello${contactInfo?.firstName ? ` ${contactInfo.firstName}` : ''}! Welcome to National Lawyers Guild NYC. Your information is now in our system and I'm here to help you.`;
       action = "greeting";
       confidence = 0.9;
     } else if (lowerMessage.includes('help')) {
-      response = "I'm here to help! I can assist you with questions about our services. Your conversation is being tracked in our CRM system for better support.";
+      response = "I'm here to help! I can assist you with questions about our legal services. Your conversation is being tracked for better support.";
       action = "help_request";
       confidence = 0.85;
-    } else if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('pricing')) {
-      response = "I'd be happy to help you with pricing information. Let me connect you with our sales team who can provide detailed pricing based on your needs.";
-      action = "pricing_inquiry";
+    } else if (lowerMessage.includes('lawyer') || lowerMessage.includes('legal')) {
+      response = "Great! You're interested in our legal services. I've noted this in your profile and someone from our legal team will reach out to you soon.";
+      action = "legal_inquiry";
       confidence = 0.9;
-    } else if (lowerMessage.includes('demo') || lowerMessage.includes('trial')) {
-      response = "Great! I can help you schedule a demo. Your interest has been noted in our CRM system and someone from our team will reach out to you soon.";
-      action = "demo_request";
+    } else if (lowerMessage.includes('consultation') || lowerMessage.includes('meeting')) {
+      response = "I'd be happy to help you schedule a consultation. Your interest has been noted and someone will contact you to arrange a meeting.";
+      action = "consultation_request";
       confidence = 0.95;
     }
 
-    // Send bot response back to GoHighLevel
-    if (conversationId) {
+    // Send bot response back to GoHighLevel with proper contact ID
+    if (conversationId && contactId) {
       try {
         const botMessageData = {
           type: 'Chat',
@@ -314,6 +324,7 @@ app.post('/api/bot/process', async (req, res) => {
           direction: 'outbound',
           status: 'delivered',
           conversationId: conversationId,
+          contactId: contactId,  // Include contact ID
           locationId: process.env.CRM_LOCATION_ID
         };
         
@@ -332,8 +343,7 @@ app.post('/api/bot/process', async (req, res) => {
         timestamp: new Date().toISOString(),
         contactInfo: contactInfo ? {
           name: contactInfo.name,
-          firstName: contactInfo.firstName,
-          locationName: contactInfo.locationName
+          firstName: contactInfo.firstName
         } : null
       }
     });
@@ -343,7 +353,7 @@ app.post('/api/bot/process', async (req, res) => {
     res.json({
       success: true,
       data: {
-        response: "I'm experiencing some technical difficulties, but your message has been received and logged.",
+        response: "I'm experiencing some technical difficulties, but your message has been received.",
         action: "error_fallback",
         confidence: 0.5,
         timestamp: new Date().toISOString(),
@@ -396,8 +406,8 @@ app.get('/api/hello', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'iKunnect GoHighLevel Integration API',
-    version: '5.0.0',
-    description: 'Full GoHighLevel integration using REST API',
+    version: '7.0.0',
+    description: 'GoHighLevel integration with proper contact ID handling',
     status: 'operational',
     timestamp: new Date().toISOString(),
     endpoints: {
