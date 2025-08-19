@@ -180,7 +180,7 @@ app.post('/api/chat/thread', async (req, res) => {
       const conversationData = {
         locationId: process.env.CRM_LOCATION_ID,
         contactId: contactId,
-        type: 'SMS'  // Changed from 'Chat' to 'SMS' - valid enum value
+        type: 'Live_Chat'  // Changed from 'SMS' to 'Live_Chat' for proper live chat display
       };
 
       const createData = await callGHLAPI('conversations/', 'POST', conversationData);
@@ -212,7 +212,7 @@ app.post('/api/chat/thread', async (req, res) => {
   }
 });
 
-// Fixed message sending endpoint with correct message type
+// Fixed message sending endpoint with Live_Chat message type
 app.post('/api/chat/send', async (req, res) => {
   try {
     const { conversationId, body, contactId } = req.body;
@@ -231,10 +231,10 @@ app.post('/api/chat/send', async (req, res) => {
       });
     }
 
-    // Create message with correct enum values
+    // Create message with Live_Chat type for proper live chat display
     const messageData = {
-      type: 'SMS',  // Valid enum: SMS, Email, Call, etc.
-      message: body,  // Changed from 'body' to 'message'
+      type: 'Live_Chat',  // Changed from 'SMS' to 'Live_Chat' for live chat display
+      message: body,
       direction: 'inbound',
       status: 'delivered',
       conversationId: conversationId,
@@ -267,7 +267,7 @@ app.post('/api/chat/send', async (req, res) => {
   }
 });
 
-// Enhanced bot process endpoint with correct message format
+// Enhanced bot process endpoint with Live_Chat message format
 app.post('/api/bot/process', async (req, res) => {
   try {
     const { message, contactId, conversationId } = req.body;
@@ -315,12 +315,12 @@ app.post('/api/bot/process', async (req, res) => {
       confidence = 0.95;
     }
 
-    // Send bot response back to GoHighLevel with correct format
+    // Send bot response back to GoHighLevel with Live_Chat type
     if (conversationId && contactId) {
       try {
         const botMessageData = {
-          type: 'SMS',  // Valid enum value
-          message: response,  // Changed from 'body' to 'message'
+          type: 'Live_Chat',  // Changed from 'SMS' to 'Live_Chat' for live chat display
+          message: response,
           direction: 'outbound',
           status: 'delivered',
           conversationId: conversationId,
@@ -406,8 +406,8 @@ app.get('/api/hello', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'iKunnect GoHighLevel Integration API',
-    version: '8.0.0',
-    description: 'GoHighLevel integration with correct message type enums',
+    version: '9.0.0',
+    description: 'GoHighLevel integration with Live_Chat message type for proper live chat display',
     status: 'operational',
     timestamp: new Date().toISOString(),
     endpoints: {
