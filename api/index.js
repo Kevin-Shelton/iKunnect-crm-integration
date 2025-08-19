@@ -18,7 +18,7 @@ async function callGHLAPI(endpoint, method = 'GET', data = null) {
       'Authorization': `Bearer ${process.env.CRM_PIT}`,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'Version': '2021-07-28'
+      'Version': '2021-04-15'
     }
   };
   
@@ -66,6 +66,18 @@ async function getAssignedAgentName(conversationId) {
   } catch (error) {
     console.log('[Agent Name] Could not fetch assigned agent:', error.message);
     return null;
+  }
+}
+
+// Helper function to get conversation provider ID
+async function getConversationProviderId(conversationId) {
+  try {
+    // For now, we'll use a default provider ID
+    // In a real implementation, you'd fetch this from the conversation details
+    return process.env.CRM_CONVERSATION_PROVIDER_ID || 'default_provider_id';
+  } catch (error) {
+    console.log('[Provider ID] Could not fetch provider ID:', error.message);
+    return 'default_provider_id';
   }
 }
 
@@ -235,7 +247,7 @@ app.post('/api/chat/thread', async (req, res) => {
   }
 });
 
-// Fixed message sending endpoint - CUSTOMER MESSAGES (inbound)
+// CUSTOMER MESSAGE - Use inbound endpoint
 app.post('/api/chat/send', async (req, res) => {
   try {
     const { conversationId, body, contactId } = req.body;
@@ -254,18 +266,21 @@ app.post('/api/chat/send', async (req, res) => {
       });
     }
 
-    // Customer message - INBOUND direction (from customer TO business)
+    // Get conversation provider ID
+    const conversationProviderId = await getConversationProviderId(conversationId);
+
+    // Customer message - Use INBOUND endpoint
     const messageData = {
       type: 'Live_Chat',
       message: body,
-      direction: 'inbound',  // Customer messages are INBOUND
-      status: 'delivered',
       conversationId: conversationId,
-      contactId: contactId,
-      locationId: process.env.CRM_LOCATION_ID
+      conversationProviderId: conversationProviderId,
+      direction: 'inbound',  // Explicitly set as inbound
+      date: new Date().toISOString()
     };
 
-    const messageResponse = await callGHLAPI('conversations/messages', 'POST', messageData);
+    // Use the INBOUND message endpoint for customer messages
+    const messageResponse = await callGHLAPI('conversations/messages/inbound', 'POST', messageData);
     
     // Better handling of message response structure
     const messageId = messageResponse.messageId || 
@@ -407,19 +422,18 @@ app.post('/api/bot/process', async (req, res) => {
       confidence = 0.7;
     }
 
-    // Send bot response back to GoHighLevel - OUTBOUND direction (from business TO customer)
+    // Send bot response back to GoHighLevel using OUTBOUND endpoint
     if (conversationId && contactId) {
       try {
+        // Bot response - Use OUTBOUND endpoint (regular messages endpoint)
         const botMessageData = {
           type: 'Live_Chat',
           message: response,
-          direction: 'outbound',  // Bot responses are OUTBOUND (from business to customer)
-          status: 'delivered',
-          conversationId: conversationId,
           contactId: contactId,
-          locationId: process.env.CRM_LOCATION_ID
+          conversationId: conversationId
         };
         
+        // Use the regular messages endpoint for outbound (agent/bot) messages
         await callGHLAPI('conversations/messages', 'POST', botMessageData);
       } catch (error) {
         console.log('[Bot] Could not send response to GoHighLevel:', error.message);
@@ -499,8 +513,8 @@ app.get('/api/hello', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'iKunnect GoHighLevel Integration API',
-    version: '12.0.0',
-    description: 'Fixed conversation direction - customer messages inbound, bot responses outbound',
+    version: '13.0.0',
+    description: 'Fixed conversation direction using correct GoHighLevel endpoints - inbound for customers, outbound for agents',
     status: 'operational',
     timestamp: new Date().toISOString(),
     endpoints: {
@@ -508,8 +522,8 @@ app.get('/api', (req, res) => {
       ghlTest: 'GET /api/ghl-test',
       chatSession: 'POST /api/chat/session',
       chatThread: 'POST /api/chat/thread',
-      chatSend: 'POST /api/chat/send',
-      botProcess: 'POST /api/bot/process'
+      chatSend: 'POST /api/chat/send (uses inbound endpoint)',
+      botProcess: 'POST /api/bot/process (uses outbound endpoint)'
     }
   });
 });
