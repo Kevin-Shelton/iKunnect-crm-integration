@@ -1,425 +1,54 @@
-const express = require('express');
-const cors = require('cors');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iKunnect CRM Chat Interface</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>🚀 iKunnect CRM Integration</h1>
+            <p>Test your CRM MCP int with real-time chat</p>
+        </div>
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+        <div class="setup-form" id="setupForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="userName">Your Name</label>
+                    <input type="text" id="userName" placeholder="Enter your name" value="John Doe">
+                </div>
+                <div class="form-group">
+                    <label for="userEmail">Email</label>
+                    <input type="email" id="userEmail" placeholder="your@email.com" value="john@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="userPhone">Phone (Optional)</label>
+                    <input type="tel" id="userPhone" placeholder="+1234567890" value="+1234567890">
+                </div>
+            </div>
 
-// Helper function to make GoHighLevel MCP Server calls with detailed response tracking
-async function callGHLMCP(toolName, arguments_) {
-  const fetch = require('node-fetch');
-  
-  const url = 'https://services.leadconnectorhq.com/mcp/';
-  
-  // Generate unique ID for JSON-RPC request
-  const requestId = Date.now().toString();
-  
-  // Proper MCP JSON-RPC 2.0 format using tools/call
-  const jsonRpcRequest = {
-    jsonrpc: "2.0",
-    id: requestId,
-    method: "tools/call",
-    params: {
-      name: toolName,
-      arguments: arguments_ || {}
-    }
-  };
-  
-  const options = {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.CRM_PIT}`,
-      'locationId': process.env.CRM_LOCATION_ID,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream'
-    },
-    body: JSON.stringify(jsonRpcRequest)
-  };
-  
-  const response = await fetch(url, options);
-  const responseText = await response.text();
-  
-  // Return detailed response info for debugging
-  const debugInfo = {
-    tool: toolName,
-    status: response.status,
-    rawResponse: responseText,
-    timestamp: new Date().toISOString()
-  };
-  
-  // Handle Server-Sent Events format
-  if (responseText.startsWith('event: message\ndata: ')) {
-    const jsonPart = responseText.replace('event: message\ndata: ', '').trim();
-    try {
-      const responseData = JSON.parse(jsonPart);
-      debugInfo.parsedResponse = responseData;
-      
-      if (responseData.error) {
-        debugInfo.error = responseData.error;
-        throw new Error(`MCP Error: ${responseData.error.code} - ${responseData.error.message}`);
-      }
-      
-      debugInfo.result = responseData.result;
-      return { result: responseData.result, debug: debugInfo };
-    } catch (parseError) {
-      debugInfo.parseError = parseError.message;
-      throw new Error(`Failed to parse SSE response: ${jsonPart.substring(0, 200)}...`);
-    }
-  }
-  
-  // Handle regular JSON response
-  let responseData;
-  try {
-    responseData = JSON.parse(responseText);
-    debugInfo.parsedResponse = responseData;
-  } catch (parseError) {
-    debugInfo.parseError = parseError.message;
-    throw new Error(`Invalid response format: ${responseText.substring(0, 200)}...`);
-  }
-  
-  if (!response.ok) {
-    debugInfo.error = responseData;
-    throw new Error(`GHL MCP Error: ${response.status} - ${JSON.stringify(responseData)}`);
-  }
-  
-  // Handle JSON-RPC error response
-  if (responseData.error) {
-    debugInfo.error = responseData.error;
-    throw new Error(`MCP Error: ${responseData.error.code} - ${responseData.error.message}`);
-  }
-  
-  debugInfo.result = responseData.result;
-  return { result: responseData.result, debug: debugInfo };
-}
+            <div style="margin-top: 15px;">
+                <button class="btn" onclick="startChat()">Start Chat Session</button>
+            </div>
+        </div>
 
-// Health check with debug info
-app.get('/api/health', async (req, res) => {
-  try {
-    const { result, debug } = await callGHLMCP('locations_get-location', {
-      locationId: process.env.CRM_LOCATION_ID
-    });
-    
-    res.json({
-      success: true,
-      message: 'GoHighLevel MCP Server connected successfully',
-      timestamp: new Date().toISOString(),
-      debug: debug,
-      ghl: {
-        connected: true,
-        locationId: process.env.CRM_LOCATION_ID
-      }
-    });
-  } catch (error) {
-    res.json({
-      success: false,
-      message: 'MCP Server connection failed',
-      timestamp: new Date().toISOString(),
-      error: error.message,
-      ghl: {
-        connected: false,
-        hasToken: !!process.env.CRM_PIT,
-        locationId: process.env.CRM_LOCATION_ID
-      }
-    });
-  }
-});
+        <div class="chat-messages" id="chatMessages"></div>
 
-// Create contact with full debug info returned to frontend
-app.post('/api/chat/session', async (req, res) => {
-  try {
-    const { name, email, phone } = req.body;
-    
-    if (!name || !email) {
-      return res.status(400).json({
-        success: false,
-        error: 'Name and email are required'
-      });
-    }
+        <div class="chat-input">
+            <div class="input-row">
+                <input type="text" class="message-input" id="messageInput" placeholder="Type your message..." disabled>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
 
-    const nameParts = name.trim().split(' ');
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ') || '';
-    
-    let contact = null;
-    let isNewContact = false;
-    let debugInfo = null;
-    
-    try {
-      // Call MCP with debug info
-      const { result, debug } = await callGHLMCP('contacts_upsert-contact', {
-        firstName: firstName,
-        lastName: lastName,
-        email: email,
-        phone: phone || '',
-        source: 'iKunnect Live Chat Widget',
-        tags: ['Live Chat', 'Web Visitor', 'iKunnect Integration']
-      });
-      
-      debugInfo = debug;
-      
-      // Handle MCP result format - extract contact from nested structure
-      if (result.content && result.content[0]) {
-        const content = result.content[0];
-        if (content.type === 'text') {
-          try {
-            const parsed = JSON.parse(content.text);
-            // Handle nested content structure
-            if (parsed.content && parsed.content[0] && parsed.content[0].text) {
-              const innerParsed = JSON.parse(parsed.content[0].text);
-              if (innerParsed.success === false) {
-                // Return the actual error from GoHighLevel
-                return res.status(500).json({
-                  success: false,
-                  error: `Contact creation failed: ${innerParsed.data?.message || 'Unknown error'}`,
-                  ghlError: innerParsed,
-                  debug: debugInfo
-                });
-              }
-              contact = innerParsed.contact || innerParsed.data;
-            } else {
-              contact = parsed.contact || parsed.data || parsed;
-            }
-          } catch (parseError) {
-            contact = { 
-              id: `contact_${Date.now()}`, 
-              firstName: firstName,
-              lastName: lastName,
-              email: email,
-              phone: phone
-            };
-          }
-        }
-      } else if (result.contact) {
-        contact = result.contact;
-      } else if (result.id) {
-        contact = result;
-      } else {
-        // Fallback contact creation
-        contact = { 
-          id: `contact_${Date.now()}`, 
-          firstName: firstName,
-          lastName: lastName,
-          email: email,
-          phone: phone
-        };
-      }
-      
-      isNewContact = result.isNew || true;
-      
-    } catch (error) {
-      return res.status(500).json({
-        success: false,
-        error: error.message,
-        debug: debugInfo
-      });
-    }
-    
-    if (!contact || !contact.id) {
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to create or find contact - no valid ID returned',
-        debug: debugInfo
-      });
-    }
-    
-    res.json({
-      success: true,
-      data: {
-        contactId: contact.id,
-        isNewContact: isNewContact,
-        contact: {
-          id: contact.id,
-          name: `${contact.firstName || firstName} ${contact.lastName || lastName}`.trim(),
-          firstName: contact.firstName || firstName,
-          lastName: contact.lastName || lastName,
-          email: contact.email || email,
-          phone: contact.phone || phone
-        }
-      },
-      debug: debugInfo // Include full MCP debug info
-    });
-    
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      debug: 'Check server logs for more details'
-    });
-  }
-});
-
-// Simple thread creation (no MCP call needed)
-app.post('/api/chat/thread', async (req, res) => {
-  const { contactId } = req.body;
-  res.json({
-    success: true,
-    data: {
-      conversationId: `pending_${contactId}_${Date.now()}`,
-      isNewConversation: true,
-      contactId: contactId,
-      conversation: {
-        id: `pending_${contactId}_${Date.now()}`,
-        type: 'Live_Chat',
-        status: 'pending'
-      }
-    }
-  });
-});
-
-// Send message with full debug info
-app.post('/api/chat/send', async (req, res) => {
-  try {
-    const { conversationId, body, contactId } = req.body;
-    
-    if (!body || !contactId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Message body and contact ID are required'
-      });
-    }
-
-    let debugInfo = null;
-
-    try {
-      // Call MCP with debug info
-      const { result, debug } = await callGHLMCP('conversations_send-a-new-message', {
-        contactId: contactId,
-        message: body,
-        type: 'Live_Chat'
-      });
-      
-      debugInfo = debug;
-      
-      // Handle MCP result format
-      let messageResult = result;
-      if (result.content && result.content[0]) {
-        const content = result.content[0];
-        if (content.type === 'text') {
-          try {
-            const parsed = JSON.parse(content.text);
-            // Check for nested errors
-            if (parsed.content && parsed.content[0] && parsed.content[0].text) {
-              const innerParsed = JSON.parse(parsed.content[0].text);
-              if (innerParsed.success === false) {
-                return res.status(500).json({
-                  success: false,
-                  error: `Message sending failed: ${innerParsed.data?.message || 'Unknown error'}`,
-                  ghlError: innerParsed,
-                  debug: debugInfo
-                });
-              }
-              messageResult = innerParsed;
-            } else {
-              messageResult = parsed;
-            }
-          } catch {
-            messageResult = { id: 'message_sent', status: 'delivered' };
-          }
-        }
-      }
-      
-      const messageId = messageResult.messageId || 
-                       messageResult.message?.id || 
-                       messageResult.id || 
-                       'message_created';
-      
-      const actualConversationId = messageResult.conversationId || 
-                                  messageResult.conversation?.id || 
-                                  conversationId;
-      
-      res.json({
-        success: true,
-        data: {
-          messageId: messageId,
-          conversationId: actualConversationId,
-          contactId: contactId,
-          body: body,
-          timestamp: new Date().toISOString(),
-          status: 'delivered',
-          messageType: 'Live_Chat'
-        },
-        debug: debugInfo // Include full MCP debug info
-      });
-      
-    } catch (mcpError) {
-      return res.status(500).json({
-        success: false,
-        error: mcpError.message,
-        debug: debugInfo
-      });
-    }
-    
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// Legacy bot endpoint
-app.post('/api/bot/process', (req, res) => {
-  res.json({
-    success: true,
-    data: {
-      response: "This endpoint is deprecated. GoHighLevel Conversation AI handles responses automatically via MCP Server.",
-      action: "deprecated",
-      confidence: 1.0,
-      timestamp: new Date().toISOString()
-    }
-  });
-});
-
-// Test endpoint with full debug
-app.get('/api/ghl-test', async (req, res) => {
-  try {
-    const { result, debug } = await callGHLMCP('locations_get-location', {
-      locationId: process.env.CRM_LOCATION_ID
-    });
-    
-    res.json({
-      success: true,
-      message: 'GoHighLevel MCP Server connection test successful',
-      result: result,
-      debug: debug
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// Keep existing endpoints
-app.get('/api/hello', (req, res) => {
-  res.json({ 
-    message: 'Hello World!', 
-    timestamp: new Date().toISOString(),
-    status: 'working'
-  });
-});
-
-app.get('/api', (req, res) => {
-  res.json({
-    name: 'iKunnect GoHighLevel MCP Integration API',
-    version: '25.0.0 - DEBUG CHAT',
-    description: 'Debug version that shows MCP responses in chat interface',
-    status: 'operational',
-    timestamp: new Date().toISOString(),
-    debug: 'MCP responses will be shown in chat interface for troubleshooting'
-  });
-});
-
-// 404 handler
-app.use('/api/*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'API endpoint not found',
-    path: req.path,
-    method: req.method
-  });
-});
-
-module.exports = app;
+    <script src="/script.js"></script>
+</body>
+</html>
 
