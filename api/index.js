@@ -5,7 +5,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Helper function to make GoHighLevel MCP Server calls
+// Helper function to make GoHighLevel MCP Server calls with correct headers
 async function callGHLMCP(tool, input) {
   const fetch = require('node-fetch');
   
@@ -17,7 +17,7 @@ async function callGHLMCP(tool, input) {
       'Authorization': `Bearer ${process.env.CRM_PIT}`,
       'locationId': process.env.CRM_LOCATION_ID,
       'Content-Type': 'application/json',
-      'Accept': 'application/json'
+      'Accept': 'application/json, text/event-stream'  // Fixed: Include both required Accept types
     },
     body: JSON.stringify({
       tool: tool,
@@ -352,11 +352,11 @@ app.get('/api/hello', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'iKunnect GoHighLevel MCP Integration API',
-    version: '18.0.0',
-    description: 'Using GoHighLevel MCP Server for proper Live Chat integration',
+    version: '19.0.0',
+    description: 'Fixed MCP Server headers - using proper Accept headers for GoHighLevel MCP',
     status: 'operational',
     timestamp: new Date().toISOString(),
-    note: 'Now using GoHighLevel MCP Server for all operations',
+    note: 'Now using correct Accept headers: application/json, text/event-stream',
     endpoints: {
       health: 'GET /api/health (MCP Server health check)',
       ghlTest: 'GET /api/ghl-test (MCP Server connection test)',
@@ -367,6 +367,10 @@ app.get('/api', (req, res) => {
     },
     mcp: {
       server: 'https://services.leadconnectorhq.com/mcp/',
+      headers: {
+        'Accept': 'application/json, text/event-stream',
+        'Content-Type': 'application/json'
+      },
       tools_used: [
         'locations_get-location',
         'contacts_upsert-contact', 
