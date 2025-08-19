@@ -7,6 +7,12 @@ let apiBaseUrl = window.location.origin;
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Chat interface loaded');
     console.log('API Base URL:', apiBaseUrl);
+    
+    // Ensure input is disabled initially
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    if (messageInput) messageInput.disabled = true;
+    if (sendBtn) sendBtn.disabled = true;
 });
 
 // Start chat session
@@ -69,6 +75,23 @@ async function startChat() {
         
         addMessage('system', `Conversation ${currentThread.isNewConversation ? 'created' : 'found'}: ${currentThread.conversationId}`);
         
+        // Enable chat interface
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const setupForm = document.getElementById('setupForm');
+        
+        if (messageInput) {
+            messageInput.disabled = false;
+            messageInput.placeholder = "Type your message...";
+            messageInput.focus();
+        }
+        if (sendBtn) {
+            sendBtn.disabled = false;
+        }
+        if (setupForm) {
+            setupForm.style.opacity = '0.5';
+        }
+        
         // Show success message
         addMessage('bot', `Hello ${currentSession.contact.firstName || currentSession.contact.name}! I'm ready to help you. Your information has been saved to our CRM system.`);
         
@@ -93,7 +116,7 @@ async function sendMessage(messageText = null) {
     }
     
     // Clear input
-    if (!messageText) {
+    if (!messageText && messageInput) {
         messageInput.value = '';
     }
     
@@ -207,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const messageInput = document.getElementById('messageInput');
     if (messageInput) {
         messageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !messageInput.disabled) {
                 e.preventDefault();
                 sendMessage();
             }
