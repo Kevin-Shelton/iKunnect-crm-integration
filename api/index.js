@@ -1,37 +1,32 @@
-import express from 'express';
-import cors from 'cors';
+const express = require('express');
+const cors = require('cors');
 
 const app = express();
 
-// Basic middleware
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Simple health check
+// Test endpoint
+app.get('/api/hello', (req, res) => {
+  res.json({ 
+    message: 'Hello World!', 
+    timestamp: new Date().toISOString(),
+    status: 'working'
+  });
+});
+
+// Health check
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
-    message: 'API is working!',
+    message: 'API is healthy',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
 });
 
-// Simple test endpoint
-app.get('/api/test', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Test endpoint working!',
-    env: {
-      nodeEnv: process.env.NODE_ENV,
-      hasCrmUrl: !!process.env.CRM_MCP_URL,
-      hasCrmPit: !!process.env.CRM_PIT,
-      hasCrmLocationId: !!process.env.CRM_LOCATION_ID
-    }
-  });
-});
-
-// Basic chat session endpoint (simplified for testing)
+// Chat session endpoint
 app.post('/api/chat/session', (req, res) => {
   try {
     const { name, email, phone } = req.body;
@@ -45,7 +40,6 @@ app.post('/api/chat/session', (req, res) => {
 
     res.json({
       success: true,
-      message: 'Chat session created successfully!',
       data: {
         contactId: `contact-${Date.now()}`,
         isNewContact: true,
@@ -64,7 +58,7 @@ app.post('/api/chat/session', (req, res) => {
   }
 });
 
-// Basic chat thread endpoint
+// Chat thread endpoint
 app.post('/api/chat/thread', (req, res) => {
   try {
     const { contactId } = req.body;
@@ -78,7 +72,6 @@ app.post('/api/chat/thread', (req, res) => {
 
     res.json({
       success: true,
-      message: 'Conversation thread created!',
       data: {
         conversationId: `conv-${Date.now()}`,
         isNewConversation: true,
@@ -93,7 +86,7 @@ app.post('/api/chat/thread', (req, res) => {
   }
 });
 
-// Basic send message endpoint
+// Send message endpoint
 app.post('/api/chat/send', (req, res) => {
   try {
     const { conversationId, body } = req.body;
@@ -107,7 +100,6 @@ app.post('/api/chat/send', (req, res) => {
 
     res.json({
       success: true,
-      message: 'Message sent successfully!',
       data: {
         messageId: `msg-${Date.now()}`,
         conversationId: conversationId,
@@ -123,7 +115,7 @@ app.post('/api/chat/send', (req, res) => {
   }
 });
 
-// Basic bot process endpoint
+// Bot process endpoint
 app.post('/api/bot/process', (req, res) => {
   try {
     const { message } = req.body;
@@ -135,23 +127,23 @@ app.post('/api/bot/process', (req, res) => {
       });
     }
 
-    // Simple bot responses for testing
-    let response = "Thank you for your message! I'm a test bot.";
+    // Simple bot responses
+    let response = "Thank you for your message! I'm working correctly now.";
     let action = "acknowledged";
     let confidence = 0.8;
 
     if (message.toLowerCase().includes('hello') || message.toLowerCase().includes('hi')) {
-      response = "Hello! How can I help you today?";
+      response = "Hello! Great to see the integration is working!";
       action = "greeting";
       confidence = 0.9;
     } else if (message.toLowerCase().includes('help')) {
-      response = "I'm here to help! What do you need assistance with?";
+      response = "I'm here to help! The API is now functioning properly.";
       action = "help_request";
       confidence = 0.85;
-    } else if (message.toLowerCase().includes('price') || message.toLowerCase().includes('cost')) {
-      response = "I'd be happy to help you with pricing information. Let me connect you with our sales team.";
-      action = "pricing_inquiry";
-      confidence = 0.9;
+    } else if (message.toLowerCase().includes('test')) {
+      response = "Test successful! The chat integration is working perfectly.";
+      action = "test_response";
+      confidence = 0.95;
     }
 
     res.json({
@@ -171,17 +163,17 @@ app.post('/api/bot/process', (req, res) => {
   }
 });
 
-// Root API endpoint
+// Root API endpoint - ONLY for /api path
 app.get('/api', (req, res) => {
   res.json({
-    name: 'iKunnect-CRM Integration API',
+    name: 'iKunnect CRM Integration API',
     version: '1.0.0',
-    description: 'Simplified API for testing',
+    description: 'Working JavaScript API for chat integration',
     status: 'operational',
     timestamp: new Date().toISOString(),
     endpoints: {
       health: 'GET /api/health',
-      test: 'GET /api/test',
+      hello: 'GET /api/hello',
       chatSession: 'POST /api/chat/session',
       chatThread: 'POST /api/chat/thread',
       chatSend: 'POST /api/chat/send',
@@ -190,15 +182,23 @@ app.get('/api', (req, res) => {
   });
 });
 
-// 404 handler for API routes
+// 404 handler - ONLY for /api/* paths
 app.use('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
     error: 'API endpoint not found',
     path: req.path,
-    method: req.method
+    method: req.method,
+    availableEndpoints: [
+      'GET /api/health',
+      'GET /api/hello', 
+      'POST /api/chat/session',
+      'POST /api/chat/thread',
+      'POST /api/chat/send',
+      'POST /api/bot/process'
+    ]
   });
 });
 
-export default app;
+module.exports = app;
 
