@@ -1,189 +1,220 @@
-let chatSession = null;
-let conversationId = null;
-const apiBaseUrl = window.location.origin;
+// Global variables to store session data
+let currentSession = null;
+let currentThread = null;
+let apiBaseUrl = window.location.origin;
 
-function addMessage(content, type = 'user', avatar = 'U') {
-    const messagesContainer = document.getElementById('chatMessages');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${type}`;
+// Initialize the chat interface
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Chat interface loaded');
     
-    messageDiv.innerHTML = `
-        <div class="message-avatar">${avatar}</div>
-        <div class="message-content">${content}</div>
-    `;
+    // Auto-detect API URL
+    if (window.location.hostname.includes('vercel.app')) {
+        apiBaseUrl = window.location.origin;
+    }
     
-    messagesContainer.appendChild(messageDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
+    console.log('API Base URL:', apiBaseUrl);
+});
 
-function addStatus(message, type = 'info') {
-    const messagesContainer = document.getElementById('chatMessages');
-    const statusDiv = document.createElement('div');
-    statusDiv.className = `status ${type}`;
-    statusDiv.textContent = message;
-    messagesContainer.appendChild(statusDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
-
+// Start chat session
 async function startChat() {
     const name = document.getElementById('userName').value.trim();
     const email = document.getElementById('userEmail').value.trim();
     const phone = document.getElementById('userPhone').value.trim();
-
+    
     if (!name || !email) {
-        alert('Please fill in name and email');
+        addMessage('system', 'Please enter your name and email to start the chat.');
         return;
     }
-
+    
     try {
-        addStatus('Creating chat session...', 'info');
-
-        // Step 1: Create chat session (contact)
+        addMessage('system', 'Starting chat session...');
+        
+        // Create session
         const sessionResponse = await fetch(`${apiBaseUrl}/api/chat/session`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                name: name,
-                email: email,
-                phone: phone || undefined,
-                source: 'iKunnect Chat Widget',
-                tags: ['Vercel Deployment', 'Live Chat']
-            })
+            body: JSON.stringify({ name, email, phone })
         });
-
+        
         if (!sessionResponse.ok) {
-            const errorData = await sessionResponse.json().catch(() => ({}));
+            const errorData = await sessionResponse.json();
             throw new Error(`Session creation failed: ${sessionResponse.status} - ${errorData.error || 'Unknown error'}`);
         }
-
-        const sessionData = await sessionResponse.json();
-        chatSession = sessionData.data;
         
-        addStatus(`Contact ${chatSession.isNewContact ? 'created' : 'found'}: ${chatSession.contact.name}`, 'info');
-
-        // Step 2: Create conversation thread
+        const sessionData = await sessionResponse.json();
+        currentSession = sessionData.data;
+        
+        console.log('Session created:', currentSession);
+        
+        addMessage('system', `Contact ${currentSession.isNewContact ? 'created' : 'found'}: ${currentSession.contact.name}`);
+        
+        // Create conversation thread
+        addMessage('system', 'Creating conversation thread...');
+        
         const threadResponse = await fetch(`${apiBaseUrl}/api/chat/thread`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                contactId: chatSession.contactId,
-                channel: 'chat'
+            body: JSON.stringify({ 
+                contactId: currentSession.contactId 
             })
         });
-
+        
         if (!threadResponse.ok) {
-            const errorData = await threadResponse.json().catch(() => ({}));
+            const errorData = await threadResponse.json();
             throw new Error(`Thread creation failed: ${threadResponse.status} - ${errorData.error || 'Unknown error'}`);
         }
-
+        
         const threadData = await threadResponse.json();
-        conversationId = threadData.data.conversationId;
+        currentThread = threadData.data;
         
-        addStatus(`Conversation ${threadData.data.isNewConversation ? 'created' : 'found'}: ${conversationId}`, 'info');
-
-        // Enable chat input
-        document.getElementById('messageInput').disabled = false;
-        document.getElementById('sendBtn').disabled = false;
-        document.getElementById('setupForm').classList.add('hidden');
+        console.log('Thread created:', currentThread);
         
-        addMessage('Welcome! Your chat session is connected to the CRM. Try sending a message!', 'system', '🤖');
+        addMessage('system', `Conversation ${currentThread.isNewConversation ? 'created' : 'found'}: ${currentThread.conversationId}`);
         
-        // Focus on message input
-        document.getElementById('messageInput').focus();
-
+        // Enable chat interface
+        document.getElementById('chatForm').style.display = 'block';
+        document.getElementById('setupForm').style.display = 'none';
+        
+        addMessage('bot', `Hello ${currentSession.contact.firstName || currentSession.contact.name}! I'm ready to help you. Your information has been saved to our CRM system.`);
+        
     } catch (error) {
         console.error('Error starting chat:', error);
-        addStatus(`Error: ${error.message}`, 'error');
+        addMessage('system', `Error starting chat: ${error.message}`);
     }
 }
 
-async function sendMessage() {
-    const messageInput = document.getElementById('messageInput');
-    const message = messageInput.value.trim();
+// Send message
+async function sendMessage(messageText = null) {
+    if (!currentSession || !currentThread) {
+        addMessage('system', 'Please start a chat session first.');
+        return;
+    }
     
-    if (!message || !conversationId) return;
-
-    // Clear input and disable temporarily
-    messageInput.value = '';
-    messageInput.disabled = true;
-    document.getElementById('sendBtn').disabled = true;
-
+    const messageInput = document.getElementById('messageInput');
+    const message = messageText || messageInput.value.trim();
+    
+    if (!message) {
+        return;
+    }
+    
+    // Clear input
+    if (!messageText) {
+        messageInput.value = '';
+    }
+    
     // Add user message to chat
-    addMessage(message, 'user', 'U');
-
+    addMessage('user', message);
+    
     try {
-        // Send message to API
-        const response = await fetch(`${apiBaseUrl}/api/chat/send`, {
+        // Send message to CRM
+        addMessage('system', `Sending to CRM...`);
+        
+        const sendResponse = await fetch(`${apiBaseUrl}/api/chat/send`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                conversationId: conversationId,
-                body: message,
-                channel: 'Chat'
+            body: JSON.stringify({ 
+                conversationId: currentThread.conversationId,
+                contactId: currentSession.contactId,
+                body: message 
             })
         });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(`Message send failed: ${response.status} - ${errorData.error || 'Unknown error'}`);
+        
+        if (!sendResponse.ok) {
+            const errorData = await sendResponse.json();
+            throw new Error(`Message send failed: ${sendResponse.status} - ${errorData.error || 'Unknown error'}`);
         }
-
-        const messageData = await response.json();
-        addStatus(`Message sent to CRM: ${messageData.data.messageId}`, 'info');
-
-        // Process message through bot
+        
+        const sendData = await sendResponse.json();
+        console.log('Message sent:', sendData);
+        
+        addMessage('system', `Message sent to CRM: ${sendData.data.messageId}`);
+        
+        // Process with bot
         const botResponse = await fetch(`${apiBaseUrl}/api/bot/process`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
+            body: JSON.stringify({ 
                 message: message,
-                contactId: chatSession.contactId,
-                conversationId: conversationId,
-                context: { source: 'vercel_chat_widget' }
+                contactId: currentSession.contactId,
+                conversationId: currentThread.conversationId
             })
         });
-
-        if (botResponse.ok) {
-            const botData = await botResponse.json();
-            addMessage(botData.data.response, 'bot', '🤖');
-            
-            if (botData.data.action) {
-                addStatus(`Bot Action: ${botData.data.action} (Confidence: ${Math.round((botData.data.confidence || 0) * 100)}%)`, 'info');
-            }
-        } else {
-            addMessage('I received your message and it has been saved to the CRM!', 'bot', '🤖');
+        
+        if (!botResponse.ok) {
+            const errorData = await botResponse.json();
+            throw new Error(`Bot processing failed: ${botResponse.status} - ${errorData.error || 'Unknown error'}`);
         }
-
+        
+        const botData = await botResponse.json();
+        console.log('Bot response:', botData);
+        
+        // Add bot response to chat
+        addMessage('bot', botData.data.response);
+        addMessage('system', `Bot Action: ${botData.data.action} (Confidence: ${Math.round(botData.data.confidence * 100)}%)`);
+        
     } catch (error) {
         console.error('Error sending message:', error);
-        addStatus(`Error: ${error.message}`, 'error');
-        addMessage('Sorry, there was an error processing your message. Please try again.', 'bot', '🤖');
+        addMessage('system', `Error sending message: ${error.message}`);
     }
+}
 
-    // Re-enable input
-    messageInput.disabled = false;
-    document.getElementById('sendBtn').disabled = false;
-    messageInput.focus();
+// Add message to chat display
+function addMessage(type, content) {
+    const chatMessages = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type}`;
+    
+    const timestamp = new Date().toLocaleTimeString();
+    
+    switch (type) {
+        case 'user':
+            messageDiv.innerHTML = `
+                <div class="message-content user-message">
+                    <strong>You:</strong> ${content}
+                    <div class="timestamp">${timestamp}</div>
+                </div>
+            `;
+            break;
+        case 'bot':
+            messageDiv.innerHTML = `
+                <div class="message-content bot-message">
+                    <span class="bot-icon">🤖</span>
+                    <div class="bot-text">${content}</div>
+                    <div class="timestamp">${timestamp}</div>
+                </div>
+            `;
+            break;
+        case 'system':
+            messageDiv.innerHTML = `
+                <div class="message-content system-message">
+                    <em>${content}</em>
+                    <div class="timestamp">${timestamp}</div>
+                </div>
+            `;
+            break;
+    }
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 // Handle Enter key in message input
-document.getElementById('messageInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
+document.addEventListener('DOMContentLoaded', function() {
+    const messageInput = document.getElementById('messageInput');
+    if (messageInput) {
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
     }
 });
-
-// Auto-focus on name input when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('userName').focus();
-});
-
