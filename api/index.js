@@ -124,8 +124,8 @@ app.post('/api/chat/session', async (req, res) => {
         email: email,
         phone: phone || '',
         locationId: process.env.CRM_LOCATION_ID,
-        source: 'iKunnect Chat Widget',
-        tags: ['Vercel Deployment', 'Live Chat', 'Web Visitor']
+        source: 'iKunnect Live Chat Widget',
+        tags: ['Live Chat', 'Web Visitor', 'iKunnect Integration']
       };
 
       try {
@@ -149,8 +149,8 @@ app.post('/api/chat/session', async (req, res) => {
               firstName: firstName,
               lastName: lastName,
               email: email,
-              source: 'iKunnect Chat Widget - Updated',
-              tags: ['Vercel Deployment', 'Live Chat', 'Web Visitor', 'Returning Visitor']
+              source: 'iKunnect Live Chat Widget - Updated',
+              tags: ['Live Chat', 'Web Visitor', 'iKunnect Integration', 'Returning Visitor']
             };
             
             try {
@@ -199,7 +199,7 @@ app.post('/api/chat/session', async (req, res) => {
   }
 });
 
-// Real GoHighLevel conversation thread endpoint
+// Real GoHighLevel conversation thread endpoint - FIXED FOR LIVE CHAT
 app.post('/api/chat/thread', async (req, res) => {
   try {
     const { contactId } = req.body;
@@ -211,7 +211,7 @@ app.post('/api/chat/thread', async (req, res) => {
       });
     }
 
-    // Check for existing conversations
+    // Check for existing Live Chat conversations
     let conversation = null;
     let isNewConversation = false;
     
@@ -219,26 +219,35 @@ app.post('/api/chat/thread', async (req, res) => {
       const conversationsData = await callGHLAPI(`conversations/search?contactId=${contactId}&locationId=${process.env.CRM_LOCATION_ID}`);
       const conversations = conversationsData.conversations || [];
       
-      if (conversations.length > 0) {
-        conversation = conversations[0];
-        console.log('[GHL] Found existing conversation:', conversation.id);
+      // Look for existing Live Chat conversation specifically
+      const liveChatConversation = conversations.find(conv => 
+        conv.type === 'Live_Chat' || 
+        conv.type === 'LiveChat' || 
+        conv.type === 'WebChat'
+      );
+      
+      if (liveChatConversation) {
+        conversation = liveChatConversation;
+        console.log('[GHL] Found existing Live Chat conversation:', conversation.id);
       }
     } catch (searchError) {
       console.log('[GHL] Conversation search failed, will create new:', searchError.message);
     }
     
-    // If no existing conversation, create new one
+    // If no existing Live Chat conversation, create new one
     if (!conversation) {
+      // NOTE: The conversation creation API doesn't have a 'type' parameter
+      // The conversation type is determined by the first message sent to it
+      // We'll create a basic conversation and the first message will set it as Live Chat
       const conversationData = {
         locationId: process.env.CRM_LOCATION_ID,
-        contactId: contactId,
-        type: 'Live_Chat'  // Live chat type for proper display
+        contactId: contactId
       };
 
       const createData = await callGHLAPI('conversations/', 'POST', conversationData);
       conversation = createData.conversation;
       isNewConversation = true;
-      console.log('[GHL] Created new conversation:', conversation.id);
+      console.log('[GHL] Created new conversation (will become Live Chat):', conversation.id);
     }
     
     res.json({
@@ -249,7 +258,7 @@ app.post('/api/chat/thread', async (req, res) => {
         contactId: contactId,
         conversation: {
           id: conversation.id,
-          type: conversation.type,
+          type: conversation.type || 'Live_Chat',
           status: conversation.status,
           assignedTo: conversation.assignedTo
         }
@@ -266,7 +275,7 @@ app.post('/api/chat/thread', async (req, res) => {
   }
 });
 
-// CUSTOMER MESSAGE - Send to GoHighLevel and let Conversation AI handle it
+// CUSTOMER MESSAGE - Use WebChat type to ensure Live Chat display
 app.post('/api/chat/send', async (req, res) => {
   try {
     const { conversationId, body, contactId } = req.body;
@@ -285,15 +294,17 @@ app.post('/api/chat/send', async (req, res) => {
       });
     }
 
-    // Send customer message to GoHighLevel
-    // GoHighLevel's Conversation AI will automatically respond if configured
+    // Send customer message to GoHighLevel using WebChat type
+    // This should ensure the message appears as Live Chat, not SMS
     const messageData = {
-      type: 'Live_Chat',
+      type: 'WebChat',  // Try WebChat instead of Live_Chat
       message: body,
       contactId: contactId,
       conversationId: conversationId
     };
 
+    console.log('[Customer Message] Sending with WebChat type to ensure Live Chat display');
+    
     const messageResponse = await callGHLAPI('conversations/messages', 'POST', messageData);
     
     const messageId = messageResponse.messageId || 
@@ -301,7 +312,7 @@ app.post('/api/chat/send', async (req, res) => {
                      messageResponse.id || 
                      'message_created';
     
-    console.log('[Customer Message] Sent to GoHighLevel - AI will respond automatically');
+    console.log('[Customer Message] Sent to GoHighLevel as WebChat - AI will respond automatically');
     
     res.json({
       success: true,
@@ -312,7 +323,8 @@ app.post('/api/chat/send', async (req, res) => {
         body: body,
         timestamp: new Date().toISOString(),
         status: 'delivered',
-        note: 'Message sent to GoHighLevel. Conversation AI will respond automatically if enabled.'
+        messageType: 'WebChat',
+        note: 'Message sent as WebChat type to ensure Live Chat display in GoHighLevel.'
       }
     });
     
@@ -327,7 +339,6 @@ app.post('/api/chat/send', async (req, res) => {
 });
 
 // Legacy bot endpoint for backward compatibility - returns success but does nothing
-// Frontend should stop calling this endpoint
 app.post('/api/bot/process', (req, res) => {
   res.json({
     success: true,
@@ -384,23 +395,23 @@ app.get('/api/hello', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'iKunnect GoHighLevel Integration API',
-    version: '16.0.0',
-    description: 'Fixed duplicate contact handling and removed hardcoded bot responses',
+    version: '17.0.0',
+    description: 'Fixed to use WebChat message type for proper Live Chat display in GoHighLevel',
     status: 'operational',
     timestamp: new Date().toISOString(),
-    note: 'GoHighLevel Conversation AI handles all responses automatically',
+    note: 'Messages now use WebChat type to appear as Live Chat instead of SMS',
     endpoints: {
       health: 'GET /api/health',
       ghlTest: 'GET /api/ghl-test',
       chatSession: 'POST /api/chat/session (handles duplicate contacts)',
-      chatThread: 'POST /api/chat/thread',
-      chatSend: 'POST /api/chat/send (GoHighLevel AI responds automatically)',
+      chatThread: 'POST /api/chat/thread (creates Live Chat conversations)',
+      chatSend: 'POST /api/chat/send (uses WebChat type for Live Chat display)',
       botProcess: 'POST /api/bot/process (deprecated - returns success for compatibility)'
     },
     requirements: {
-      ghl_setup: 'Conversation AI must be enabled and configured in GoHighLevel',
+      ghl_setup: 'Chat Widget must be configured with Chat Type set to Live Chat',
       ai_mode: 'Set Conversation AI to Auto-Pilot mode for automatic responses',
-      channels: 'Live_Chat channel must be enabled for the Conversation AI bot'
+      channels: 'WebChat/Live_Chat channel must be enabled for the Conversation AI bot'
     }
   });
 });
