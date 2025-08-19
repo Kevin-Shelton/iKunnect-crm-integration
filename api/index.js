@@ -180,7 +180,7 @@ app.post('/api/chat/thread', async (req, res) => {
       const conversationData = {
         locationId: process.env.CRM_LOCATION_ID,
         contactId: contactId,
-        type: 'Chat'
+        type: 'SMS'  // Changed from 'Chat' to 'SMS' - valid enum value
       };
 
       const createData = await callGHLAPI('conversations/', 'POST', conversationData);
@@ -212,7 +212,7 @@ app.post('/api/chat/thread', async (req, res) => {
   }
 });
 
-// Fixed message sending endpoint with proper contact ID
+// Fixed message sending endpoint with correct message type
 app.post('/api/chat/send', async (req, res) => {
   try {
     const { conversationId, body, contactId } = req.body;
@@ -231,14 +231,14 @@ app.post('/api/chat/send', async (req, res) => {
       });
     }
 
-    // Create message with all required fields
+    // Create message with correct enum values
     const messageData = {
-      type: 'Chat',
-      body: body,
+      type: 'SMS',  // Valid enum: SMS, Email, Call, etc.
+      message: body,  // Changed from 'body' to 'message'
       direction: 'inbound',
       status: 'delivered',
       conversationId: conversationId,
-      contactId: contactId,  // This was missing!
+      contactId: contactId,
       locationId: process.env.CRM_LOCATION_ID
     };
 
@@ -267,7 +267,7 @@ app.post('/api/chat/send', async (req, res) => {
   }
 });
 
-// Enhanced bot process endpoint with proper message creation
+// Enhanced bot process endpoint with correct message format
 app.post('/api/bot/process', async (req, res) => {
   try {
     const { message, contactId, conversationId } = req.body;
@@ -315,16 +315,16 @@ app.post('/api/bot/process', async (req, res) => {
       confidence = 0.95;
     }
 
-    // Send bot response back to GoHighLevel with proper contact ID
+    // Send bot response back to GoHighLevel with correct format
     if (conversationId && contactId) {
       try {
         const botMessageData = {
-          type: 'Chat',
-          body: response,
+          type: 'SMS',  // Valid enum value
+          message: response,  // Changed from 'body' to 'message'
           direction: 'outbound',
           status: 'delivered',
           conversationId: conversationId,
-          contactId: contactId,  // Include contact ID
+          contactId: contactId,
           locationId: process.env.CRM_LOCATION_ID
         };
         
@@ -406,8 +406,8 @@ app.get('/api/hello', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'iKunnect GoHighLevel Integration API',
-    version: '7.0.0',
-    description: 'GoHighLevel integration with proper contact ID handling',
+    version: '8.0.0',
+    description: 'GoHighLevel integration with correct message type enums',
     status: 'operational',
     timestamp: new Date().toISOString(),
     endpoints: {
