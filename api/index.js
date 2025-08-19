@@ -41,6 +41,16 @@ async function callGHLAPI(endpoint, method = 'GET', data = null) {
   }
   
   if (!response.ok) {
+    // Special handling for duplicate contact error
+    if (response.status === 400 && responseData.message && responseData.message.includes('duplicated contacts')) {
+      // Return the error with contact ID so we can use the existing contact
+      const duplicateError = new Error(`Duplicate contact: ${responseData.message}`);
+      duplicateError.isDuplicate = true;
+      duplicateError.existingContactId = responseData.meta?.contactId;
+      duplicateError.matchingField = responseData.meta?.matchingField;
+      throw duplicateError;
+    }
+    
     throw new Error(`GHL API Error: ${response.status} - ${JSON.stringify(responseData)}`);
   }
   
@@ -78,7 +88,7 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Real GoHighLevel chat session endpoint
+// Real GoHighLevel chat session endpoint with duplicate contact handling
 app.post('/api/chat/session', async (req, res) => {
   try {
     const { name, email, phone } = req.body;
@@ -97,11 +107,12 @@ app.post('/api/chat/session', async (req, res) => {
     try {
       const searchData = await callGHLAPI(`contacts/search/duplicate?locationId=${process.env.CRM_LOCATION_ID}&email=${encodeURIComponent(email)}`);
       contact = searchData.contact;
+      console.log('[GHL] Found existing contact by email:', contact?.id);
     } catch (searchError) {
-      console.log('[GHL] Contact search failed, will create new:', searchError.message);
+      console.log('[GHL] Contact search by email failed, will try to create new:', searchError.message);
     }
     
-    // If no existing contact found, create new one
+    // If no existing contact found, try to create new one
     if (!contact) {
       const nameParts = name.trim().split(' ');
       const firstName = nameParts[0] || '';
@@ -117,9 +128,49 @@ app.post('/api/chat/session', async (req, res) => {
         tags: ['Vercel Deployment', 'Live Chat', 'Web Visitor']
       };
 
-      const createData = await callGHLAPI('contacts/', 'POST', contactData);
-      contact = createData.contact;
-      isNewContact = true;
+      try {
+        const createData = await callGHLAPI('contacts/', 'POST', contactData);
+        contact = createData.contact;
+        isNewContact = true;
+        console.log('[GHL] Created new contact:', contact?.id);
+      } catch (createError) {
+        // Handle duplicate contact error
+        if (createError.isDuplicate && createError.existingContactId) {
+          console.log('[GHL] Duplicate contact detected, using existing contact:', createError.existingContactId);
+          
+          // Get the existing contact details
+          try {
+            const existingContactData = await callGHLAPI(`contacts/${createError.existingContactId}`);
+            contact = existingContactData.contact;
+            isNewContact = false;
+            
+            // Update the existing contact with new information if needed
+            const updateData = {
+              firstName: firstName,
+              lastName: lastName,
+              email: email,
+              source: 'iKunnect Chat Widget - Updated',
+              tags: ['Vercel Deployment', 'Live Chat', 'Web Visitor', 'Returning Visitor']
+            };
+            
+            try {
+              await callGHLAPI(`contacts/${contact.id}`, 'PUT', updateData);
+              console.log('[GHL] Updated existing contact with new info');
+            } catch (updateError) {
+              console.log('[GHL] Could not update existing contact:', updateError.message);
+            }
+            
+          } catch (fetchError) {
+            throw new Error(`Could not fetch existing contact: ${fetchError.message}`);
+          }
+        } else {
+          throw createError;
+        }
+      }
+    }
+    
+    if (!contact || !contact.id) {
+      throw new Error('Failed to create or find contact');
     }
     
     res.json({
@@ -170,6 +221,7 @@ app.post('/api/chat/thread', async (req, res) => {
       
       if (conversations.length > 0) {
         conversation = conversations[0];
+        console.log('[GHL] Found existing conversation:', conversation.id);
       }
     } catch (searchError) {
       console.log('[GHL] Conversation search failed, will create new:', searchError.message);
@@ -186,6 +238,7 @@ app.post('/api/chat/thread', async (req, res) => {
       const createData = await callGHLAPI('conversations/', 'POST', conversationData);
       conversation = createData.conversation;
       isNewConversation = true;
+      console.log('[GHL] Created new conversation:', conversation.id);
     }
     
     res.json({
@@ -232,9 +285,8 @@ app.post('/api/chat/send', async (req, res) => {
       });
     }
 
-    // Send customer message to GoHighLevel using regular endpoint
-    // GoHighLevel's Conversation AI will automatically detect this as an inbound message
-    // and respond if the AI bot is enabled and set to Auto-Pilot mode
+    // Send customer message to GoHighLevel
+    // GoHighLevel's Conversation AI will automatically respond if configured
     const messageData = {
       type: 'Live_Chat',
       message: body,
@@ -249,7 +301,7 @@ app.post('/api/chat/send', async (req, res) => {
                      messageResponse.id || 
                      'message_created';
     
-    console.log('[Customer Message] Sent to GoHighLevel - Conversation AI will handle response');
+    console.log('[Customer Message] Sent to GoHighLevel - AI will respond automatically');
     
     res.json({
       success: true,
@@ -260,8 +312,7 @@ app.post('/api/chat/send', async (req, res) => {
         body: body,
         timestamp: new Date().toISOString(),
         status: 'delivered',
-        note: 'Message sent to GoHighLevel. Conversation AI will respond automatically if enabled.',
-        fullResponse: messageResponse
+        note: 'Message sent to GoHighLevel. Conversation AI will respond automatically if enabled.'
       }
     });
     
@@ -275,12 +326,20 @@ app.post('/api/chat/send', async (req, res) => {
   }
 });
 
-// REMOVED: Bot process endpoint - GoHighLevel's Conversation AI handles this automatically
-// The /api/bot/process endpoint has been removed because:
-// 1. GoHighLevel's Conversation AI automatically responds to inbound messages
-// 2. We don't need to create our own bot logic
-// 3. The CRM's AI agent is more intelligent and properly trained
-// 4. Responses come directly from the assigned agent's AI configuration
+// Legacy bot endpoint for backward compatibility - returns success but does nothing
+// Frontend should stop calling this endpoint
+app.post('/api/bot/process', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      response: "This endpoint is deprecated. GoHighLevel Conversation AI handles responses automatically.",
+      action: "deprecated",
+      confidence: 1.0,
+      timestamp: new Date().toISOString(),
+      note: "Please update your frontend to remove calls to this endpoint."
+    }
+  });
+});
 
 // Test endpoint to verify GoHighLevel connection
 app.get('/api/ghl-test', async (req, res) => {
@@ -325,17 +384,18 @@ app.get('/api/hello', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'iKunnect GoHighLevel Integration API',
-    version: '15.0.0',
-    description: 'Proper integration with GoHighLevel Conversation AI - no hardcoded responses',
+    version: '16.0.0',
+    description: 'Fixed duplicate contact handling and removed hardcoded bot responses',
     status: 'operational',
     timestamp: new Date().toISOString(),
-    note: 'This API sends messages to GoHighLevel and lets the CRM\'s Conversation AI handle responses automatically',
+    note: 'GoHighLevel Conversation AI handles all responses automatically',
     endpoints: {
       health: 'GET /api/health',
       ghlTest: 'GET /api/ghl-test',
-      chatSession: 'POST /api/chat/session',
+      chatSession: 'POST /api/chat/session (handles duplicate contacts)',
       chatThread: 'POST /api/chat/thread',
-      chatSend: 'POST /api/chat/send (GoHighLevel AI responds automatically)'
+      chatSend: 'POST /api/chat/send (GoHighLevel AI responds automatically)',
+      botProcess: 'POST /api/bot/process (deprecated - returns success for compatibility)'
     },
     requirements: {
       ghl_setup: 'Conversation AI must be enabled and configured in GoHighLevel',
