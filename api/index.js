@@ -47,6 +47,28 @@ async function callGHLAPI(endpoint, method = 'GET', data = null) {
   return responseData;
 }
 
+// Helper function to get assigned agent name
+async function getAssignedAgentName(conversationId) {
+  try {
+    // Get conversation details to find assignedTo
+    const conversationData = await callGHLAPI(`conversations/${conversationId}`);
+    const assignedTo = conversationData.conversation?.assignedTo;
+    
+    if (!assignedTo) {
+      return null; // No agent assigned
+    }
+    
+    // Get user details to get the agent's name
+    const userData = await callGHLAPI(`users/${assignedTo}`);
+    const agentName = userData.name || userData.firstName || 'Agent';
+    
+    return agentName;
+  } catch (error) {
+    console.log('[Agent Name] Could not fetch assigned agent:', error.message);
+    return null;
+  }
+}
+
 // Health check with GHL REST API
 app.get('/api/health', async (req, res) => {
   try {
@@ -180,7 +202,7 @@ app.post('/api/chat/thread', async (req, res) => {
       const conversationData = {
         locationId: process.env.CRM_LOCATION_ID,
         contactId: contactId,
-        type: 'Live_Chat'  // Changed from 'SMS' to 'Live_Chat' for proper live chat display
+        type: 'Live_Chat'  // Live chat type for proper display
       };
 
       const createData = await callGHLAPI('conversations/', 'POST', conversationData);
@@ -197,7 +219,8 @@ app.post('/api/chat/thread', async (req, res) => {
         conversation: {
           id: conversation.id,
           type: conversation.type,
-          status: conversation.status
+          status: conversation.status,
+          assignedTo: conversation.assignedTo
         }
       }
     });
@@ -212,7 +235,7 @@ app.post('/api/chat/thread', async (req, res) => {
   }
 });
 
-// Fixed message sending endpoint with Live_Chat message type
+// Fixed message sending endpoint with better error handling
 app.post('/api/chat/send', async (req, res) => {
   try {
     const { conversationId, body, contactId } = req.body;
@@ -231,9 +254,9 @@ app.post('/api/chat/send', async (req, res) => {
       });
     }
 
-    // Create message with Live_Chat type for proper live chat display
+    // Create message with Live_Chat type
     const messageData = {
-      type: 'Live_Chat',  // Changed from 'SMS' to 'Live_Chat' for live chat display
+      type: 'Live_Chat',
       message: body,
       direction: 'inbound',
       status: 'delivered',
@@ -244,16 +267,23 @@ app.post('/api/chat/send', async (req, res) => {
 
     const messageResponse = await callGHLAPI('conversations/messages', 'POST', messageData);
     
+    // Better handling of message response structure
+    const messageId = messageResponse.messageId || 
+                     messageResponse.message?.id || 
+                     messageResponse.id || 
+                     'message_created';
+    
     res.json({
       success: true,
       data: {
-        messageId: messageResponse.message?.id || messageResponse.id,
+        messageId: messageId,
         conversationId: conversationId,
         contactId: contactId,
         body: body,
         timestamp: new Date().toISOString(),
         status: 'delivered',
-        direction: 'inbound'
+        direction: 'inbound',
+        fullResponse: messageResponse // Debug info
       }
     });
     
@@ -267,7 +297,7 @@ app.post('/api/chat/send', async (req, res) => {
   }
 });
 
-// Enhanced bot process endpoint with Live_Chat message format
+// Enhanced bot process endpoint with real agent name detection
 app.post('/api/bot/process', async (req, res) => {
   try {
     const { message, contactId, conversationId } = req.body;
@@ -290,36 +320,98 @@ app.post('/api/bot/process', async (req, res) => {
       }
     }
 
-    // Enhanced bot logic with personalization
-    let response = `Thank you for your message${contactInfo?.firstName ? `, ${contactInfo.firstName}` : ''}! I'm your AI assistant and your information has been saved to our CRM.`;
-    let action = "acknowledged";
+    // Get assigned agent name from conversation
+    let agentName = 'your assistant';
+    if (conversationId) {
+      const assignedAgentName = await getAssignedAgentName(conversationId);
+      if (assignedAgentName) {
+        agentName = assignedAgentName;
+      }
+    }
+
+    // Intelligent bot logic with real agent name
+    let response = '';
+    let action = '';
     let confidence = 0.8;
 
     const lowerMessage = message.toLowerCase();
+    const firstName = contactInfo?.firstName || 'there';
     
-    if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
-      response = `Hello${contactInfo?.firstName ? ` ${contactInfo.firstName}` : ''}! Welcome to National Lawyers Guild NYC. Your information is now in our system and I'm here to help you.`;
+    // Greeting responses
+    if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
+      response = `Hello ${firstName}! I'm ${agentName} from iKunnect. I'm here to help you with any questions about our services. What can I assist you with today?`;
       action = "greeting";
-      confidence = 0.9;
-    } else if (lowerMessage.includes('help')) {
-      response = "I'm here to help! I can assist you with questions about our legal services. Your conversation is being tracked for better support.";
-      action = "help_request";
-      confidence = 0.85;
-    } else if (lowerMessage.includes('lawyer') || lowerMessage.includes('legal')) {
-      response = "Great! You're interested in our legal services. I've noted this in your profile and someone from our legal team will reach out to you soon.";
-      action = "legal_inquiry";
-      confidence = 0.9;
-    } else if (lowerMessage.includes('consultation') || lowerMessage.includes('meeting')) {
-      response = "I'd be happy to help you schedule a consultation. Your interest has been noted and someone will contact you to arrange a meeting.";
-      action = "consultation_request";
       confidence = 0.95;
     }
+    
+    // Name questions - Use real agent name
+    else if (lowerMessage.includes('name') || lowerMessage.includes('who are you')) {
+      response = `Hi ${firstName}! I'm ${agentName}, your assigned agent at iKunnect. I'm here to help you with our contact center platform and services. What would you like to know?`;
+      action = "introduction";
+      confidence = 0.9;
+    }
+    
+    // Company/business questions
+    else if (lowerMessage.includes('company') || lowerMessage.includes('business') || lowerMessage.includes('what do you do') || lowerMessage.includes('services')) {
+      response = `Great question, ${firstName}! I'm ${agentName} and I work for iKunnect, a comprehensive contact center platform (CCaaS). We help businesses manage customer communications through live chat widgets, phone systems, CRM integration, and AI-powered customer service solutions. We're powered by OneMeta technology and specialize in improving customer experience. Would you like to know more about any specific service?`;
+      action = "company_info";
+      confidence = 0.95;
+    }
+    
+    // Help requests
+    else if (lowerMessage.includes('help') || lowerMessage.includes('assist') || lowerMessage.includes('support')) {
+      response = `I'm here to help, ${firstName}! I'm ${agentName}, and I can assist you with information about our contact center solutions, live chat services, CRM integrations, or answer any questions about iKunnect. What specific area would you like to know more about?`;
+      action = "help_request";
+      confidence = 0.9;
+    }
+    
+    // Legal/lawyer questions (legacy from previous setup)
+    else if (lowerMessage.includes('lawyer') || lowerMessage.includes('legal')) {
+      response = `I think there might be some confusion, ${firstName}. I'm ${agentName} from iKunnect, which is actually a contact center and customer communication platform, not a legal service. We help businesses manage their customer interactions through live chat, phone systems, and CRM integration. Is there something about our communication services I can help you with?`;
+      action = "clarification";
+      confidence = 0.85;
+    }
+    
+    // Pricing questions
+    else if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('pricing')) {
+      response = `Thanks for your interest in our pricing, ${firstName}! I'm ${agentName}, and I'd love to help you understand our iKunnect platform pricing. We offer flexible pricing based on your business needs. I can connect you with our sales team who can provide detailed pricing information tailored to your requirements. Would you like me to arrange a consultation?`;
+      action = "pricing_inquiry";
+      confidence = 0.9;
+    }
+    
+    // Demo/consultation requests
+    else if (lowerMessage.includes('demo') || lowerMessage.includes('consultation') || lowerMessage.includes('meeting') || lowerMessage.includes('call')) {
+      response = `Excellent, ${firstName}! I'm ${agentName}, and I'd be happy to arrange a demo or consultation for you. Our team can show you exactly how iKunnect can improve your customer communication workflows. I've noted your interest and someone from our team will reach out to schedule a convenient time. Is there a preferred time of day that works best for you?`;
+      action = "demo_request";
+      confidence = 0.95;
+    }
+    
+    // Features questions
+    else if (lowerMessage.includes('feature') || lowerMessage.includes('capability') || lowerMessage.includes('can you') || lowerMessage.includes('able to')) {
+      response = `Great question, ${firstName}! I'm ${agentName}, and I'm excited to tell you about iKunnect's powerful features: live chat widgets (like this one!), omnichannel communication, CRM integration, AI-powered responses, call center management, and real-time analytics. We're also powered by OneMeta's advanced AI technology. Which specific feature interests you most?`;
+      action = "features_inquiry";
+      confidence = 0.9;
+    }
+    
+    // Integration questions
+    else if (lowerMessage.includes('integrate') || lowerMessage.includes('crm') || lowerMessage.includes('api')) {
+      response = `Absolutely, ${firstName}! I'm ${agentName}, and integration is one of our strengths at iKunnect. We integrate seamlessly with popular CRMs like GoHighLevel, Salesforce, HubSpot, and many others. We also offer robust APIs for custom integrations. This chat conversation, for example, is being automatically saved to our CRM system. Would you like to know more about specific integrations?`;
+      action = "integration_inquiry";
+      confidence = 0.95;
+    }
+    
+    // Default intelligent response
+    else {
+      response = `Thanks for your message, ${firstName}! I'm ${agentName} from iKunnect, and I want to make sure I give you the most helpful response. Could you tell me a bit more about what you're looking for? Are you interested in our contact center platform, live chat solutions, CRM integrations, or something else? I'm here to help!`;
+      action = "clarification_request";
+      confidence = 0.7;
+    }
 
-    // Send bot response back to GoHighLevel with Live_Chat type
+    // Send bot response back to GoHighLevel
     if (conversationId && contactId) {
       try {
         const botMessageData = {
-          type: 'Live_Chat',  // Changed from 'SMS' to 'Live_Chat' for live chat display
+          type: 'Live_Chat',
           message: response,
           direction: 'outbound',
           status: 'delivered',
@@ -341,6 +433,7 @@ app.post('/api/bot/process', async (req, res) => {
         action: action,
         confidence: confidence,
         timestamp: new Date().toISOString(),
+        agentName: agentName,
         contactInfo: contactInfo ? {
           name: contactInfo.name,
           firstName: contactInfo.firstName
@@ -353,7 +446,7 @@ app.post('/api/bot/process', async (req, res) => {
     res.json({
       success: true,
       data: {
-        response: "I'm experiencing some technical difficulties, but your message has been received.",
+        response: "I'm experiencing some technical difficulties, but your message has been received. Let me try to help you anyway - what can I assist you with today?",
         action: "error_fallback",
         confidence: 0.5,
         timestamp: new Date().toISOString(),
@@ -406,8 +499,8 @@ app.get('/api/hello', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'iKunnect GoHighLevel Integration API',
-    version: '9.0.0',
-    description: 'GoHighLevel integration with Live_Chat message type for proper live chat display',
+    version: '11.0.0',
+    description: 'Enhanced GoHighLevel integration with real assigned agent name detection and Live_Chat message type',
     status: 'operational',
     timestamp: new Date().toISOString(),
     endpoints: {
