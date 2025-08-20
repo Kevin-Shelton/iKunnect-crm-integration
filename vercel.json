@@ -1,12 +1,10 @@
 {
   "version": 2,
   "functions": {
-    "api/[...all].js": {
-      "runtime": "nodejs18.x"
-    }
+    "api/[...all].js": { "runtime": "nodejs20.x" }
   },
   "routes": [
-    { "src": "^/api(/.*)?$", "dest": "/api/[...all].js" },
+    { "src": "^/api(?:/.*)?$", "dest": "/api/[...all].js" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/public/$1" }
   ]
