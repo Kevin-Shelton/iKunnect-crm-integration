@@ -1,20 +1,30 @@
 // api/chat/send.js
-// iKunnect ↔ GoHighLevel (Vercel Serverless)
+// iKunnect ↔ GoHighLevel (Vercel Serverless Function)
 // First message: find-or-create contact (MCP) -> inbound Live_Chat (Integrations API)
 // Follow-ups: outbound on conversation (MCP)
 
+const HANDLER_ID = 'vercel-chat-send-v3';
+
+// ---------- Small utilities ----------
 function setCORS(res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*'); // set to your domain if sending cookies
+  res.setHeader('Access-Control-Allow-Origin', '*'); // set to your domain if using cookies
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
     'Authorization, locationId, X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
   );
+  res.setHeader('X-Handler', HANDLER_ID); // diagnostic header so you can confirm which code runs
 }
 
 function pick(obj, path) {
   return path.split('.').reduce((o, k) => (o && o[k] != null ? o[k] : undefined), obj);
+}
+
+function splitName(name) {
+  if (!name) return { firstName: '', lastName: '' };
+  const parts = String(name).trim().split(/\s+/);
+  return { firstName: parts[0] || '', lastName: parts.slice(1).join(' ') || '' };
 }
 
 function parseMcpEnvelope(status, rawText) {
@@ -28,7 +38,7 @@ function parseMcpEnvelope(status, rawText) {
 
   const base = parsed?.result ?? parsed;
 
-  // unwrap nested { content:[{ type:'text', text:'{...}' }]}
+  // unwrap up to 5 nested { content:[{ type:'text', text:'{...}' }]}
   let current = base;
   for (let i = 0; i < 5; i++) {
     const textNode = current?.content?.[0]?.text;
@@ -44,6 +54,7 @@ function parseMcpEnvelope(status, rawText) {
   return current;
 }
 
+// ---------- MCP + Integrations calls ----------
 async function callMCP(toolName, input = {}) {
   const mcpUrl = process.env.CRM_MCP_URL || 'https://services.leadconnectorhq.com/mcp/';
   const pit = process.env.CRM_PIT;
@@ -74,8 +85,6 @@ async function callMCP(toolName, input = {}) {
   return parseMcpEnvelope(resp.status, txt);
 }
 
-// ---- Contacts: find or create (MCP) ----------------------------------------
-
 async function findExistingContact({ email, phone }) {
   const q = email || phone;
   if (!q) return null;
@@ -89,18 +98,11 @@ async function findExistingContact({ email, phone }) {
   const contacts =
     pick(r, 'data.contacts') || pick(r, 'contacts') || (Array.isArray(r?.data) ? r.data : []) || [];
 
-  // exact match priority: email, then phone (E.164 preferred for phone)
   const exact =
-    (email && contacts.find(c => (c.email || '').toLowerCase() === email.toLowerCase())) ||
+    (email && contacts.find(c => (c.email || '').toLowerCase() === String(email).toLowerCase())) ||
     (phone && contacts.find(c => (c.phone || '') === phone));
 
   return exact || contacts[0] || null;
-}
-
-function splitName(name) {
-  if (!name) return { firstName: '', lastName: '' };
-  const parts = String(name).trim().split(/\s+/);
-  return { firstName: parts[0] || '', lastName: parts.slice(1).join(' ') || '' };
 }
 
 async function upsertContact({ name, email, phone, source, tags }) {
@@ -118,8 +120,7 @@ async function upsertContact({ name, email, phone, source, tags }) {
   return contact;
 }
 
-// ---- Conversations: first inbound (Integrations API) + follow-ups (MCP) ----
-
+// Integrations API: FIRST (visitor) message by contactId
 async function postInboundByContact({ contactId, text, provider }) {
   const base = process.env.CRM_BASE_URL || 'https://services.leadconnectorhq.com';
   const pit = process.env.CRM_PIT;
@@ -130,7 +131,7 @@ async function postInboundByContact({ contactId, text, provider }) {
     contactId,
     message: text,
     type: 'Live_Chat',
-    provider // 'live-chat' | 'webchat'
+    provider // 'live-chat' or 'webchat'
   };
 
   const headers = {
@@ -154,6 +155,7 @@ async function postInboundByContact({ contactId, text, provider }) {
   return json;
 }
 
+// MCP: follow-up message on existing conversation
 async function sendOutboundOnThread({ conversationId, text, messageType = 'Live_Chat' }) {
   return callMCP('conversations_send-a-new-message', {
     conversationId,
@@ -173,15 +175,33 @@ function extractConversationId(obj) {
   );
 }
 
-// ---- Handler ---------------------------------------------------------------
-
+// ---------- Handler ----------
 export default async function handler(req, res) {
   setCORS(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+
+  // Diagnostic: GET lets you confirm this function is the one running
+  if (req.method === 'GET') {
+    return res.status(200).json({ ok: true, handler: HANDLER_ID });
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
 
   try {
-    const { conversationId, body, contactId, name, email, phone, channel, source, tags } = (req.body || {});
+    const {
+      conversationId,
+      contactId,
+      body,
+      channel,          // 'chat' | 'webchat'
+      name,
+      email,
+      phone,
+      source,
+      tags
+    } = (req.body || {});
+
     if (!body) return res.status(400).json({ success: false, error: 'Message body is required' });
     const text = String(body).trim();
     if (!text) return res.status(400).json({ success: false, error: 'Message body cannot be empty' });
@@ -192,29 +212,30 @@ export default async function handler(req, res) {
     let finalContactId = contactId || null;
     let resultObj;
 
-    // 0) If we don't have a conversation, ensure we have a contact (find or create)
+    // If no conversation yet, ensure we have a contact (find or create), then send inbound
     if (!finalConversationId) {
       if (!finalContactId) {
-        // Try to find by email/phone
+        // find or create contact by email/phone
         const found = await findExistingContact({ email, phone });
         if (found?.id) {
           finalContactId = found.id;
           console.log('[send] Found contact:', finalContactId);
         } else {
-          // Create/upsert contact (name/email/phone may be partial—MCP accepts blanks)
           const created = await upsertContact({ name, email, phone, source, tags });
           finalContactId = created.id;
           console.log('[send] Created contact:', finalContactId);
         }
       }
 
-      // 1) FIRST message → Inbound by contact (creates/attaches thread + triggers Conversation AI)
+      // First message → Inbound by contact (creates/attaches conversation; triggers Conversation AI)
+      console.log('[send] Inbound by contact via Integrations API:', { contactId: finalContactId, provider });
       const inbound = await postInboundByContact({ contactId: finalContactId, text, provider });
       resultObj = inbound;
       finalConversationId = extractConversationId(inbound);
       console.log('[send] inbound conversationId:', finalConversationId);
     } else {
-      // 2) FOLLOW-UP → Outbound on existing thread
+      // Follow-up → Outbound via MCP on existing thread
+      console.log('[send] Outbound via MCP:', { conversationId: finalConversationId });
       const outbound = await sendOutboundOnThread({ conversationId: finalConversationId, text, messageType: 'Live_Chat' });
       resultObj = outbound;
     }
