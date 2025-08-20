@@ -1,4 +1,5 @@
 import express from 'express';
+import type { Request, Response } from 'express';
 import { createCRMClient } from '../lib/ghlMcp';
 import {
   ChatSessionInput,
@@ -12,15 +13,120 @@ import {
 
 const router = express.Router();
 
+/* -------------------------------------------------------------------------- */
+/*                           MCP helper (direct call)                         */
+/* -------------------------------------------------------------------------- */
+
+function pick(obj: any, path: string) {
+  return path.split('.').reduce((o, k) => (o && o[k] != null ? o[k] : undefined), obj);
+}
+
+function parseMcpEnvelope(status: number, rawText: string) {
+  if (!rawText || typeof rawText !== 'string') throw new Error(`Empty MCP response [${status}]`);
+  const ssePrefix = 'event: message\ndata: ';
+  const body = rawText.startsWith(ssePrefix) ? rawText.slice(ssePrefix.length).trim() : rawText;
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    throw new Error(`Invalid MCP response [${status}]: ${body.slice(0, 240)}...`);
+  }
+  const base = parsed?.result ?? parsed;
+
+  // unwrap nested { content:[{ type:'text', text:'{...}' }]}
+  let current: any = base;
+  for (let i = 0; i < 5; i++) {
+    const textNode = current?.content?.[0]?.text;
+    if (!textNode || typeof textNode !== 'string') break;
+    try {
+      current = JSON.parse(textNode);
+    } catch {
+      break;
+    }
+  }
+
+  if (current?.error) {
+    const msg = current.error?.message || 'Unknown MCP error';
+    const code = current.error?.code || status;
+    throw new Error(`${code}: ${msg}`);
+  }
+  return current;
+}
+
+async function callGHLMCP(toolName: string, input: Record<string, any> = {}) {
+  const fetchImpl: typeof fetch =
+    (globalThis as any).fetch ?? (await import('node-fetch')).default as unknown as typeof fetch;
+
+  const mcpUrl = process.env.CRM_MCP_URL || 'https://services.leadconnectorhq.com/mcp/';
+  const pit = process.env.CRM_PIT;
+  const locationId = process.env.CRM_LOCATION_ID;
+  if (!pit || !locationId) throw new Error('Missing env: CRM_PIT or CRM_LOCATION_ID');
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${pit}`,
+    locationId,
+    'Content-Type': 'application/json',
+    Accept: 'application/json, text/event-stream'
+  };
+
+  // Preferred envelope: { tool, input }
+  let resp = await fetchImpl(mcpUrl, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ tool: toolName, input })
+  });
+  let txt = await resp.text();
+  if (resp.ok) return parseMcpEnvelope(resp.status, txt);
+
+  // Fallback JSON-RPC
+  const rpc = {
+    jsonrpc: '2.0',
+    id: Date.now().toString(),
+    method: 'tools/call',
+    params: { name: toolName, arguments: input }
+  };
+  resp = await fetchImpl(mcpUrl, { method: 'POST', headers, body: JSON.stringify(rpc) });
+  txt = await resp.text();
+  if (!resp.ok) throw new Error(`GHL MCP Error [${resp.status}]: ${txt.slice(0, 240)}...`);
+  return parseMcpEnvelope(resp.status, txt);
+}
+
+async function sendInboundVisitorMessage(params: { contactId: string; text: string; provider?: string }) {
+  const { contactId, text, provider = 'live-chat' } = params;
+  return callGHLMCP('conversations_add-an-inbound-message', {
+    contactId,
+    text,
+    provider,                  // 'live-chat' | 'webchat'
+    messageType: 'Live_Chat'   // ensures routing to Conversation AI for live chat
+  });
+}
+
+async function sendOutboundMessage(params: { conversationId: string; text: string; messageType?: string }) {
+  const { conversationId, text, messageType = 'Live_Chat' } = params;
+  return callGHLMCP('conversations_send-a-new-message', {
+    conversationId,
+    text,
+    messageType
+  });
+}
+
+function extractConversationId(obj: any) {
+  return pick(obj, 'data.conversationId') || pick(obj, 'conversationId') || pick(obj, 'conversation.id') || null;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                 Endpoints                                  */
+/* -------------------------------------------------------------------------- */
+
 /**
  * Create or update a chat session (contact)
  * POST /chat/session
  */
-router.post('/session', async (req, res) => {
+router.post('/session', async (req: Request, res: Response) => {
   try {
     const sessionData: ChatSessionInput = req.body;
-    
-    // Validate required fields
+
     if (!sessionData.name && !sessionData.email && !sessionData.phone) {
       return res.status(400).json({
         error: 'Bad Request',
@@ -30,8 +136,7 @@ router.post('/session', async (req, res) => {
     }
 
     const crmClient = createCRMClient();
-    
-    // Prepare contact data for CRM
+
     const contactData = {
       name: sessionData.name,
       email: sessionData.email,
@@ -41,17 +146,16 @@ router.post('/session', async (req, res) => {
       tags: sessionData.tags || ['iKunnect', 'Chat Lead']
     };
 
-    console.log('[Chat Session] Creating/updating contact:', { 
-      name: contactData.name, 
-      email: contactData.email, 
-      phone: contactData.phone 
+    console.log('[Chat Session] Upsert contact:', {
+      name: contactData.name,
+      email: contactData.email,
+      phone: contactData.phone
     });
 
-    // Create or update contact in CRM
     const contactResult = await crmClient.upsertContact(contactData);
-    
+
     if (!contactResult.success) {
-      console.error('[Chat Session] Failed to create/update contact:', contactResult.error);
+      console.error('[Chat Session] Upsert failed:', contactResult.error);
       return res.status(500).json({
         error: 'Internal Server Error',
         message: 'Failed to create chat session',
@@ -61,24 +165,20 @@ router.post('/session', async (req, res) => {
     }
 
     const contact = contactResult.data as Contact;
-    
+
     const response: ChatSessionResponse = {
       contactId: contact.id,
       isNewContact: !contact.dateUpdated || contact.dateAdded === contact.dateUpdated,
-      contact: contact
+      contact
     };
 
-    console.log('[Chat Session] Session created successfully:', { 
-      contactId: contact.id, 
-      isNewContact: response.isNewContact 
-    });
+    console.log('[Chat Session] OK:', { contactId: contact.id, isNewContact: response.isNewContact });
 
     res.status(200).json({
       success: true,
       data: response,
       timestamp: new Date().toISOString()
     });
-
   } catch (error) {
     console.error('[Chat Session] Error:', error);
     res.status(500).json({
@@ -94,11 +194,10 @@ router.post('/session', async (req, res) => {
  * Create or find a conversation thread
  * POST /chat/thread
  */
-router.post('/thread', async (req, res) => {
+router.post('/thread', async (req: Request, res: Response) => {
   try {
     const threadData: ChatThreadInput = req.body;
-    
-    // Validate required fields
+
     if (!threadData.contactId) {
       return res.status(400).json({
         error: 'Bad Request',
@@ -108,21 +207,45 @@ router.post('/thread', async (req, res) => {
     }
 
     const crmClient = createCRMClient();
-    
-    console.log('[Chat Thread] Finding/creating conversation for contact:', threadData.contactId);
 
-    // Find or create conversation thread
+    console.log('[Chat Thread] Find/create conversation for:', threadData.contactId);
+
+    // Keep your existing abstraction for now
     const threadResult = await crmClient.findOrCreateConversation(
-      threadData.contactId, 
+      threadData.contactId,
       threadData.channel || 'chat'
     );
-    
+
     if (!threadResult.success) {
-      console.error('[Chat Thread] Failed to create/find thread:', threadResult.error);
-      return res.status(500).json({
-        error: 'Internal Server Error',
-        message: 'Failed to create conversation thread',
-        details: threadResult.error,
+      console.error('[Chat Thread] Failed via client; trying inbound seed…', threadResult.error);
+
+      // Fallback: seed an inbound message to force conversation creation
+      const inbound = await sendInboundVisitorMessage({
+        contactId: threadData.contactId,
+        text: threadData.seed || '[session-start]',
+        provider: 'live-chat'
+      });
+      const conversationId =
+        extractConversationId(inbound) || pick(inbound, 'data.id') || pick(inbound, 'id');
+
+      if (!conversationId) {
+        return res.status(500).json({
+          error: 'Internal Server Error',
+          message: 'Failed to create conversation thread',
+          details: threadResult.error || 'No conversation id returned',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      const response: ChatThreadResponse = {
+        conversationId,
+        isNewConversation: true
+      };
+
+      console.log('[Chat Thread] Fallback created thread:', { conversationId });
+      return res.status(200).json({
+        success: true,
+        data: response,
         timestamp: new Date().toISOString()
       });
     }
@@ -132,17 +255,13 @@ router.post('/thread', async (req, res) => {
       isNewConversation: threadResult.data!.isNew
     };
 
-    console.log('[Chat Thread] Thread ready:', { 
-      conversationId: response.conversationId, 
-      isNewConversation: response.isNewConversation 
-    });
+    console.log('[Chat Thread] Ready:', response);
 
     res.status(200).json({
       success: true,
       data: response,
       timestamp: new Date().toISOString()
     });
-
   } catch (error) {
     console.error('[Chat Thread] Error:', error);
     res.status(500).json({
@@ -157,12 +276,14 @@ router.post('/thread', async (req, res) => {
 /**
  * Send a message to a conversation
  * POST /chat/send
+ *
+ * - No conversationId  -> INBOUND visitor message by contactId (creates/attaches thread; triggers Conversation AI)
+ * - With conversationId -> OUTBOUND agent/bot message on that thread
  */
-router.post('/send', async (req, res) => {
+router.post('/send', async (req: Request, res: Response) => {
   try {
     const messageData: ChatMessageInput = req.body;
-    
-    // Validate required fields
+
     if (!messageData.conversationId && !messageData.contactId) {
       return res.status(400).json({
         error: 'Bad Request',
@@ -179,53 +300,65 @@ router.post('/send', async (req, res) => {
       });
     }
 
-    const crmClient = createCRMClient();
-    
-    // Prepare message for CRM
-    const crmMessageData = {
-      conversationId: messageData.conversationId,
-      contactId: messageData.contactId,
-      body: messageData.body.trim(),
-      channel: (messageData.channel || 'Chat') as any,
-      direction: 'inbound' as const
-    };
+    const text = messageData.body.trim();
+    const provider =
+      (messageData.channel?.toLowerCase() === 'webchat' ? 'webchat' : 'live-chat');
 
-    console.log('[Chat Send] Sending message:', { 
-      conversationId: crmMessageData.conversationId,
-      contactId: crmMessageData.contactId,
-      bodyLength: crmMessageData.body.length,
-      channel: crmMessageData.channel
-    });
+    let finalConversationId = messageData.conversationId || null;
+    let mcpObj: any;
 
-    // Send message via CRM
-    const messageResult = await crmClient.sendMessage(crmMessageData);
-    
-    if (!messageResult.success) {
-      console.error('[Chat Send] Failed to send message:', messageResult.error);
+    if (!finalConversationId) {
+      // First customer message → INBOUND
+      console.log('[Chat Send] INBOUND via MCP:', { contactId: messageData.contactId, provider });
+      const inbound = await sendInboundVisitorMessage({
+        contactId: messageData.contactId as string,
+        text,
+        provider
+      });
+      mcpObj = inbound;
+      finalConversationId =
+        extractConversationId(inbound) || pick(inbound, 'data.id') || pick(inbound, 'id');
+    } else {
+      // Follow-up → OUTBOUND
+      console.log('[Chat Send] OUTBOUND via MCP:', { conversationId: finalConversationId });
+      const outbound = await sendOutboundMessage({
+        conversationId: finalConversationId,
+        text,
+        messageType: 'Live_Chat'
+      });
+      mcpObj = outbound;
+    }
+
+    if (!finalConversationId) {
       return res.status(500).json({
         error: 'Internal Server Error',
-        message: 'Failed to send message',
-        details: messageResult.error,
+        message: 'No conversationId returned by MCP',
         timestamp: new Date().toISOString()
       });
     }
 
+    const messageId =
+      pick(mcpObj, 'data.messageId') ||
+      pick(mcpObj, 'messageId') ||
+      pick(mcpObj, 'message.id') ||
+      'message_created';
+
     const response: ChatMessageResponse = {
-      messageId: messageResult.data!.id,
-      message: messageResult.data!
+      messageId,
+      message: {
+        id: messageId,
+        conversationId: finalConversationId,
+        body: text
+      } as any
     };
 
-    console.log('[Chat Send] Message sent successfully:', { 
-      messageId: response.messageId,
-      conversationId: messageResult.data!.conversationId
-    });
+    console.log('[Chat Send] OK:', { messageId, conversationId: finalConversationId });
 
     res.status(200).json({
       success: true,
       data: response,
       timestamp: new Date().toISOString()
     });
-
   } catch (error) {
     console.error('[Chat Send] Error:', error);
     res.status(500).json({
@@ -241,11 +374,11 @@ router.post('/send', async (req, res) => {
  * Get messages from a conversation
  * GET /chat/messages/:conversationId
  */
-router.get('/messages/:conversationId', async (req, res) => {
+router.get('/messages/:conversationId', async (req: Request, res: Response) => {
   try {
     const { conversationId } = req.params;
     const limit = parseInt(req.query.limit as string) || 25;
-    
+
     if (!conversationId) {
       return res.status(400).json({
         error: 'Bad Request',
@@ -255,14 +388,13 @@ router.get('/messages/:conversationId', async (req, res) => {
     }
 
     const crmClient = createCRMClient();
-    
-    console.log('[Chat Messages] Fetching messages:', { conversationId, limit });
 
-    // Get messages from CRM
+    console.log('[Chat Messages] Fetching:', { conversationId, limit });
+
     const messagesResult = await crmClient.getMessages(conversationId, limit);
-    
+
     if (!messagesResult.success) {
-      console.error('[Chat Messages] Failed to fetch messages:', messagesResult.error);
+      console.error('[Chat Messages] Failed:', messagesResult.error);
       return res.status(500).json({
         error: 'Internal Server Error',
         message: 'Failed to fetch messages',
@@ -271,17 +403,11 @@ router.get('/messages/:conversationId', async (req, res) => {
       });
     }
 
-    console.log('[Chat Messages] Messages fetched successfully:', { 
-      conversationId, 
-      messageCount: messagesResult.data?.items?.length || 0 
-    });
-
     res.status(200).json({
       success: true,
       data: messagesResult.data,
       timestamp: new Date().toISOString()
     });
-
   } catch (error) {
     console.error('[Chat Messages] Error:', error);
     res.status(500).json({
@@ -297,10 +423,10 @@ router.get('/messages/:conversationId', async (req, res) => {
  * Search for a contact by email or phone
  * POST /chat/contact/search
  */
-router.post('/contact/search', async (req, res) => {
+router.post('/contact/search', async (req: Request, res: Response) => {
   try {
     const { email, phone } = req.body;
-    
+
     if (!email && !phone) {
       return res.status(400).json({
         error: 'Bad Request',
@@ -310,14 +436,13 @@ router.post('/contact/search', async (req, res) => {
     }
 
     const crmClient = createCRMClient();
-    
-    console.log('[Contact Search] Searching for contact:', { email, phone });
 
-    // Search for contact in CRM
+    console.log('[Contact Search] Query:', { email, phone });
+
     const searchResult = await crmClient.searchContact(email, phone);
-    
+
     if (!searchResult.success) {
-      console.error('[Contact Search] Search failed:', searchResult.error);
+      console.error('[Contact Search] Failed:', searchResult.error);
       return res.status(500).json({
         error: 'Internal Server Error',
         message: 'Failed to search for contact',
@@ -325,12 +450,6 @@ router.post('/contact/search', async (req, res) => {
         timestamp: new Date().toISOString()
       });
     }
-
-    console.log('[Contact Search] Search completed:', { 
-      email, 
-      phone, 
-      resultsFound: searchResult.data?.length || 0 
-    });
 
     res.status(200).json({
       success: true,
@@ -340,7 +459,6 @@ router.post('/contact/search', async (req, res) => {
       },
       timestamp: new Date().toISOString()
     });
-
   } catch (error) {
     console.error('[Contact Search] Error:', error);
     res.status(500).json({
@@ -353,4 +471,3 @@ router.post('/contact/search', async (req, res) => {
 });
 
 export default router;
-
