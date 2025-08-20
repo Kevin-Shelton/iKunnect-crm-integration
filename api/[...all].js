@@ -1,4 +1,4 @@
-// GoHighLevel MCP Integration — Single Catch-All for /api/*
+// GoHighLevel MCP Integration – Single Catch-All for /api/*
 // Flow:
 //   - contacts: MCP (find/create)
 //   - first message: Integrations API /conversations/messages/inbound (by contactId, Live_Chat)
@@ -91,7 +91,7 @@ export default async function handler(req, res) {
     return parseMcpEnvelopeText(response.status, responseText);
   }
 
-  // -------- Integrations API: first inbound message by contactId --------
+  // -------- Enhanced Integrations API: first inbound message by contactId --------
   async function postInboundByContact({ contactId, text, provider }) {
     const fetch = (await import('node-fetch')).default;
     const base = process.env.CRM_BASE_URL || 'https://services.leadconnectorhq.com';
@@ -99,32 +99,91 @@ export default async function handler(req, res) {
     const locationId = process.env.CRM_LOCATION_ID;
     if (!pit || !locationId) throw new Error('Missing required env: CRM_PIT or CRM_LOCATION_ID');
 
-    const payload = {
-      contactId,
-      message: text,
-      type: 'Live_Chat',
-      provider // 'live-chat' | 'webchat'
-    };
+    // Try Method 1: Regular messages endpoint
+    try {
+      console.log('[INBOUND] Trying regular messages endpoint...');
+      const payload1 = {
+        type: 'Live_Chat',
+        contactId,
+        message: text,
+        locationId: locationId,
+        provider: provider || 'live-chat'
+      };
 
-    const headers = {
-      Authorization: `Bearer ${pit}`,
-      locationId,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      Version: '2021-07-28'
-    };
+      const headers1 = {
+        Authorization: `Bearer ${pit}`,
+        locationId,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Version: '2021-07-28'
+      };
 
-    const resp = await fetch(`${base}/conversations/messages/inbound`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload)
-    });
+      console.log('[INBOUND] Method 1 payload:', JSON.stringify(payload1, null, 2));
 
-    const txt = await resp.text();
-    let json;
-    try { json = JSON.parse(txt); } catch { throw new Error(`Inbound API bad response [${resp.status}]: ${txt.slice(0,240)}...`); }
-    if (!resp.ok) throw new Error(json?.message || json?.error || `Inbound API ${resp.status}`);
-    return json;
+      const resp1 = await fetch(`${base}/conversations/messages`, {
+        method: 'POST',
+        headers: headers1,
+        body: JSON.stringify(payload1)
+      });
+
+      const txt1 = await resp1.text();
+      console.log('[INBOUND] Method 1 response:', resp1.status, txt1);
+      
+      if (resp1.ok) {
+        const json1 = JSON.parse(txt1);
+        console.log('[INBOUND] Method 1 success:', JSON.stringify(json1, null, 2));
+        return json1;
+      }
+    } catch (err) {
+      console.log('[INBOUND] Method 1 failed:', err.message);
+    }
+
+    // Try Method 2: Your original inbound endpoint
+    try {
+      console.log('[INBOUND] Trying inbound endpoint...');
+      const payload2 = {
+        contactId,
+        message: text,
+        type: 'Live_Chat',
+        provider: provider || 'live-chat',
+        locationId: locationId,
+        source: 'api'
+      };
+
+      const headers2 = {
+        Authorization: `Bearer ${pit}`,
+        locationId,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Version: '2021-07-28'
+      };
+
+      console.log('[INBOUND] Method 2 payload:', JSON.stringify(payload2, null, 2));
+
+      const resp2 = await fetch(`${base}/conversations/messages/inbound`, {
+        method: 'POST',
+        headers: headers2,
+        body: JSON.stringify(payload2)
+      });
+
+      const txt2 = await resp2.text();
+      console.log('[INBOUND] Method 2 response:', resp2.status, txt2);
+      
+      let json2;
+      try { json2 = JSON.parse(txt2); } catch { throw new Error(`Inbound API bad response [${resp2.status}]: ${txt2.slice(0,240)}...`); }
+      
+      if (!resp2.ok) {
+        console.error('[INBOUND] Method 2 error:', json2);
+        throw new Error(json2?.message || json2?.error || `Inbound API ${resp2.status}`);
+      }
+
+      console.log('[INBOUND] Method 2 success:', JSON.stringify(json2, null, 2));
+      return json2;
+      
+    } catch (err) {
+      console.error('[INBOUND] Both methods failed. Last error:', err.message);
+      throw err;
+    }
   }
 
   // -------- Contact helpers --------
@@ -185,15 +244,36 @@ export default async function handler(req, res) {
     return contact;
   }
 
+  // Enhanced extractConversationId with more logging and paths
   function extractConversationId(obj) {
-    return (
-      pick(obj, 'data.conversationId') ||
-      pick(obj, 'conversationId') ||
-      pick(obj, 'conversation.id') ||
-      pick(obj, 'data.id') ||
-      pick(obj, 'id') ||
-      null
-    );
+    console.log('[EXTRACT] Input object:', JSON.stringify(obj, null, 2));
+    
+    const paths = [
+      'data.conversationId',
+      'conversationId', 
+      'conversation.id',
+      'data.conversation.id',
+      'data.id',
+      'id',
+      'message.conversationId',
+      'result.conversationId',
+      'response.conversationId',
+      'data.message.conversationId',
+      'messageId', // Sometimes the messageId is actually the conversationId
+      'data.messageId'
+    ];
+    
+    for (const path of paths) {
+      const value = pick(obj, path);
+      console.log(`[EXTRACT] Checking path '${path}':`, value);
+      if (value) {
+        console.log(`[EXTRACT] Found conversationId at '${path}':`, value);
+        return value;
+      }
+    }
+    
+    console.log('[EXTRACT] No conversationId found in any expected path');
+    return null;
   }
 
   // ================= ROUTES =================
@@ -202,7 +282,7 @@ export default async function handler(req, res) {
   if (method === 'GET' && path === '/api') {
     return res.json({
       name: 'iKunnect ↔ GoHighLevel MCP Integration',
-      version: 'live-chat-flow-1.1',
+      version: 'live-chat-flow-1.2-debug',
       status: 'operational',
       timestamp: nowIso()
     });
@@ -297,17 +377,33 @@ export default async function handler(req, res) {
 
     const { contactId, seed, channel } = body;
     if (!contactId) return res.status(400).json({ success: false, error: 'Contact ID is required' });
+    
     try {
+      console.log('[THREAD] Creating thread for contactId:', contactId);
       const provider = (channel && String(channel).toLowerCase() === 'webchat') ? 'webchat' : 'live-chat';
       const inbound = await postInboundByContact({
         contactId,
         text: seed || '[session-start]',
         provider
       });
+      
+      console.log('[THREAD] Inbound response received:', JSON.stringify(inbound, null, 2));
+      
       const conversationId = extractConversationId(inbound);
+      console.log('[THREAD] Extracted conversationId:', conversationId);
+      
       if (!conversationId) {
-        return res.status(502).json({ success: false, error: 'No conversationId returned by inbound API' });
+        console.error('[THREAD] No conversationId found in response:', inbound);
+        return res.status(502).json({ 
+          success: false, 
+          error: 'No conversationId returned by inbound API',
+          debug: {
+            inboundResponse: inbound,
+            extractedId: conversationId
+          }
+        });
       }
+      
       return res.json({
         success: true,
         data: {
@@ -322,6 +418,7 @@ export default async function handler(req, res) {
         }
       });
     } catch (error) {
+      console.error('[THREAD] Thread creation failed:', error);
       return res.status(500).json({ success: false, error: `Thread init failed: ${error.message}` });
     }
   }
@@ -352,11 +449,14 @@ export default async function handler(req, res) {
         if (!contactId) {
           return res.status(400).json({ success: false, error: 'contactId is required when no conversationId is provided' });
         }
+        console.log('[SEND] First message - using inbound API for contactId:', contactId);
         // FIRST message -> inbound by contact
         const inbound = await postInboundByContact({ contactId, text, provider });
         result = inbound;
         finalConversationId = extractConversationId(inbound);
+        console.log('[SEND] First message created conversationId:', finalConversationId);
       } else {
+        console.log('[SEND] Follow-up message - using MCP for conversationId:', finalConversationId);
         // FOLLOW-UP -> MCP send on existing thread
         result = await callMCP('conversations_send-a-new-message', {
           conversationId: finalConversationId,
@@ -366,7 +466,15 @@ export default async function handler(req, res) {
       }
 
       if (!finalConversationId) {
-        return res.status(502).json({ success: false, error: 'No conversationId returned' });
+        console.error('[SEND] No conversationId after sending:', result);
+        return res.status(502).json({ 
+          success: false, 
+          error: 'No conversationId returned',
+          debug: {
+            result: result,
+            extractedId: finalConversationId
+          }
+        });
       }
 
       const messageId =
@@ -388,6 +496,7 @@ export default async function handler(req, res) {
         }
       });
     } catch (error) {
+      console.error('[SEND] Message sending failed:', error);
       return res.status(500).json({ success: false, error: `Message sending failed: ${error.message}` });
     }
   }
