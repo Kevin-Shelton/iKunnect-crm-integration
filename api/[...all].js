@@ -1,11 +1,12 @@
-// GoHighLevel MCP Integration API — Correct Live_Chat flow
-// - Find/create contact via MCP where needed
-// - First message: Integrations API /conversations/messages/inbound (by contactId)
-// - Follow-ups: MCP conversations_send-a-new-message (by conversationId)
+// GoHighLevel MCP Integration — Single Catch-All for /api/*
+// Flow:
+//   - contacts: MCP (find/create)
+//   - first message: Integrations API /conversations/messages/inbound (by contactId, Live_Chat)
+//   - follow-ups: MCP conversations_send-a-new-message (by conversationId)
 
 export default async function handler(req, res) {
   // -------- CORS --------
-  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*'); // set your domain if using cookies
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
@@ -17,13 +18,12 @@ export default async function handler(req, res) {
   const { method, url } = req;
   const path = (url || '').split('?')[0];
 
-  // -------- Utilities --------
+  // -------- Utils --------
+  const nowIso = () => new Date().toISOString();
   function pick(obj, pathStr) {
     return pathStr.split('.').reduce((o, k) => (o && o[k] != null ? o[k] : undefined), obj);
   }
-  const nowIso = () => new Date().toISOString();
 
-  // Parse SSE/embedded content wrappers used by MCP responses
   function parseMcpEnvelopeText(status, rawText) {
     if (!rawText || typeof rawText !== 'string') throw new Error(`Empty MCP response [${status}]`);
     const ssePrefix = 'event: message\ndata: ';
@@ -51,17 +51,13 @@ export default async function handler(req, res) {
     return current;
   }
 
-  // -------- MCP call (JSON-RPC, keeps your original approach) --------
-  async function callGHLMCP(toolName, arguments_) {
+  // -------- MCP JSON-RPC call --------
+  async function callMCP(toolName, arguments_) {
     const fetch = (await import('node-fetch')).default;
-
     const mcpUrl = process.env.CRM_MCP_URL || 'https://services.leadconnectorhq.com/mcp/';
     const pit = process.env.CRM_PIT;
     const locationId = process.env.CRM_LOCATION_ID;
-
-    if (!pit || !locationId) {
-      throw new Error('Missing required environment variables: CRM_PIT or CRM_LOCATION_ID');
-    }
+    if (!pit || !locationId) throw new Error('Missing required env: CRM_PIT or CRM_LOCATION_ID');
 
     const jsonRpcRequest = {
       jsonrpc: '2.0',
@@ -83,7 +79,6 @@ export default async function handler(req, res) {
 
     const response = await fetch(mcpUrl, options);
     const responseText = await response.text();
-
     if (!response.ok) {
       throw new Error(`GHL MCP Error: ${response.status} - ${responseText.slice(0, 240)}...`);
     }
@@ -93,11 +88,10 @@ export default async function handler(req, res) {
   // -------- Integrations API: first inbound message by contactId --------
   async function postInboundByContact({ contactId, text, provider }) {
     const fetch = (await import('node-fetch')).default;
-
     const base = process.env.CRM_BASE_URL || 'https://services.leadconnectorhq.com';
     const pit = process.env.CRM_PIT;
     const locationId = process.env.CRM_LOCATION_ID;
-    if (!pit || !locationId) throw new Error('Missing required environment variables: CRM_PIT or CRM_LOCATION_ID');
+    if (!pit || !locationId) throw new Error('Missing required env: CRM_PIT or CRM_LOCATION_ID');
 
     const payload = {
       contactId,
@@ -127,7 +121,7 @@ export default async function handler(req, res) {
     return json;
   }
 
-  // -------- Helpers you already had (lightly tweaked) --------
+  // -------- Contact helpers --------
   function extractContactFromMCPResponse(mcpResult) {
     if (!mcpResult) return null;
     if (mcpResult.content && mcpResult.content[0]?.type === 'text') {
@@ -151,33 +145,30 @@ export default async function handler(req, res) {
     try {
       const q = email || phone;
       if (!q) return null;
-
-      const searchResult = await callGHLMCP('contacts_get-contacts', {
+      const r = await callMCP('contacts_get-contacts', {
         locationId: process.env.CRM_LOCATION_ID,
         query: q,
         limit: 25
       });
-
       const contacts =
-        pick(searchResult, 'data.contacts') ||
-        pick(searchResult, 'contacts') ||
-        (Array.isArray(searchResult?.data) ? searchResult.data : []) ||
+        pick(r, 'data.contacts') ||
+        pick(r, 'contacts') ||
+        (Array.isArray(r?.data) ? r.data : []) ||
         [];
-
       const exact =
         (email && contacts.find(c => (c.email || '').toLowerCase() === String(email).toLowerCase())) ||
         (phone && contacts.find(c => (c.phone || '') === phone));
       return exact || contacts[0] || null;
     } catch (e) {
-      console.log('[CONTACT SEARCH] Search failed:', e.message);
+      console.log('[CONTACT SEARCH] Failed:', e.message);
       return null;
     }
   }
 
-  async function upsertContact(firstName, lastName, email, phone) {
-    const r = await callGHLMCP('contacts_upsert-contact', {
-      firstName,
-      lastName,
+  async function upsertContact({ firstName, lastName, email, phone }) {
+    const r = await callMCP('contacts_upsert-contact', {
+      firstName: firstName || '',
+      lastName: lastName || '',
       email: email || '',
       phone: phone || '',
       source: 'iKunnect Live Chat Widget',
@@ -199,14 +190,12 @@ export default async function handler(req, res) {
     );
   }
 
-  // ================== ROUTES ==================
+  // ================= ROUTES =================
 
-  // Simple status
   if (method === 'GET' && path === '/api') {
     return res.json({
-      name: 'iKunnect GoHighLevel MCP Integration API',
-      version: '34.0.0',
-      description: 'Live_Chat: inbound first via Integrations API; follow-ups via MCP.',
+      name: 'iKunnect ↔ GoHighLevel MCP Integration',
+      version: 'live-chat-flow-1.0',
       status: 'operational',
       timestamp: nowIso()
     });
@@ -218,7 +207,7 @@ export default async function handler(req, res) {
 
   if (method === 'GET' && path === '/api/health') {
     try {
-      await callGHLMCP('locations_get-location', { locationId: process.env.CRM_LOCATION_ID });
+      await callMCP('locations_get-location', { locationId: process.env.CRM_LOCATION_ID });
       return res.json({
         success: true,
         message: 'GoHighLevel MCP Server connected successfully',
@@ -239,7 +228,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // Create/find contact (unchanged behavior)
+  // Create/find contact
   if (method === 'POST' && path === '/api/chat/session') {
     const { name, email, phone } = req.body || {};
     if (!name && !email && !phone) {
@@ -251,7 +240,7 @@ export default async function handler(req, res) {
       let contact = await findExistingContact(email, phone);
       let isNewContact = false;
       if (!contact) {
-        contact = await upsertContact(firstName, lastName, email, phone);
+        contact = await upsertContact({ firstName, lastName, email, phone });
         isNewContact = true;
       }
       return res.json({
@@ -274,11 +263,10 @@ export default async function handler(req, res) {
     }
   }
 
-  // ENSURE THREAD: previously returned "pending_*"; now it seeds a real inbound and returns a real conversationId
+  // Create/ensure a REAL conversation (used to return "pending_*"; now posts an inbound seed)
   if (method === 'POST' && path === '/api/chat/thread') {
     const { contactId, seed, channel } = req.body || {};
     if (!contactId) return res.status(400).json({ success: false, error: 'Contact ID is required' });
-
     try {
       const provider = (channel && String(channel).toLowerCase() === 'webchat') ? 'webchat' : 'live-chat';
       const inbound = await postInboundByContact({
@@ -308,12 +296,11 @@ export default async function handler(req, res) {
     }
   }
 
-  // SEND MESSAGE:
-  // - if no conversationId: first message -> inbound by contactId (creates/attaches thread + triggers AI)
-  // - if conversationId present: follow-up -> MCP send-a-new-message on that thread
+  // Send message:
+  //   - No conversationId => first message -> inbound by contactId (creates/attaches thread + triggers AI)
+  //   - Has conversationId => follow-up -> MCP send on thread
   if (method === 'POST' && path === '/api/chat/send') {
-    const { conversationId, body, contactId, channel } = req.body || {};
-
+    const { conversationId, contactId, body, channel } = req.body || {};
     if (!body) return res.status(400).json({ success: false, error: 'Message body is required' });
 
     const text = String(body).trim();
@@ -335,7 +322,7 @@ export default async function handler(req, res) {
         finalConversationId = extractConversationId(inbound);
       } else {
         // FOLLOW-UP -> MCP send on existing thread
-        result = await callGHLMCP('conversations_send-a-new-message', {
+        result = await callMCP('conversations_send-a-new-message', {
           conversationId: finalConversationId,
           text,
           messageType: 'Live_Chat'
