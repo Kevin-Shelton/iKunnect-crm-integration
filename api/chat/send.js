@@ -1,10 +1,11 @@
 // api/chat/send.js
-// Vercel Serverless Function — iKunnect ↔ GoHighLevel MCP (Live_Chat)
-// Sends customer’s first message as INBOUND by contact, then OUTBOUND by conversation.
+// iKunnect ↔ GoHighLevel (Vercel Serverless)
+// First message: find-or-create contact (MCP) -> inbound Live_Chat (Integrations API)
+// Follow-ups: outbound on conversation (MCP)
 
 function setCORS(res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', '*'); // set to your domain if sending cookies
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
@@ -43,7 +44,7 @@ function parseMcpEnvelope(status, rawText) {
   return current;
 }
 
-async function callGHLMCP(toolName, input = {}) {
+async function callMCP(toolName, input = {}) {
   const mcpUrl = process.env.CRM_MCP_URL || 'https://services.leadconnectorhq.com/mcp/';
   const pit = process.env.CRM_PIT;
   const locationId = process.env.CRM_LOCATION_ID;
@@ -56,8 +57,12 @@ async function callGHLMCP(toolName, input = {}) {
     Accept: 'application/json, text/event-stream'
   };
 
-  // Preferred envelope: { tool, input }
-  let resp = await fetch(mcpUrl, { method: 'POST', headers, body: JSON.stringify({ tool: toolName, input }) });
+  // Preferred MCP envelope
+  let resp = await fetch(mcpUrl, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ tool: toolName, input })
+  });
   let txt = await resp.text();
   if (resp.ok) return parseMcpEnvelope(resp.status, txt);
 
@@ -69,32 +74,92 @@ async function callGHLMCP(toolName, input = {}) {
   return parseMcpEnvelope(resp.status, txt);
 }
 
-async function sendInboundVisitorMessage({ contactId, text, provider = 'live-chat' }) {
-  // Be liberal with field names to satisfy tool variations.
-  const input = {
-    contactId,                 // camelCase
-    contact_id: contactId,     // snake_case
-    contact: { id: contactId },// nested style (seen in some tools)
-    text,
-    message: text,             // some handlers use `message`
-    provider,                  // 'live-chat' | 'webchat'
-    messageType: 'Live_Chat'
-  };
-  console.log('[MCP] conversations_add-an-inbound-message input:', input);
-  return callGHLMCP('conversations_add-an-inbound-message', input);
+// ---- Contacts: find or create (MCP) ----------------------------------------
+
+async function findExistingContact({ email, phone }) {
+  const q = email || phone;
+  if (!q) return null;
+
+  const r = await callMCP('contacts_get-contacts', {
+    locationId: process.env.CRM_LOCATION_ID,
+    query: q,
+    limit: 25
+  });
+
+  const contacts =
+    pick(r, 'data.contacts') || pick(r, 'contacts') || (Array.isArray(r?.data) ? r.data : []) || [];
+
+  // exact match priority: email, then phone (E.164 preferred for phone)
+  const exact =
+    (email && contacts.find(c => (c.email || '').toLowerCase() === email.toLowerCase())) ||
+    (phone && contacts.find(c => (c.phone || '') === phone));
+
+  return exact || contacts[0] || null;
 }
 
-async function sendOutboundMessage({ conversationId, text, messageType = 'Live_Chat' }) {
-  const input = {
-    conversationId,
-    conversation_id: conversationId,
-    id: conversationId,        // some handlers read `id` for conversation id
-    text,
+function splitName(name) {
+  if (!name) return { firstName: '', lastName: '' };
+  const parts = String(name).trim().split(/\s+/);
+  return { firstName: parts[0] || '', lastName: parts.slice(1).join(' ') || '' };
+}
+
+async function upsertContact({ name, email, phone, source, tags }) {
+  const { firstName, lastName } = splitName(name);
+  const r = await callMCP('contacts_upsert-contact', {
+    firstName,
+    lastName,
+    email: email || '',
+    phone: phone || '',
+    source: source || 'iKunnect Chat Widget',
+    tags: tags && Array.isArray(tags) ? tags : ['iKunnect', 'Live Chat']
+  });
+  const contact = pick(r, 'data.contact') || pick(r, 'contact') || r;
+  if (!contact?.id) throw new Error('Contact upsert returned no id');
+  return contact;
+}
+
+// ---- Conversations: first inbound (Integrations API) + follow-ups (MCP) ----
+
+async function postInboundByContact({ contactId, text, provider }) {
+  const base = process.env.CRM_BASE_URL || 'https://services.leadconnectorhq.com';
+  const pit = process.env.CRM_PIT;
+  const locationId = process.env.CRM_LOCATION_ID;
+  if (!pit || !locationId) throw new Error('Missing env: CRM_PIT or CRM_LOCATION_ID');
+
+  const payload = {
+    contactId,
     message: text,
-    messageType
+    type: 'Live_Chat',
+    provider // 'live-chat' | 'webchat'
   };
-  console.log('[MCP] conversations_send-a-new-message input:', input);
-  return callGHLMCP('conversations_send-a-new-message', input);
+
+  const headers = {
+    Authorization: `Bearer ${pit}`,
+    locationId,
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    Version: '2021-07-28' // accepted by most LC endpoints
+  };
+
+  const resp = await fetch(`${base}/conversations/messages/inbound`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload)
+  });
+
+  const txt = await resp.text();
+  let json;
+  try { json = JSON.parse(txt); } catch { throw new Error(`Inbound API bad response [${resp.status}]: ${txt.slice(0,240)}...`); }
+  if (!resp.ok) throw new Error(json?.message || json?.error || `Inbound API ${resp.status}`);
+  return json;
+}
+
+async function sendOutboundOnThread({ conversationId, text, messageType = 'Live_Chat' }) {
+  return callMCP('conversations_send-a-new-message', {
+    conversationId,
+    text,
+    messageType
+  });
 }
 
 function extractConversationId(obj) {
@@ -108,45 +173,60 @@ function extractConversationId(obj) {
   );
 }
 
+// ---- Handler ---------------------------------------------------------------
+
 export default async function handler(req, res) {
   setCORS(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
   try {
-    const { conversationId, body, contactId, channel } = (req.body || {});
-    if (!body || !contactId) {
-      return res.status(400).json({ success: false, error: 'Message body and contactId are required' });
-    }
-
+    const { conversationId, body, contactId, name, email, phone, channel, source, tags } = (req.body || {});
+    if (!body) return res.status(400).json({ success: false, error: 'Message body is required' });
     const text = String(body).trim();
     if (!text) return res.status(400).json({ success: false, error: 'Message body cannot be empty' });
 
     const provider = (channel && String(channel).toLowerCase() === 'webchat') ? 'webchat' : 'live-chat';
 
     let finalConversationId = conversationId || null;
-    let mcpObj;
+    let finalContactId = contactId || null;
+    let resultObj;
 
+    // 0) If we don't have a conversation, ensure we have a contact (find or create)
     if (!finalConversationId) {
-      console.log('[SEND] INBOUND (first message):', { contactId, provider, text });
-      const inbound = await sendInboundVisitorMessage({ contactId, text, provider });
-      mcpObj = inbound;
+      if (!finalContactId) {
+        // Try to find by email/phone
+        const found = await findExistingContact({ email, phone });
+        if (found?.id) {
+          finalContactId = found.id;
+          console.log('[send] Found contact:', finalContactId);
+        } else {
+          // Create/upsert contact (name/email/phone may be partial—MCP accepts blanks)
+          const created = await upsertContact({ name, email, phone, source, tags });
+          finalContactId = created.id;
+          console.log('[send] Created contact:', finalContactId);
+        }
+      }
+
+      // 1) FIRST message → Inbound by contact (creates/attaches thread + triggers Conversation AI)
+      const inbound = await postInboundByContact({ contactId: finalContactId, text, provider });
+      resultObj = inbound;
       finalConversationId = extractConversationId(inbound);
-      console.log('[SEND] inbound response conversationId:', finalConversationId);
+      console.log('[send] inbound conversationId:', finalConversationId);
     } else {
-      console.log('[SEND] OUTBOUND (follow-up):', { conversationId: finalConversationId, text });
-      const outbound = await sendOutboundMessage({ conversationId: finalConversationId, text, messageType: 'Live_Chat' });
-      mcpObj = outbound;
+      // 2) FOLLOW-UP → Outbound on existing thread
+      const outbound = await sendOutboundOnThread({ conversationId: finalConversationId, text, messageType: 'Live_Chat' });
+      resultObj = outbound;
     }
 
     if (!finalConversationId) {
-      return res.status(502).json({ success: false, error: 'No conversationId returned by MCP' });
+      return res.status(502).json({ success: false, error: 'No conversationId returned' });
     }
 
     const messageId =
-      pick(mcpObj, 'data.messageId') ||
-      pick(mcpObj, 'messageId') ||
-      pick(mcpObj, 'message.id') ||
+      pick(resultObj, 'data.messageId') ||
+      pick(resultObj, 'messageId') ||
+      pick(resultObj, 'message.id') ||
       'message_created';
 
     return res.status(200).json({
@@ -154,7 +234,7 @@ export default async function handler(req, res) {
       data: {
         messageId,
         conversationId: finalConversationId,
-        contactId,
+        contactId: finalContactId,
         body: text,
         messageType: 'Live_Chat',
         timestamp: new Date().toISOString()
