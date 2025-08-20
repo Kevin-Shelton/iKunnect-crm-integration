@@ -99,15 +99,15 @@ export default async function handler(req, res) {
     const locationId = process.env.CRM_LOCATION_ID;
     if (!pit || !locationId) throw new Error('Missing required env: CRM_PIT or CRM_LOCATION_ID');
 
-    // Try Method 1: Regular messages endpoint
+    // Try Method 1: Inbound endpoint with correct Live Chat parameters
     try {
-      console.log('[INBOUND] Trying regular messages endpoint...');
+      console.log('[INBOUND] Trying inbound endpoint with Live Chat params...');
       const payload1 = {
-        type: 'Live_Chat',
         contactId,
         message: text,
-        locationId: locationId,
-        provider: provider || 'live-chat'
+        type: 'Live_Chat',
+        provider: 'web_chat', // Try web_chat as provider
+        source: 'live_chat'
       };
 
       const headers1 = {
@@ -120,7 +120,7 @@ export default async function handler(req, res) {
 
       console.log('[INBOUND] Method 1 payload:', JSON.stringify(payload1, null, 2));
 
-      const resp1 = await fetch(`${base}/conversations/messages`, {
+      const resp1 = await fetch(`${base}/conversations/messages/inbound`, {
         method: 'POST',
         headers: headers1,
         body: JSON.stringify(payload1)
@@ -138,19 +138,65 @@ export default async function handler(req, res) {
       console.log('[INBOUND] Method 1 failed:', err.message);
     }
 
-    // Try Method 2: Your original inbound endpoint
+    // Try Method 2: Different provider variations
+    const providerVariants = ['webchat', 'live-chat', 'chat', 'widget'];
+    
+    for (const providerVar of providerVariants) {
+      try {
+        console.log(`[INBOUND] Trying provider variant: ${providerVar}`);
+        const payload2 = {
+          contactId,
+          message: text,
+          type: 'Live_Chat',
+          provider: providerVar,
+          source: 'api',
+          channel: 'chat'
+        };
+
+        const headers2 = {
+          Authorization: `Bearer ${pit}`,
+          locationId,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Version: '2021-07-28'
+        };
+
+        console.log(`[INBOUND] ${providerVar} payload:`, JSON.stringify(payload2, null, 2));
+
+        const resp2 = await fetch(`${base}/conversations/messages/inbound`, {
+          method: 'POST',
+          headers: headers2,
+          body: JSON.stringify(payload2)
+        });
+
+        const txt2 = await resp2.text();
+        console.log(`[INBOUND] ${providerVar} response:`, resp2.status, txt2);
+        
+        let json2;
+        try { json2 = JSON.parse(txt2); } catch { continue; } // Try next variant
+        
+        if (resp2.ok) {
+          console.log(`[INBOUND] ${providerVar} success:`, JSON.stringify(json2, null, 2));
+          return json2;
+        }
+        
+      } catch (err) {
+        console.log(`[INBOUND] Provider ${providerVar} failed:`, err.message);
+        continue; // Try next variant
+      }
+    }
+
+    // Try Method 3: Regular messages endpoint as last resort
     try {
-      console.log('[INBOUND] Trying inbound endpoint...');
-      const payload2 = {
+      console.log('[INBOUND] Trying regular messages endpoint as fallback...');
+      const payload3 = {
+        type: 'Live_Chat',
         contactId,
         message: text,
-        type: 'Live_Chat',
-        provider: provider || 'live-chat',
-        locationId: locationId,
-        source: 'api'
+        provider: 'web_chat'
       };
 
-      const headers2 = {
+      const headers3 = {
         Authorization: `Bearer ${pit}`,
         locationId,
         'Content-Type': 'application/json',
@@ -158,31 +204,31 @@ export default async function handler(req, res) {
         Version: '2021-07-28'
       };
 
-      console.log('[INBOUND] Method 2 payload:', JSON.stringify(payload2, null, 2));
+      console.log('[INBOUND] Method 3 payload:', JSON.stringify(payload3, null, 2));
 
-      const resp2 = await fetch(`${base}/conversations/messages/inbound`, {
+      const resp3 = await fetch(`${base}/conversations/messages`, {
         method: 'POST',
-        headers: headers2,
-        body: JSON.stringify(payload2)
+        headers: headers3,
+        body: JSON.stringify(payload3)
       });
 
-      const txt2 = await resp2.text();
-      console.log('[INBOUND] Method 2 response:', resp2.status, txt2);
+      const txt3 = await resp3.text();
+      console.log('[INBOUND] Method 3 response:', resp3.status, txt3);
       
-      let json2;
-      try { json2 = JSON.parse(txt2); } catch { throw new Error(`Inbound API bad response [${resp2.status}]: ${txt2.slice(0,240)}...`); }
+      let json3;
+      try { json3 = JSON.parse(txt3); } catch { throw new Error(`Messages API bad response [${resp3.status}]: ${txt3.slice(0,240)}...`); }
       
-      if (!resp2.ok) {
-        console.error('[INBOUND] Method 2 error:', json2);
-        throw new Error(json2?.message || json2?.error || `Inbound API ${resp2.status}`);
+      if (!resp3.ok) {
+        console.error('[INBOUND] Method 3 error:', json3);
+        throw new Error(json3?.message || json3?.error || `Messages API ${resp3.status}`);
       }
 
-      console.log('[INBOUND] Method 2 success:', JSON.stringify(json2, null, 2));
-      return json2;
+      console.log('[INBOUND] Method 3 success:', JSON.stringify(json3, null, 2));
+      return json3;
       
     } catch (err) {
-      console.error('[INBOUND] Both methods failed. Last error:', err.message);
-      throw err;
+      console.error('[INBOUND] All methods failed. Last error:', err.message);
+      throw new Error(`Failed to send Live Chat message: ${err.message}`);
     }
   }
 
@@ -457,11 +503,12 @@ export default async function handler(req, res) {
         console.log('[SEND] First message created conversationId:', finalConversationId);
       } else {
         console.log('[SEND] Follow-up message - using MCP for conversationId:', finalConversationId);
-        // FOLLOW-UP -> MCP send on existing thread
+        // FOLLOW-UP -> MCP send on existing thread with correct Live Chat type
         result = await callMCP('conversations_send-a-new-message', {
           conversationId: finalConversationId,
           text,
-          messageType: 'Live_Chat'
+          messageType: 'Live_Chat', // Ensure this stays as Live_Chat
+          type: 'Live_Chat' // Add type field as well
         });
       }
 
