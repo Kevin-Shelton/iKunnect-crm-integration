@@ -1,54 +1,102 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>iKunnect CRM Chat Interface</title>
-    <link rel="stylesheet" href="/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>iKunnect CRM Chat Interface</title>
+  <!-- Use relative paths so this works locally and on Vercel -->
+  <link rel="stylesheet" href="./style.css" />
+  <style>
+    /* Minimal extras for status bar; safe with your existing CSS */
+    .status-bar{display:flex;gap:.75rem;align-items:center;justify-content:space-between;margin:8px 0 12px;color:#555}
+    .status-chip{font-size:.85rem;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:4px 10px}
+    .status-chip.ok{background:#e6f9ee;border-color:#b7e4c7;color:#1b5e20}
+    .status-chip.bad{background:#fff1f2;border-color:#fecdd3;color:#7f1d1d}
+    .status-actions button{font-size:.8rem;padding:6px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer}
+    .status-actions button:hover{background:#f8fafc}
+  </style>
 </head>
 <body>
-    <div class="chat-container">
-        <div class="chat-header">
-            <h1>🚀 iKunnect CRM Integration</h1>
-            <p>Test your CRM MCP int with real-time chat</p>
-        </div>
-
-        <div class="setup-form" id="setupForm">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="userName">Your Name</label>
-                    <input type="text" id="userName" placeholder="Enter your name" value="John Doe">
-                </div>
-                <div class="form-group">
-                    <label for="userEmail">Email</label>
-                    <input type="email" id="userEmail" placeholder="your@email.com" value="john@example.com">
-                </div>
-                <div class="form-group">
-                    <label for="userPhone">Phone (Optional)</label>
-                    <input type="tel" id="userPhone" placeholder="+1234567890" value="+1234567890">
-                </div>
-            </div>
-
-            <div style="margin-top: 15px;">
-                <button class="btn" onclick="startChat()">Start Chat Session</button>
-            </div>
-        </div>
-
-        <div class="chat-messages" id="chatMessages"></div>
-
-        <div class="chat-input">
-            <div class="input-row">
-                <input type="text" class="message-input" id="messageInput" placeholder="Type your message..." disabled>
-                <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
+  <div class="chat-container">
+    <div class="chat-header">
+      <h1>🚀 iKunnect CRM Integration</h1>
+      <p>Test your CRM MCP integration with real-time chat</p>
     </div>
 
-    <script src="/script.js"></script>
+    <!-- Status / Debug -->
+    <div class="status-bar">
+      <div>
+        <span class="status-chip" id="apiBaseChip">API: detecting…</span>
+        <span class="status-chip" id="healthChip">Health: unknown</span>
+      </div>
+      <div class="status-actions">
+        <button onclick="testAPI()">Re-test Health</button>
+        <button onclick="debugSession()">Debug</button>
+      </div>
+    </div>
+
+    <!-- Setup form -->
+    <div class="setup-form" id="setupForm">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="userName">Your Name</label>
+          <input type="text" id="userName" placeholder="Enter your name" value="John Doe" />
+        </div>
+        <div class="form-group">
+          <label for="userEmail">Email</label>
+          <input type="email" id="userEmail" placeholder="your@email.com" value="john@example.com" />
+        </div>
+        <div class="form-group">
+          <label for="userPhone">Phone (Optional)</label>
+          <input type="tel" id="userPhone" placeholder="+1234567890" value="+1234567890" />
+        </div>
+      </div>
+      <div style="margin-top: 15px;">
+        <button class="btn" onclick="startChat()">Start Chat Session</button>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="chat-messages" id="chatMessages"></div>
+
+    <!-- Input -->
+    <div class="chat-input">
+      <div class="input-row">
+        <input type="text" class="message-input" id="messageInput" placeholder="Type your message..." disabled />
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled title="Send">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Use relative path so it loads locally and on Vercel -->
+  <script src="./script.js"></script>
+  <script>
+    // Show API base + live health in the chips
+    document.addEventListener('DOMContentLoaded', () => {
+      const base = (typeof apiBaseUrl !== 'undefined') ? apiBaseUrl : window.location.origin;
+      const chip = document.getElementById('apiBaseChip');
+      if (chip) chip.textContent = `API: ${base}`;
+    });
+
+    // Hook testAPI to set the health chip color
+    const _origTestAPI = typeof testAPI === 'function' ? testAPI : null;
+    if (_origTestAPI) {
+      window.testAPI = async function wrappedTestAPI() {
+        const chip = document.getElementById('healthChip');
+        if (chip) { chip.classList.remove('ok','bad'); chip.textContent = 'Health: checking…'; }
+        try {
+          await _origTestAPI();
+          // script.js will append a chat message; we also set a quick visual flag
+          if (chip) { chip.classList.add('ok'); chip.textContent = 'Health: OK'; }
+        } catch(e) {
+          if (chip) { chip.classList.add('bad'); chip.textContent = 'Health: error'; }
+        }
+      };
+    }
+  </script>
 </body>
 </html>
-

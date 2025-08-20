@@ -1,25 +1,36 @@
-// ================== CONFIG ==================
-const VERCEL_BASE = 'https://<your-app>.vercel.app'; // <-- CHANGE THIS to your deployed URL
+// ------------------ CONFIG ------------------
+const VERCEL_BASE = 'https://<your-app>.vercel.app'; // <-- change to your deployed URL
 
-// Global variables to store session data
-let currentSession = null;
-let currentThread = null;
+let currentSession = null; // { contactId, ... }
+let currentThread = null;  // { conversationId, ... }
 
-// Decide which API base to use
-let apiBaseUrl = (window.location.hostname.includes('vercel.app') || window.location.hostname.endsWith('.yourdomain.com'))
-  ? window.location.origin
-  : VERCEL_BASE; // fallback to Vercel when running locally
+let apiBaseUrl =
+  window.location.hostname.includes('vercel.app') ? window.location.origin : VERCEL_BASE;
 
-// ================== INIT ==================
-document.addEventListener('DOMContentLoaded', function() {
+// ------------------ INIT ------------------
+document.addEventListener('DOMContentLoaded', () => {
   console.log('Chat interface loaded');
   console.log('API Base URL:', apiBaseUrl);
   setTimeout(testAPI, 500);
+
+  const messageInput = document.getElementById('messageInput');
+  if (messageInput) {
+    messageInput.addEventListener('keypress', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+  }
+  ['userName', 'userEmail', 'userPhone'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('keypress', e => { if (e.key === 'Enter') { e.preventDefault(); startChat(); }});
+  });
 });
 
-// ================== SESSION ==================
+// ------------------ SESSION ------------------
 async function startChat() {
-  const name = document.getElementById('userName').value.trim();
+  const name  = document.getElementById('userName').value.trim();
   const email = document.getElementById('userEmail').value.trim();
   const phone = document.getElementById('userPhone').value.trim();
 
@@ -32,89 +43,66 @@ async function startChat() {
     addMessage('system', 'Starting chat session...');
 
     // 1) Create/find contact
-    const sessionResponse = await fetch(`${apiBaseUrl}/api/chat/session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const sessionRes  = await fetch(`${apiBaseUrl}/api/chat/session`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, phone })
     });
+    const sessionTxt  = await sessionRes.text();
+    let sessionJson;
+    try { sessionJson = JSON.parse(sessionTxt); }
+    catch { console.error('Session RAW:', sessionRes.status, sessionTxt.slice(0,200)); throw new Error(`Session creation failed: ${sessionRes.status} (non-JSON)`); }
+    if (!sessionRes.ok || !sessionJson.success) throw new Error(sessionJson?.error || `Session failed: ${sessionRes.status}`);
 
-    const sessionText = await sessionResponse.text();
-    let sessionData;
-    try { sessionData = JSON.parse(sessionText); }
-    catch {
-      console.error('Session RAW:', sessionResponse.status, sessionText.slice(0, 200));
-      throw new Error(`Session creation failed: ${sessionResponse.status} - Non-JSON response`);
-    }
-    if (!sessionResponse.ok || !sessionData.success) {
-      throw new Error(`Session creation failed: ${sessionResponse.status} - ${sessionData?.error || 'Unknown error'}`);
-    }
-
-    currentSession = sessionData.data;
-    console.log('Session created:', currentSession);
+    currentSession = sessionJson.data;
     addMessage('system', `Contact ${currentSession.isNewContact ? 'created' : 'found'}: ${currentSession.contact.name}`);
 
-    // 2) Create REAL conversation thread (serverless will post an inbound seed)
+    // 2) Seed a REAL conversation (serverless will post inbound seed)
     addMessage('system', 'Creating conversation thread...');
-    const threadResponse = await fetch(`${apiBaseUrl}/api/chat/thread`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contactId: currentSession.contactId })
+    const threadRes  = await fetch(`${apiBaseUrl}/api/chat/thread`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contactId: currentSession.contactId, channel: 'chat' })
     });
+    const threadTxt  = await threadRes.text();
+    let threadJson;
+    try { threadJson = JSON.parse(threadTxt); }
+    catch { console.error('Thread RAW:', threadRes.status, threadTxt.slice(0,200)); throw new Error(`Thread creation failed: ${threadRes.status} (non-JSON)`); }
+    if (!threadRes.ok || !threadJson.success) throw new Error(threadJson?.error || `Thread failed: ${threadRes.status}`);
 
-    const threadText = await threadResponse.text();
-    let threadData;
-    try { threadData = JSON.parse(threadText); }
-    catch {
-      console.error('Thread RAW:', threadResponse.status, threadText.slice(0, 200));
-      throw new Error(`Thread creation failed: ${threadResponse.status} - Non-JSON response`);
-    }
-    if (!threadResponse.ok || !threadData.success) {
-      throw new Error(`Thread creation failed: ${threadResponse.status} - ${threadData?.error || 'Unknown error'}`);
-    }
-
-    currentThread = threadData.data;
-    console.log('Thread created:', currentThread);
-    addMessage('system', `Conversation ${currentThread.isNewConversation ? 'created' : 'found'}: ${currentThread.conversationId}`);
+    currentThread = threadJson.data;
+    addMessage('system', `Conversation created: ${currentThread.conversationId}`);
 
     // Enable UI
     document.getElementById('setupForm')?.style?.setProperty('display', 'none');
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
-    if (messageInput) {
-      messageInput.disabled = false;
-      messageInput.placeholder = 'Type your message...';
-      messageInput.focus();
-    }
+    if (messageInput) { messageInput.disabled = false; messageInput.placeholder = 'Type your message...'; messageInput.focus(); }
     if (sendBtn) sendBtn.disabled = false;
 
     addMessage('bot', `Hello ${currentSession.contact.firstName || currentSession.contact.name}! I'm ready to help you. Your information has been saved to our CRM system.`);
-  } catch (error) {
-    console.error('Error starting chat:', error);
-    addMessage('system', `Error starting chat: ${error.message}`);
+  } catch (err) {
+    console.error('Error starting chat:', err);
+    addMessage('system', `Error starting chat: ${err.message}`);
   }
 }
 
-// ================== SEND ==================
+// ------------------ SEND ------------------
 async function sendMessage(messageText = null) {
   if (!currentSession || !currentThread) {
     addMessage('system', 'Please start a chat session first.');
     return;
   }
 
-  const messageInput = document.getElementById('messageInput');
-  const message = messageText || messageInput.value.trim();
+  const input = document.getElementById('messageInput');
+  const message = messageText || (input ? input.value.trim() : '');
   if (!message) return;
-
-  if (!messageText) messageInput.value = '';
+  if (!messageText && input) input.value = '';
 
   addMessage('user', message);
 
   try {
     addMessage('system', 'Sending to CRM...');
-
-    const sendResponse = await fetch(`${apiBaseUrl}/api/chat/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const sendRes = await fetch(`${apiBaseUrl}/api/chat/send`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         conversationId: currentThread.conversationId, // follow-up path (MCP)
         contactId: currentSession.contactId,
@@ -122,103 +110,63 @@ async function sendMessage(messageText = null) {
         channel: 'chat'
       })
     });
+    const sendTxt = await sendRes.text();
+    let sendJson;
+    try { sendJson = JSON.parse(sendTxt); }
+    catch { console.error('Send RAW:', sendRes.status, sendTxt.slice(0,200)); throw new Error(`Message send failed: ${sendRes.status} (non-JSON)`); }
+    if (!sendRes.ok || !sendJson.success) throw new Error(sendJson?.error || `Message send failed: ${sendRes.status}`);
 
-    const sendText = await sendResponse.text();
-    let sendData;
-    try { sendData = JSON.parse(sendText); }
-    catch {
-      console.error('Send RAW:', sendResponse.status, sendText.slice(0, 200));
-      throw new Error(`Message send failed: ${sendResponse.status} - Non-JSON response`);
-    }
-
-    if (!sendResponse.ok || !sendData.success) {
-      throw new Error(`Message send failed: ${sendResponse.status} - ${sendData?.error || 'Unknown error'}`);
-    }
-
-    console.log('Message sent:', sendData);
-    addMessage('system', `Message sent to CRM: ${sendData.data.messageId}`);
+    addMessage('system', `Message sent to CRM: ${sendJson.data.messageId}`);
     addMessage('system', 'Message delivered to GoHighLevel. If Conversation AI is enabled, the response will appear in your CRM.');
-  } catch (error) {
-    console.error('Error sending message:', error);
-    addMessage('system', `Error sending message: ${error.message}`);
+  } catch (err) {
+    console.error('Error sending message:', err);
+    addMessage('system', `Error sending message: ${err.message}`);
   }
 }
 
-// ================== UI HELPERS ==================
+// ------------------ UI HELPERS ------------------
 function addMessage(type, content) {
-  const chatMessages = document.getElementById('chatMessages');
-  if (!chatMessages) return;
+  const box = document.getElementById('chatMessages');
+  if (!box) return;
+  const div = document.createElement('div');
+  div.className = `message ${type}`;
+  const ts = new Date().toLocaleTimeString();
 
-  const messageDiv = document.createElement('div');
-  messageDiv.className = `message ${type}`;
-
-  const timestamp = new Date().toLocaleTimeString();
   if (type === 'user') {
-    messageDiv.innerHTML = `<div class="message-content user-message"><strong>You:</strong> ${content}<div class="timestamp">${timestamp}</div></div>`;
+    div.innerHTML = `<div class="message-content user-message"><strong>You:</strong> ${content}<div class="timestamp">${ts}</div></div>`;
   } else if (type === 'bot') {
-    messageDiv.innerHTML = `<div class="message-content bot-message"><span class="bot-icon">🤖</span><div class="bot-text">${content}</div><div class="timestamp">${timestamp}</div></div>`;
+    div.innerHTML = `<div class="message-content bot-message"><span class="bot-icon">🤖</span><div class="bot-text">${content}</div><div class="timestamp">${ts}</div></div>`;
   } else {
-    messageDiv.innerHTML = `<div class="message-content system-message"><em>${content}</em><div class="timestamp">${timestamp}</div></div>`;
+    div.innerHTML = `<div class="message-content system-message"><em>${content}</em><div class="timestamp">${ts}</div></div>`;
   }
-
-  chatMessages.appendChild(messageDiv);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  const messageInput = document.getElementById('messageInput');
-  if (messageInput) {
-    messageInput.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-  }
-  ['userName', 'userEmail', 'userPhone'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          startChat();
-        }
-      });
-    }
-  });
-});
-
-function sendQuickResponse(message) { sendMessage(message); }
-
+function sendQuickResponse(msg) { sendMessage(msg); }
 function debugSession() {
   console.log('Current Session:', currentSession);
   console.log('Current Thread:', currentThread);
   console.log('API Base URL:', apiBaseUrl);
 }
 
-// ================== HEALTH TEST ==================
+// ------------------ HEALTH TEST ------------------
 async function testAPI() {
   try {
     const url = `${apiBaseUrl}/api/health`;
-    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
     const text = await res.text();
-
+    console.log('[API /health RAW]', res.status, res.headers.get('content-type'), text.slice(0,200));
     let data;
-    try { data = JSON.parse(text); }
-    catch {
-      console.error('API /health RAW:', res.status, res.headers.get('content-type'), text.slice(0, 200));
-      throw new Error(`HTTP ${res.status} — not JSON from ${url}`);
-    }
-
-    console.log('API Health:', data);
+    try { data = JSON.parse(text); } catch { addMessage('system', `❌ API Test: non-JSON (HTTP ${res.status})`); return; }
     if (data.success) {
       const name = data?.ghl?.locationName || 'GoHighLevel';
       addMessage('system', `✅ Connected to ${name}`);
     } else {
-      addMessage('system', `❌ Connection failed: ${data.error || 'Unknown error'}`);
+      const msg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
+      addMessage('system', `❌ Connection failed: ${msg}`);
     }
-  } catch (error) {
-    console.error('API Test failed:', error);
-    addMessage('system', `❌ API Test failed: ${error.message}`);
+  } catch (err) {
+    addMessage('system', `❌ API Test failed: ${err.message}`);
   }
 }
