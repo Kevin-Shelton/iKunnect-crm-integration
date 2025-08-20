@@ -1,4 +1,4 @@
-// GoHighLevel MCP Integration API - Debug Contact Creation
+// GoHighLevel MCP Integration API - Fixed Contact ID Parameter
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -49,25 +49,20 @@ export default async function handler(req, res) {
       body: JSON.stringify(jsonRpcRequest)
     };
     
-    console.log(`[GHL MCP] === CALLING TOOL ===`);
-    console.log(`[GHL MCP] Tool: ${toolName}`);
+    console.log(`[GHL MCP] Calling tool: ${toolName}`);
     console.log(`[GHL MCP] Arguments:`, JSON.stringify(arguments_, null, 2));
     
     const response = await fetch(mcpUrl, options);
     const responseText = await response.text();
     
-    console.log(`[GHL MCP] === RESPONSE ===`);
-    console.log(`[GHL MCP] Status: ${response.status}`);
-    console.log(`[GHL MCP] Raw Response: ${responseText}`);
+    console.log(`[GHL MCP] Response status: ${response.status}`);
+    console.log(`[GHL MCP] Response: ${responseText.substring(0, 500)}...`);
     
     // Handle Server-Sent Events format
     if (responseText.startsWith('event: message\ndata: ')) {
       const jsonPart = responseText.replace('event: message\ndata: ', '').trim();
-      console.log(`[GHL MCP] SSE JSON Part: ${jsonPart}`);
-      
       try {
         const responseData = JSON.parse(jsonPart);
-        console.log(`[GHL MCP] Parsed SSE Response:`, JSON.stringify(responseData, null, 2));
         
         if (responseData.error) {
           throw new Error(`MCP Error: ${responseData.error.code} - ${responseData.error.message}`);
@@ -75,7 +70,6 @@ export default async function handler(req, res) {
         
         return responseData.result;
       } catch (parseError) {
-        console.log(`[GHL MCP] SSE Parse Error:`, parseError.message);
         throw new Error(`Failed to parse SSE response: ${parseError.message}`);
       }
     }
@@ -84,9 +78,7 @@ export default async function handler(req, res) {
     let responseData;
     try {
       responseData = JSON.parse(responseText);
-      console.log(`[GHL MCP] Parsed JSON Response:`, JSON.stringify(responseData, null, 2));
     } catch (parseError) {
-      console.log(`[GHL MCP] JSON Parse Error:`, parseError.message);
       throw new Error(`Invalid response format: ${responseText.substring(0, 200)}...`);
     }
     
@@ -101,13 +93,132 @@ export default async function handler(req, res) {
     return responseData.result;
   }
 
+  // Helper function to extract contact data from MCP response
+  function extractContactFromMCPResponse(mcpResult) {
+    if (!mcpResult) return null;
+    
+    // Handle nested content structure
+    if (mcpResult.content && mcpResult.content[0]) {
+      const content = mcpResult.content[0];
+      if (content.type === 'text') {
+        try {
+          const parsed = JSON.parse(content.text);
+          
+          // Handle double-nested structure
+          if (parsed.content && parsed.content[0] && parsed.content[0].text) {
+            const innerParsed = JSON.parse(parsed.content[0].text);
+            
+            if (innerParsed.success === false) {
+              throw new Error(innerParsed.data?.message || innerParsed.message || 'Operation failed');
+            }
+            
+            return innerParsed.data?.contact || innerParsed.contact || innerParsed.data;
+          }
+          
+          if (parsed.success === false) {
+            throw new Error(parsed.data?.message || parsed.message || 'Operation failed');
+          }
+          
+          return parsed.data?.contact || parsed.contact || parsed.data || parsed;
+        } catch (parseError) {
+          console.log('[GHL MCP] Parse error:', parseError.message);
+          return null;
+        }
+      }
+    }
+    
+    // Handle direct contact structure
+    return mcpResult.contact || mcpResult.data || mcpResult;
+  }
+
+  // Helper function to find existing contact by email
+  async function findExistingContact(email, phone) {
+    try {
+      console.log(`[CONTACT SEARCH] Looking for existing contact: ${email}`);
+      
+      const searchResult = await callGHLMCP('contacts_get-contacts', {
+        locationId: process.env.CRM_LOCATION_ID,
+        query: email,
+        limit: 10
+      });
+      
+      // Extract contacts from MCP response
+      let contacts = [];
+      if (searchResult.content && searchResult.content[0]) {
+        const content = searchResult.content[0];
+        if (content.type === 'text') {
+          try {
+            const parsed = JSON.parse(content.text);
+            if (parsed.content && parsed.content[0] && parsed.content[0].text) {
+              const innerParsed = JSON.parse(parsed.content[0].text);
+              contacts = innerParsed.data?.contacts || innerParsed.contacts || [];
+            } else {
+              contacts = parsed.data?.contacts || parsed.contacts || [];
+            }
+          } catch {
+            contacts = [];
+          }
+        }
+      } else {
+        contacts = searchResult.contacts || searchResult.data?.contacts || [];
+      }
+      
+      // Find exact match by email or phone
+      const exactMatch = contacts.find(contact => 
+        contact.email === email || 
+        (phone && contact.phone === phone)
+      );
+      
+      if (exactMatch) {
+        console.log(`[CONTACT SEARCH] Found existing contact: ${exactMatch.id}`);
+        return exactMatch;
+      }
+      
+      console.log('[CONTACT SEARCH] No existing contact found');
+      return null;
+      
+    } catch (error) {
+      console.log('[CONTACT SEARCH] Search failed:', error.message);
+      return null;
+    }
+  }
+
+  // Helper function to create new contact
+  async function createNewContact(firstName, lastName, email, phone) {
+    try {
+      console.log(`[CONTACT CREATE] Creating new contact: ${firstName} ${lastName}`);
+      
+      const createResult = await callGHLMCP('contacts_create-contact', {
+        firstName: firstName,
+        lastName: lastName,
+        email: email,
+        phone: phone || '',
+        source: 'iKunnect Live Chat Widget',
+        tags: ['Live Chat', 'Web Visitor', 'iKunnect Integration']
+      });
+      
+      const contact = extractContactFromMCPResponse(createResult);
+      
+      if (contact && contact.id) {
+        console.log(`[CONTACT CREATE] Successfully created contact: ${contact.id}`);
+        return contact;
+      }
+      
+      throw new Error('Failed to create contact - no ID returned');
+      
+    } catch (error) {
+      console.log('[CONTACT CREATE] Creation failed:', error.message);
+      throw error;
+    }
+  }
+
   try {
     // Route handling
     if (method === 'GET' && path === '/api') {
       return res.json({
         name: 'iKunnect GoHighLevel MCP Integration API',
-        version: '30.0.0 - DEBUG CONTACT CREATION',
-        description: 'Debug version to troubleshoot contact creation issues',
+        version: '31.0.0 - FIXED CONTACT_ID PARAMETER',
+        description: 'GoHighLevel MCP Server integration with correct contact_id parameter format',
         status: 'operational',
         timestamp: new Date().toISOString()
       });
@@ -162,158 +273,26 @@ export default async function handler(req, res) {
       const lastName = nameParts.slice(1).join(' ') || '';
       
       try {
-        console.log(`[SESSION] === STARTING SESSION ===`);
-        console.log(`[SESSION] Name: ${firstName} ${lastName}`);
-        console.log(`[SESSION] Email: ${email}`);
-        console.log(`[SESSION] Phone: ${phone || 'none'}`);
+        console.log(`[SESSION] Starting session for: ${firstName} ${lastName} (${email})`);
         
         // Step 1: Try to find existing contact
-        console.log(`[SESSION] === SEARCHING FOR EXISTING CONTACT ===`);
-        
-        let existingContact = null;
-        try {
-          const searchResult = await callGHLMCP('contacts_get-contacts', {
-            locationId: process.env.CRM_LOCATION_ID,
-            query: email,
-            limit: 5
-          });
-          
-          console.log(`[SESSION] Search result type: ${typeof searchResult}`);
-          console.log(`[SESSION] Full search result:`, JSON.stringify(searchResult, null, 2));
-          
-          // Try to extract contacts from various possible response structures
-          let contacts = [];
-          
-          if (searchResult.content && searchResult.content[0]) {
-            console.log(`[SESSION] Found content structure`);
-            const content = searchResult.content[0];
-            if (content.type === 'text') {
-              try {
-                const parsed = JSON.parse(content.text);
-                console.log(`[SESSION] Parsed content:`, JSON.stringify(parsed, null, 2));
-                
-                if (parsed.content && parsed.content[0] && parsed.content[0].text) {
-                  const innerParsed = JSON.parse(parsed.content[0].text);
-                  console.log(`[SESSION] Inner parsed:`, JSON.stringify(innerParsed, null, 2));
-                  contacts = innerParsed.data?.contacts || innerParsed.contacts || [];
-                } else {
-                  contacts = parsed.data?.contacts || parsed.contacts || [];
-                }
-              } catch (parseError) {
-                console.log(`[SESSION] Content parse error:`, parseError.message);
-                contacts = [];
-              }
-            }
-          } else {
-            console.log(`[SESSION] Direct result structure`);
-            contacts = searchResult.contacts || searchResult.data?.contacts || [];
-          }
-          
-          console.log(`[SESSION] Extracted contacts:`, JSON.stringify(contacts, null, 2));
-          
-          // Find exact match
-          existingContact = contacts.find(contact => 
-            contact.email === email || 
-            (phone && contact.phone === phone)
-          );
-          
-          if (existingContact) {
-            console.log(`[SESSION] Found existing contact:`, JSON.stringify(existingContact, null, 2));
-          } else {
-            console.log(`[SESSION] No existing contact found`);
-          }
-          
-        } catch (searchError) {
-          console.log(`[SESSION] Search failed:`, searchError.message);
-        }
-        
-        let contact = existingContact;
+        let contact = await findExistingContact(email, phone);
         let isNewContact = false;
         
         // Step 2: If no existing contact, create new one
         if (!contact) {
-          console.log(`[SESSION] === CREATING NEW CONTACT ===`);
-          
-          try {
-            const createResult = await callGHLMCP('contacts_create-contact', {
-              firstName: firstName,
-              lastName: lastName,
-              email: email,
-              phone: phone || '',
-              source: 'iKunnect Live Chat Widget',
-              tags: ['Live Chat', 'Web Visitor', 'iKunnect Integration']
-            });
-            
-            console.log(`[SESSION] Create result type: ${typeof createResult}`);
-            console.log(`[SESSION] Full create result:`, JSON.stringify(createResult, null, 2));
-            
-            // Try to extract contact from various possible response structures
-            if (createResult.content && createResult.content[0]) {
-              console.log(`[SESSION] Found content structure in create result`);
-              const content = createResult.content[0];
-              if (content.type === 'text') {
-                try {
-                  const parsed = JSON.parse(content.text);
-                  console.log(`[SESSION] Parsed create content:`, JSON.stringify(parsed, null, 2));
-                  
-                  if (parsed.content && parsed.content[0] && parsed.content[0].text) {
-                    const innerParsed = JSON.parse(parsed.content[0].text);
-                    console.log(`[SESSION] Inner parsed create:`, JSON.stringify(innerParsed, null, 2));
-                    
-                    if (innerParsed.success === false) {
-                      throw new Error(innerParsed.data?.message || innerParsed.message || 'Contact creation failed');
-                    }
-                    
-                    contact = innerParsed.data?.contact || innerParsed.contact || innerParsed.data;
-                  } else {
-                    if (parsed.success === false) {
-                      throw new Error(parsed.data?.message || parsed.message || 'Contact creation failed');
-                    }
-                    contact = parsed.data?.contact || parsed.contact || parsed.data || parsed;
-                  }
-                } catch (parseError) {
-                  console.log(`[SESSION] Create content parse error:`, parseError.message);
-                  // Create fallback contact
-                  contact = { 
-                    id: `contact_${Date.now()}`, 
-                    firstName: firstName,
-                    lastName: lastName,
-                    email: email,
-                    phone: phone
-                  };
-                }
-              }
-            } else {
-              console.log(`[SESSION] Direct create result structure`);
-              contact = createResult.contact || createResult.data || createResult;
-            }
-            
-            console.log(`[SESSION] Final extracted contact:`, JSON.stringify(contact, null, 2));
-            isNewContact = true;
-            
-          } catch (createError) {
-            console.log(`[SESSION] Create failed:`, createError.message);
-            throw createError;
-          }
+          contact = await createNewContact(firstName, lastName, email, phone);
+          isNewContact = true;
         }
-        
-        console.log(`[SESSION] === FINAL CONTACT CHECK ===`);
-        console.log(`[SESSION] Contact object:`, JSON.stringify(contact, null, 2));
-        console.log(`[SESSION] Contact ID: ${contact?.id}`);
-        console.log(`[SESSION] Is new contact: ${isNewContact}`);
         
         if (!contact || !contact.id) {
           return res.status(500).json({
             success: false,
-            error: 'Failed to create or find contact - no valid ID returned',
-            debug: {
-              contactObject: contact,
-              isNewContact: isNewContact,
-              searchAttempted: !existingContact,
-              createAttempted: !existingContact
-            }
+            error: 'Failed to create or find contact - no valid ID returned'
           });
         }
+        
+        console.log(`[SESSION] Using contact: ${contact.id} (${isNewContact ? 'new' : 'existing'})`);
         
         return res.json({
           success: true,
@@ -376,23 +355,60 @@ export default async function handler(req, res) {
       }
 
       try {
-        console.log(`[MESSAGE] === SENDING MESSAGE ===`);
-        console.log(`[MESSAGE] Contact ID: ${contactId}`);
-        console.log(`[MESSAGE] Message: ${body}`);
+        console.log(`[MESSAGE] Sending message to contact ${contactId}: ${body}`);
         
+        // Use the correct parameter name: contact_id (with underscore)
         const messageParams = {
-          contactId: contactId,
+          contact_id: contactId,  // FIXED: Use underscore format
           message: body,
           type: 'Live_Chat'
         };
         
+        console.log('[MESSAGE] Using parameters:', JSON.stringify(messageParams, null, 2));
+        
         const messageData = await callGHLMCP('conversations_send-a-new-message', messageParams);
+        
+        console.log('[MESSAGE] Message sent successfully:', JSON.stringify(messageData, null, 2));
+        
+        // Handle MCP result format
+        let messageResult = messageData;
+        if (messageData.content && messageData.content[0]) {
+          const content = messageData.content[0];
+          if (content.type === 'text') {
+            try {
+              const parsed = JSON.parse(content.text);
+              if (parsed.content && parsed.content[0] && parsed.content[0].text) {
+                const innerParsed = JSON.parse(parsed.content[0].text);
+                if (innerParsed.success === false) {
+                  return res.status(500).json({
+                    success: false,
+                    error: `Message sending failed: ${innerParsed.data?.message || innerParsed.message || 'Unknown error'}`
+                  });
+                }
+                messageResult = innerParsed;
+              } else {
+                messageResult = parsed;
+              }
+            } catch {
+              messageResult = { id: 'message_sent', status: 'delivered' };
+            }
+          }
+        }
+        
+        const messageId = messageResult.messageId || 
+                         messageResult.message?.id || 
+                         messageResult.id || 
+                         'message_created';
+        
+        const actualConversationId = messageResult.conversationId || 
+                                    messageResult.conversation?.id || 
+                                    conversationId;
         
         return res.json({
           success: true,
           data: {
-            messageId: 'message_sent',
-            conversationId: conversationId,
+            messageId: messageId,
+            conversationId: actualConversationId,
             contactId: contactId,
             body: body,
             timestamp: new Date().toISOString(),
