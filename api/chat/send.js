@@ -1,5 +1,5 @@
 // api/chat/send.js
-// iKunnect ↔ CRM (Vercel Serverless)
+// iKunnect ↔ GoHighLevel (Vercel Serverless)
 // First message: find-or-create contact (MCP) -> inbound Live_Chat (Integrations API)
 // Follow-ups: outbound on conversation (MCP)
 
