@@ -15,11 +15,17 @@ export default async function handler(req, res) {
   );
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { method, url } = req;
-  const path = (url || '').split('?')[0];
+  // -------- Path normalize (handles trailing slashes) --------
+  const u = new URL(req.url, 'https://dummy.local');
+  let path = u.pathname;
+  if (path.length > 1 && path.endsWith('/')) path = path.replace(/\/+$/, '');
+
+  const method = req.method;
+  const nowIso = () => new Date().toISOString();
+
+  console.log(`[api] ${method} ${path}`);
 
   // -------- Utils --------
-  const nowIso = () => new Date().toISOString();
   function pick(obj, pathStr) {
     return pathStr.split('.').reduce((o, k) => (o && o[k] != null ? o[k] : undefined), obj);
   }
@@ -192,10 +198,11 @@ export default async function handler(req, res) {
 
   // ================= ROUTES =================
 
+  // Simple status
   if (method === 'GET' && path === '/api') {
     return res.json({
       name: 'iKunnect ↔ GoHighLevel MCP Integration',
-      version: 'live-chat-flow-1.0',
+      version: 'live-chat-flow-1.1',
       status: 'operational',
       timestamp: nowIso()
     });
@@ -228,9 +235,26 @@ export default async function handler(req, res) {
     }
   }
 
+  // GET handshakes (so you can open these URLs in a browser to confirm routing)
+  if (method === 'GET' && path === '/api/chat/session') {
+    return res.json({ ok: true, route: '/api/chat/session', expect: 'POST JSON { name/email/phone }' });
+  }
+  if (method === 'GET' && path === '/api/chat/send') {
+    return res.json({ ok: true, route: '/api/chat/send', expect: 'POST JSON { contactId+body } or { conversationId+body }' });
+  }
+  if (method === 'GET' && path === '/api/chat/thread') {
+    return res.json({ ok: true, route: '/api/chat/thread', expect: 'POST JSON { contactId }' });
+  }
+
   // Create/find contact
   if (method === 'POST' && path === '/api/chat/session') {
-    const { name, email, phone } = req.body || {};
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    const raw = Buffer.concat(chunks).toString('utf8');
+    let body = {};
+    try { body = raw ? JSON.parse(raw) : {}; } catch { body = {}; }
+
+    const { name, email, phone } = body;
     if (!name && !email && !phone) {
       return res.status(400).json({ success: false, error: 'At least one of name, email, or phone is required' });
     }
@@ -263,9 +287,15 @@ export default async function handler(req, res) {
     }
   }
 
-  // Create/ensure a REAL conversation (used to return "pending_*"; now posts an inbound seed)
+  // Create/ensure a REAL conversation (post inbound seed)
   if (method === 'POST' && path === '/api/chat/thread') {
-    const { contactId, seed, channel } = req.body || {};
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    const raw = Buffer.concat(chunks).toString('utf8');
+    let body = {};
+    try { body = raw ? JSON.parse(raw) : {}; } catch { body = {}; }
+
+    const { contactId, seed, channel } = body;
     if (!contactId) return res.status(400).json({ success: false, error: 'Contact ID is required' });
     try {
       const provider = (channel && String(channel).toLowerCase() === 'webchat') ? 'webchat' : 'live-chat';
@@ -300,10 +330,16 @@ export default async function handler(req, res) {
   //   - No conversationId => first message -> inbound by contactId (creates/attaches thread + triggers AI)
   //   - Has conversationId => follow-up -> MCP send on thread
   if (method === 'POST' && path === '/api/chat/send') {
-    const { conversationId, contactId, body, channel } = req.body || {};
-    if (!body) return res.status(400).json({ success: false, error: 'Message body is required' });
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    const raw = Buffer.concat(chunks).toString('utf8');
+    let body = {};
+    try { body = raw ? JSON.parse(raw) : {}; } catch { body = {}; }
 
-    const text = String(body).trim();
+    const { conversationId, contactId, body: msg, channel } = body;
+    if (!msg) return res.status(400).json({ success: false, error: 'Message body is required' });
+
+    const text = String(msg).trim();
     if (!text) return res.status(400).json({ success: false, error: 'Message body cannot be empty' });
 
     try {
@@ -354,19 +390,6 @@ export default async function handler(req, res) {
     } catch (error) {
       return res.status(500).json({ success: false, error: `Message sending failed: ${error.message}` });
     }
-  }
-
-  // Deprecated note
-  if (method === 'POST' && path === '/api/bot/process') {
-    return res.json({
-      success: true,
-      data: {
-        response: 'Deprecated. Conversation AI responds automatically.',
-        action: 'deprecated',
-        confidence: 1.0,
-        timestamp: nowIso()
-      }
-    });
   }
 
   // 404
