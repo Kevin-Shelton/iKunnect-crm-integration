@@ -199,9 +199,9 @@ async function testAPI() {
     let data;
     try { data = JSON.parse(text); } catch { addMessage('system', `⚠️ API Test: non-JSON (HTTP ${res.status})`); return; }
     if (data.success) {
-      const name = data?.ghl?.locationName || 'GoHighLevel';
-      addMessage('system', `✅ Connected to ${name} (Location: ${data?.ghl?.locationId})`);
-    } else {
+  const locationId = data?.env?.locationId || 'unknown';
+  addMessage('system', `✅ Connected to CRM (Location: ${locationId})`);
+  }else {
       const msg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
       addMessage('system', `❌ Connection failed: ${msg}`);
     }
