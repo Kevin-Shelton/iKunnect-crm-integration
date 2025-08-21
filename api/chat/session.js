@@ -25,6 +25,8 @@ module.exports = async function handler(req, res) {
       params: { name: toolName, arguments: arguments_ || {} }
     };
 
+    console.log('[MCP] Request:', JSON.stringify(jsonRpcRequest, null, 2));
+
     const response = await fetch(mcpUrl, {
       method: 'POST',
       headers: {
@@ -37,6 +39,7 @@ module.exports = async function handler(req, res) {
     });
 
     const responseText = await response.text();
+    console.log('[MCP] Raw response:', response.status, responseText);
     
     if (!response.ok) {
       throw new Error(`CRM MCP Error: ${response.status} - ${responseText.slice(0, 240)}...`);
@@ -46,15 +49,32 @@ module.exports = async function handler(req, res) {
     const ssePrefix = 'event: message\ndata: ';
     const body = responseText.startsWith(ssePrefix) ? responseText.slice(ssePrefix.length).trim() : responseText;
     
-    let parsed = JSON.parse(body);
+    let parsed;
+    try {
+      parsed = JSON.parse(body);
+    } catch (err) {
+      console.log('[MCP] JSON parse error:', err.message);
+      throw new Error(`Invalid MCP response: ${body.slice(0, 240)}...`);
+    }
+    
+    console.log('[MCP] Parsed response:', JSON.stringify(parsed, null, 2));
+    
     let current = parsed?.result ?? parsed;
     
     // Unwrap nested content
     for (let i = 0; i < 5; i++) {
       const textNode = current?.content?.[0]?.text;
       if (!textNode || typeof textNode !== 'string') break;
-      try { current = JSON.parse(textNode); } catch { break; }
+      try { 
+        const nested = JSON.parse(textNode);
+        console.log(`[MCP] Unwrapped level ${i + 1}:`, JSON.stringify(nested, null, 2));
+        current = nested;
+      } catch { 
+        break; 
+      }
     }
+
+    console.log('[MCP] Final processed result:', JSON.stringify(current, null, 2));
 
     if (current?.error) {
       throw new Error(`${current.error?.code || 'CRM_ERROR'}: ${current.error?.message || 'Unknown error'}`);
@@ -97,20 +117,38 @@ module.exports = async function handler(req, res) {
         tags: ['Live Chat', 'Web Visitor', 'iKunnect Integration']
       });
 
-      console.log('[SESSION] MCP contact result:', JSON.stringify(mcpResult, null, 2));
+      console.log('[SESSION] Full MCP result structure:', JSON.stringify(mcpResult, null, 2));
 
-      // Extract contact from MCP response
-      let contact = mcpResult;
-      if (mcpResult?.data?.contact) {
-        contact = mcpResult.data.contact;
-      } else if (mcpResult?.contact) {
-        contact = mcpResult.contact;
-      } else if (mcpResult?.data) {
-        contact = mcpResult.data;
+      // Try multiple paths to find the contact
+      const possiblePaths = [
+        mcpResult?.data?.contact,
+        mcpResult?.contact,
+        mcpResult?.data,
+        mcpResult,
+        mcpResult?.result?.contact,
+        mcpResult?.result?.data?.contact,
+        mcpResult?.result?.data,
+        mcpResult?.result
+      ];
+
+      let contact = null;
+      for (let i = 0; i < possiblePaths.length; i++) {
+        const candidate = possiblePaths[i];
+        console.log(`[SESSION] Checking path ${i}:`, candidate);
+        if (candidate && candidate.id) {
+          contact = candidate;
+          console.log(`[SESSION] Found contact at path ${i}:`, contact);
+          break;
+        }
       }
 
-      if (!contact?.id) {
-        throw new Error('Contact creation failed - no ID returned');
+      if (!contact || !contact.id) {
+        console.error('[SESSION] No contact found in any path. Full result:', mcpResult);
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Contact creation failed - no ID returned',
+          debug: mcpResult
+        });
       }
 
       console.log('[SESSION] Contact created successfully:', contact.id);
