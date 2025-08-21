@@ -25,7 +25,7 @@ module.exports = async function handler(req, res) {
       params: { name: toolName, arguments: arguments_ || {} }
     };
 
-    console.log('[MCP] Request:', JSON.stringify(jsonRpcRequest, null, 2));
+    console.log(`[MCP] Calling ${toolName} with:`, JSON.stringify(arguments_, null, 2));
 
     const response = await fetch(mcpUrl, {
       method: 'POST',
@@ -39,7 +39,7 @@ module.exports = async function handler(req, res) {
     });
 
     const responseText = await response.text();
-    console.log('[MCP] Raw response:', response.status, responseText);
+    console.log(`[MCP] ${toolName} raw response:`, response.status, responseText);
     
     if (!response.ok) {
       throw new Error(`CRM MCP Error: ${response.status} - ${responseText.slice(0, 240)}...`);
@@ -49,16 +49,7 @@ module.exports = async function handler(req, res) {
     const ssePrefix = 'event: message\ndata: ';
     const body = responseText.startsWith(ssePrefix) ? responseText.slice(ssePrefix.length).trim() : responseText;
     
-    let parsed;
-    try {
-      parsed = JSON.parse(body);
-    } catch (err) {
-      console.log('[MCP] JSON parse error:', err.message);
-      throw new Error(`Invalid MCP response: ${body.slice(0, 240)}...`);
-    }
-    
-    console.log('[MCP] Parsed response:', JSON.stringify(parsed, null, 2));
-    
+    let parsed = JSON.parse(body);
     let current = parsed?.result ?? parsed;
     
     // Unwrap nested content
@@ -66,18 +57,16 @@ module.exports = async function handler(req, res) {
       const textNode = current?.content?.[0]?.text;
       if (!textNode || typeof textNode !== 'string') break;
       try { 
-        const nested = JSON.parse(textNode);
-        console.log(`[MCP] Unwrapped level ${i + 1}:`, JSON.stringify(nested, null, 2));
-        current = nested;
+        current = JSON.parse(textNode);
       } catch { 
         break; 
       }
     }
 
-    console.log('[MCP] Final processed result:', JSON.stringify(current, null, 2));
+    console.log(`[MCP] ${toolName} processed result:`, JSON.stringify(current, null, 2));
 
-    if (current?.error) {
-      throw new Error(`${current.error?.code || 'CRM_ERROR'}: ${current.error?.message || 'Unknown error'}`);
+    if (current?.error || (current?.success === false)) {
+      throw new Error(`${current?.error?.code || current?.data?.statusCode || 'CRM_ERROR'}: ${current?.error?.message || current?.data?.message || current?.message || 'Unknown error'}`);
     }
     
     return current;
@@ -102,12 +91,44 @@ module.exports = async function handler(req, res) {
         });
       }
 
+      // First, test if we can get location info (read-only operation)
+      console.log('[SESSION] Testing location access...');
+      try {
+        const locationResult = await callMCP('locations_get-location', {
+          locationId: process.env.CRM_LOCATION_ID
+        });
+        console.log('[SESSION] Location access test passed:', locationResult?.name || 'Location found');
+      } catch (locError) {
+        console.error('[SESSION] Location access test failed:', locError.message);
+        return res.status(500).json({ 
+          success: false, 
+          error: `Location access failed: ${locError.message}` 
+        });
+      }
+
+      // Try to search for existing contacts first (read operation)
+      console.log('[SESSION] Testing contact search...');
+      try {
+        const searchResult = await callMCP('contacts_get-contacts', {
+          locationId: process.env.CRM_LOCATION_ID,
+          query: email || phone || name,
+          limit: 5
+        });
+        console.log('[SESSION] Contact search test passed, found:', searchResult?.data?.contacts?.length || 0, 'contacts');
+      } catch (searchError) {
+        console.error('[SESSION] Contact search test failed:', searchError.message);
+        return res.status(500).json({ 
+          success: false, 
+          error: `Contact search failed: ${searchError.message}` 
+        });
+      }
+
+      // Now try creating a contact
       const [firstName, ...rest] = String(name || '').trim().split(/\s+/);
       const lastName = rest.join(' ');
 
       console.log('[SESSION] Creating contact in CRM:', { firstName, lastName, email, phone });
 
-      // Create contact in CRM using MCP
       const mcpResult = await callMCP('contacts_upsert-contact', {
         firstName: firstName || '',
         lastName: lastName || '',
@@ -117,36 +138,13 @@ module.exports = async function handler(req, res) {
         tags: ['Live Chat', 'Web Visitor', 'iKunnect Integration']
       });
 
-      console.log('[SESSION] Full MCP result structure:', JSON.stringify(mcpResult, null, 2));
+      // Extract contact from successful result
+      let contact = mcpResult?.data?.contact || mcpResult?.contact || mcpResult?.data || mcpResult;
 
-      // Try multiple paths to find the contact
-      const possiblePaths = [
-        mcpResult?.data?.contact,
-        mcpResult?.contact,
-        mcpResult?.data,
-        mcpResult,
-        mcpResult?.result?.contact,
-        mcpResult?.result?.data?.contact,
-        mcpResult?.result?.data,
-        mcpResult?.result
-      ];
-
-      let contact = null;
-      for (let i = 0; i < possiblePaths.length; i++) {
-        const candidate = possiblePaths[i];
-        console.log(`[SESSION] Checking path ${i}:`, candidate);
-        if (candidate && candidate.id) {
-          contact = candidate;
-          console.log(`[SESSION] Found contact at path ${i}:`, contact);
-          break;
-        }
-      }
-
-      if (!contact || !contact.id) {
-        console.error('[SESSION] No contact found in any path. Full result:', mcpResult);
+      if (!contact?.id) {
         return res.status(500).json({ 
           success: false, 
-          error: 'Contact creation failed - no ID returned',
+          error: 'Contact creation succeeded but no ID returned',
           debug: mcpResult
         });
       }
@@ -170,10 +168,10 @@ module.exports = async function handler(req, res) {
       });
 
     } catch (error) {
-      console.error('[SESSION] Contact creation failed:', error);
+      console.error('[SESSION] Error:', error);
       return res.status(500).json({ 
         success: false, 
-        error: `Contact creation failed: ${error.message}` 
+        error: error.message
       });
     }
   }
