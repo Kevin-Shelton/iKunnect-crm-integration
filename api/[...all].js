@@ -92,25 +92,34 @@ export default async function handler(req, res) {
   }
 
   // -------- Enhanced Integrations API: first inbound message by contactId --------
-  async function postInboundByContact({ contactId, text, provider }) {
-    const fetch = (await import('node-fetch')).default;
-    const base = process.env.CRM_BASE_URL || 'https://services.leadconnectorhq.com';
-    const pit = process.env.CRM_PIT;
-    const locationId = process.env.CRM_LOCATION_ID;
-    if (!pit || !locationId) throw new Error('Missing required env: CRM_PIT or CRM_LOCATION_ID');
+async function postInboundByContact({ contactId, text, provider }) {
+  const fetch = (await import('node-fetch')).default;
+  const base = process.env.CRM_BASE_URL || 'https://services.leadconnectorhq.com';
+  const pit = process.env.CRM_PIT;
+  const locationId = process.env.CRM_LOCATION_ID;
+  if (!pit || !locationId) throw new Error('Missing required env: CRM_PIT or CRM_LOCATION_ID');
 
-    // Try Method 1: Inbound endpoint with correct Live Chat parameters
+  // Try different provider values to get Live Chat classification
+  const providerVariants = [
+    { provider: 'webchat', source: 'webchat' },
+    { provider: 'web_chat', source: 'live_chat' },
+    { provider: 'chat', source: 'chat' },
+    { provider: 'live-chat', source: 'live_chat' }
+  ];
+
+  for (const variant of providerVariants) {
     try {
-      console.log('[INBOUND] Trying inbound endpoint with Live Chat params...');
-      const payload1 = {
+      console.log(`[INBOUND] Trying provider: ${variant.provider}, source: ${variant.source}`);
+      
+      const payload = {
         contactId,
         message: text,
         type: 'Live_Chat',
-        provider: 'web_chat', // Try web_chat as provider
-        source: 'live_chat'
+        provider: variant.provider,
+        source: variant.source
       };
 
-      const headers1 = {
+      const headers = {
         Authorization: `Bearer ${pit}`,
         locationId,
         'Content-Type': 'application/json',
@@ -118,25 +127,30 @@ export default async function handler(req, res) {
         Version: '2021-07-28'
       };
 
-      console.log('[INBOUND] Method 1 payload:', JSON.stringify(payload1, null, 2));
+      console.log(`[INBOUND] ${variant.provider} payload:`, JSON.stringify(payload, null, 2));
 
-      const resp1 = await fetch(`${base}/conversations/messages/inbound`, {
+      const resp = await fetch(`${base}/conversations/messages/inbound`, {
         method: 'POST',
-        headers: headers1,
-        body: JSON.stringify(payload1)
+        headers,
+        body: JSON.stringify(payload)
       });
 
-      const txt1 = await resp1.text();
-      console.log('[INBOUND] Method 1 response:', resp1.status, txt1);
-      
-      if (resp1.ok) {
-        const json1 = JSON.parse(txt1);
-        console.log('[INBOUND] Method 1 success:', JSON.stringify(json1, null, 2));
-        return json1;
+      const txt = await resp.text();
+      console.log(`[INBOUND] ${variant.provider} response:`, resp.status, txt);
+
+      if (resp.ok) {
+        const json = JSON.parse(txt);
+        console.log(`[INBOUND] ${variant.provider} SUCCESS:`, JSON.stringify(json, null, 2));
+        return json;
       }
     } catch (err) {
-      console.log('[INBOUND] Method 1 failed:', err.message);
+      console.log(`[INBOUND] Provider ${variant.provider} failed:`, err.message);
+      continue;
     }
+  }
+
+  throw new Error('All Live Chat provider variants failed');
+}
 
     // Try Method 2: Different provider variations
     const providerVariants = ['webchat', 'live-chat', 'chat', 'widget'];
@@ -328,7 +342,7 @@ export default async function handler(req, res) {
   if (method === 'GET' && path === '/api') {
     return res.json({
       name: 'iKunnect ↔ GoHighLevel MCP Integration',
-      version: 'live-chat-flow-1.2-debug',
+      version: 'live-chat-flow-1.3-livechat-fix',
       status: 'operational',
       timestamp: nowIso()
     });
@@ -426,7 +440,7 @@ export default async function handler(req, res) {
     
     try {
       console.log('[THREAD] Creating thread for contactId:', contactId);
-      const provider = (channel && String(channel).toLowerCase() === 'webchat') ? 'webchat' : 'live-chat';
+      const provider = (channel && String(channel).toLowerCase() === 'webchat') ? 'webchat' : 'web_chat';
       const inbound = await postInboundByContact({
         contactId,
         text: seed || '[session-start]',
@@ -486,7 +500,7 @@ export default async function handler(req, res) {
     if (!text) return res.status(400).json({ success: false, error: 'Message body cannot be empty' });
 
     try {
-      const provider = (channel && String(channel).toLowerCase() === 'webchat') ? 'webchat' : 'live-chat';
+      const provider = (channel && String(channel).toLowerCase() === 'webchat') ? 'webchat' : 'web_chat';
 
       let finalConversationId = conversationId || null;
       let result;
