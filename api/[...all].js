@@ -4,7 +4,7 @@
 //   - first message: Integrations API /conversations/messages/inbound (by contactId, Live_Chat)
 //   - follow-ups: MCP conversations_send-a-new-message (by conversationId)
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // -------- CORS --------
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*'); // set your domain if using cookies
