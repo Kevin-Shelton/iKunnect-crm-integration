@@ -86,113 +86,16 @@ module.exports = async function handler(req, res) {
       const q = email || phone;
       if (!q) return null;
       
+      console.log(`[CONTACT SEARCH] Searching for: ${q}`);
+      
       const r = await callMCP('contacts_get-contacts', {
         locationId: process.env.CRM_LOCATION_ID,
         query: q,
         limit: 25
       });
       
+      console.log('[CONTACT SEARCH] Raw response:', JSON.stringify(r, null, 2));
+      
       const contacts = r?.data?.contacts || r?.contacts || (Array.isArray(r?.data) ? r.data : []) || [];
       
-      const exact = (email && contacts.find(c => (c.email || '').toLowerCase() === String(email).toLowerCase())) ||
-                    (phone && contacts.find(c => (c.phone || '') === phone));
-      
-      return exact || contacts[0] || null;
-    } catch (e) {
-      console.log('[CONTACT SEARCH] Failed:', e.message);
-      return null;
-    }
-  }
-
-  async function upsertContact({ firstName, lastName, email, phone }) {
-    const r = await callMCP('contacts_upsert-contact', {
-      firstName: firstName || '',
-      lastName: lastName || '',
-      email: email || '',
-      phone: phone || '',
-      source: 'iKunnect Live Chat Widget',
-      tags: ['Live Chat', 'Web Visitor', 'iKunnect Integration']
-    });
-    
-    // Extract contact from MCP response
-    let contact = r;
-    if (r?.content?.[0]?.text) {
-      try {
-        const parsed = JSON.parse(r.content[0].text);
-        if (parsed.content?.[0]?.text) {
-          const inner = JSON.parse(parsed.content[0].text);
-          contact = inner.data?.contact || inner.contact || inner.data || inner;
-        } else {
-          contact = parsed.data?.contact || parsed.contact || parsed.data || parsed;
-        }
-      } catch {
-        contact = r.contact || r.data || r;
-      }
-    }
-    
-    if (!contact?.id) {
-      throw new Error('Contact upsert returned no id');
-    }
-    
-    return contact;
-  }
-
-  try {
-    console.log('Session endpoint called:', req.method, req.url);
-
-    if (req.method === 'GET') {
-      return res.json({ 
-        ok: true, 
-        route: '/api/chat/session', 
-        expect: 'POST JSON { name/email/phone }'
-      });
-    }
-
-    if (req.method === 'POST') {
-      const { name, email, phone } = req.body;
-      
-      if (!name && !email && !phone) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'At least one of name, email, or phone is required' 
-        });
-      }
-
-      const [firstName, ...rest] = String(name || '').trim().split(/\s+/);
-      const lastName = rest.join(' ');
-
-      let contact = await findExistingContact(email, phone);
-      let isNewContact = false;
-      
-      if (!contact) {
-        contact = await upsertContact({ firstName, lastName, email, phone });
-        isNewContact = true;
-      }
-
-      return res.json({
-        success: true,
-        data: {
-          contactId: contact.id,
-          isNewContact,
-          contact: {
-            id: contact.id,
-            name: `${contact.firstName || firstName || ''} ${contact.lastName || lastName || ''}`.trim(),
-            firstName: contact.firstName || firstName || '',
-            lastName: contact.lastName || lastName || '',
-            email: contact.email || email || '',
-            phone: contact.phone || phone || ''
-          }
-        }
-      });
-    }
-
-    return res.status(405).json({ error: 'Method not allowed' });
-
-  } catch (error) {
-    console.error('Session endpoint error:', error);
-    return res.status(500).json({ 
-      success: false, 
-      error: 'Server error: ' + error.message
-    });
-  }
-};
+      console.log(`[CONTACT SEARCH] Found ${contacts.length} contacts`);
