@@ -1,6 +1,8 @@
-export async function sendInboundMessage({ contactId, text, provider = 'web_chat' }) {
+// Shared CRM MCP functions - CommonJS version
+
+async function callMCP(toolName, arguments_) {
   const fetch = (await import('node-fetch')).default;
-  const base = process.env.CRM_BASE_URL || 'https://services.leadconnectorhq.com';
+  const mcpUrl = process.env.CRM_MCP_URL || 'https://services.leadconnectorhq.com/mcp/';
   const pit = process.env.CRM_PIT;
   const locationId = process.env.CRM_LOCATION_ID;
   
@@ -8,98 +10,99 @@ export async function sendInboundMessage({ contactId, text, provider = 'web_chat
     throw new Error('Missing required env: CRM_PIT or CRM_LOCATION_ID');
   }
 
-  // Try multiple payload variations to find what works
-  const variations = [
-    {
-      name: 'standard_inbound',
-      payload: {
-        contactId,
-        message: text,
-        type: 'Live_Chat',
-        provider,
-        source: 'live_chat'
-      }
-    },
-    {
-      name: 'with_location',
-      payload: {
-        contactId,
-        message: text,
-        type: 'Live_Chat',
-        provider,
-        locationId
-      }
-    },
-    {
-      name: 'simple_format',
-      payload: {
-        contactId,
-        message: text,
-        type: 'Live_Chat'
-      }
-    }
-  ];
-
-  const headers = {
-    Authorization: `Bearer ${pit}`,
-    locationId,
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-    Version: '2021-07-28'
+  const jsonRpcRequest = {
+    jsonrpc: '2.0',
+    id: Date.now().toString(),
+    method: 'tools/call',
+    params: { name: toolName, arguments: arguments_ || {} }
   };
 
-  for (const variation of variations) {
-    try {
-      console.log(`[CRM] Trying ${variation.name}:`, JSON.stringify(variation.payload, null, 2));
+  const options = {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${pit}`,
+      locationId,
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream'
+    },
+    body: JSON.stringify(jsonRpcRequest)
+  };
 
-      const resp = await fetch(`${base}/conversations/messages/inbound`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(variation.payload)
-      });
+  const response = await fetch(mcpUrl, options);
+  const responseText = await response.text();
+  
+  if (!response.ok) {
+    throw new Error(`CRM MCP Error: ${response.status} - ${responseText.slice(0, 240)}...`);
+  }
+  
+  return parseMcpEnvelopeText(response.status, responseText);
+}
 
-      const txt = await resp.text();
-      console.log(`[CRM] ${variation.name} response:`, resp.status, txt);
+function parseMcpEnvelopeText(status, rawText) {
+  if (!rawText || typeof rawText !== 'string') {
+    throw new Error(`Empty MCP response [${status}]`);
+  }
+  
+  const ssePrefix = 'event: message\ndata: ';
+  const body = rawText.startsWith(ssePrefix) ? rawText.slice(ssePrefix.length).trim() : rawText;
 
-      if (resp.ok) {
-        console.log(`[CRM] ${variation.name} SUCCESS!`);
-        return JSON.parse(txt);
-      }
-    } catch (err) {
-      console.log(`[CRM] ${variation.name} failed:`, err.message);
-      continue;
-    }
+  let parsed;
+  try { 
+    parsed = JSON.parse(body); 
+  } catch { 
+    throw new Error(`Invalid MCP response [${status}]: ${body.slice(0, 240)}...`); 
   }
 
-  // If inbound endpoint fails, try regular messages endpoint
+  const base = parsed?.result ?? parsed;
+
+  // unwrap nested { content:[{ type:'text', text:'{...}' }]}
+  let current = base;
+  for (let i = 0; i < 5; i++) {
+    const textNode = current?.content?.[0]?.text;
+    if (!textNode || typeof textNode !== 'string') break;
+    try { current = JSON.parse(textNode); } catch { break; }
+  }
+
+  if (current?.error) {
+    const msg = current.error?.message || 'Unknown MCP error';
+    const code = current.error?.code || status;
+    throw new Error(`${code}: ${msg}`);
+  }
+  
+  return current;
+}
+
+async function findExistingContact(email, phone) {
   try {
-    console.log('[CRM] Trying regular messages endpoint as fallback...');
-    const fallbackPayload = {
-      type: 'Live_Chat',
-      contactId,
-      message: text,
-      provider
-    };
-
-    console.log('[CRM] Fallback payload:', JSON.stringify(fallbackPayload, null, 2));
-
-    const resp = await fetch(`${base}/conversations/messages`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(fallbackPayload)
+    const q = email || phone;
+    if (!q) return null;
+    
+    const r = await callMCP('contacts_get-contacts', {
+      locationId: process.env.CRM_LOCATION_ID,
+      query: q,
+      limit: 25
     });
-
-    const txt = await resp.text();
-    console.log('[CRM] Fallback response:', resp.status, txt);
-
-    if (resp.ok) {
-      console.log('[CRM] Fallback SUCCESS!');
-      return JSON.parse(txt);
-    }
-
-    throw new Error(`All endpoints failed. Last error: ${resp.status} - ${txt}`);
-  } catch (err) {
-    console.error('[CRM] All message sending methods failed:', err.message);
-    throw err;
+    
+    const contacts = r?.data?.contacts || r?.contacts || (Array.isArray(r?.data) ? r.data : []) || [];
+    
+    const exact = (email && contacts.find(c => (c.email || '').toLowerCase() === String(email).toLowerCase())) ||
+                  (phone && contacts.find(c => (c.phone || '') === phone));
+    
+    return exact || contacts[0] || null;
+  } catch (e) {
+    console.log('[CONTACT SEARCH] Failed:', e.message);
+    return null;
   }
 }
+
+async function upsertContact({ firstName, lastName, email, phone }) {
+  const r = await callMCP('contacts_upsert-contact', {
+    firstName: firstName || '',
+    lastName: lastName || '',
+    email: email || '',
+    phone: phone || '',
+    source: 'iKunnect Live Chat Widget',
+    tags: ['Live Chat', 'Web Visitor', 'iKunnect Integration']
+  });
+  
+  const contact = extractContactFro
