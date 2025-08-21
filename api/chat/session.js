@@ -7,7 +7,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // MCP helper function (only what we need)
+  // MCP helper function
   async function searchContacts(query) {
     const fetch = (await import('node-fetch')).default;
     const mcpUrl = process.env.CRM_MCP_URL || 'https://services.leadconnectorhq.com/mcp/';
@@ -22,8 +22,8 @@ module.exports = async function handler(req, res) {
         name: 'contacts_get-contacts', 
         arguments: {
           locationId,
-          query,
-          limit: 10
+          query: query || '',
+          limit: 20
         }
       }
     };
@@ -61,7 +61,8 @@ module.exports = async function handler(req, res) {
     return res.json({ 
       ok: true, 
       route: '/api/chat/session', 
-      expect: 'POST JSON { name/email/phone }'
+      expect: 'POST JSON { name/email/phone }',
+      note: 'Use existing contacts from CRM (contact creation requires Edit Contacts permission)'
     });
   }
 
@@ -76,44 +77,57 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      console.log('[SESSION] Searching for existing contact:', { name, email, phone });
+      console.log('[SESSION] Searching for contact:', { name, email, phone });
 
-      // Search for existing contact by email or phone
+      // Search for existing contact
       const searchQuery = email || phone || name;
       const contacts = await searchContacts(searchQuery);
       
-      console.log('[SESSION] Found contacts:', contacts.length);
+      console.log(`[SESSION] Found ${contacts.length} contacts for query: ${searchQuery}`);
 
       let contact = null;
       
       // Try to find exact match by email or phone
       if (email) {
         contact = contacts.find(c => (c.email || '').toLowerCase() === email.toLowerCase());
+        console.log('[SESSION] Email match:', contact ? contact.id : 'none');
       }
       if (!contact && phone) {
         contact = contacts.find(c => c.phone === phone);
+        console.log('[SESSION] Phone match:', contact ? contact.id : 'none');
       }
-      if (!contact && contacts.length > 0) {
-        contact = contacts[0]; // Use first match
+      if (!contact && name) {
+        contact = contacts.find(c => 
+          (c.contactName || '').toLowerCase().includes(name.toLowerCase()) ||
+          (c.firstName || '').toLowerCase() === name.toLowerCase().split(' ')[0] ||
+          (c.email || '').toLowerCase().includes(name.toLowerCase())
+        );
+        console.log('[SESSION] Name match:', contact ? contact.id : 'none');
       }
 
       if (!contact) {
-        // Return a message that we can't create new contacts due to permissions
-        return res.status(400).json({
-          success: false,
-          error: 'Contact not found and cannot create new contacts. Please use an existing email/phone from your CRM.',
-          availableContacts: contacts.slice(0, 5).map(c => ({
+        // Get a broader list to show available options
+        const allContacts = await searchContacts('');
+        const availableContacts = allContacts
+          .filter(c => c.email || c.phone) // Only show contacts with email or phone
+          .slice(0, 10)
+          .map(c => ({
             name: c.contactName,
             email: c.email,
             phone: c.phone
-          }))
+          }));
+
+        return res.status(400).json({
+          success: false,
+          error: 'Contact not found. Try one of these existing contacts:',
+          suggestion: 'Use an exact email or phone number from the list below',
+          availableContacts,
+          searchedFor: { name, email, phone },
+          totalContacts: allContacts.length
         });
       }
 
-      console.log('[SESSION] Using existing contact:', contact.id);
-
-      const [firstName, ...rest] = String(name || contact.firstName || '').trim().split(/\s+/);
-      const lastName = rest.join(' ') || contact.lastName || '';
+      console.log('[SESSION] Using existing contact:', contact.id, contact.contactName);
 
       return res.json({
         success: true,
@@ -122,11 +136,11 @@ module.exports = async function handler(req, res) {
           isNewContact: false,
           contact: {
             id: contact.id,
-            name: contact.contactName || `${firstName} ${lastName}`.trim(),
-            firstName: contact.firstName || firstName || '',
-            lastName: contact.lastName || lastName || '',
-            email: contact.email || email || '',
-            phone: contact.phone || phone || ''
+            name: contact.contactName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
+            firstName: contact.firstName || '',
+            lastName: contact.lastName || '',
+            email: contact.email || '',
+            phone: contact.phone || ''
           }
         }
       });
