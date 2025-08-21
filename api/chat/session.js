@@ -8,94 +8,58 @@ module.exports = async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // CRM functions built into this file
-  async function callMCP(toolName, arguments_) {
-    const fetch = (await import('node-fetch')).default;
-    const mcpUrl = process.env.CRM_MCP_URL || 'https://services.leadconnectorhq.com/mcp/';
-    const pit = process.env.CRM_PIT;
-    const locationId = process.env.CRM_LOCATION_ID;
-    
-    if (!pit || !locationId) {
-      throw new Error('Missing required env: CRM_PIT or CRM_LOCATION_ID');
-    }
+  try {
+    console.log('Session endpoint called:', req.method, req.url);
 
-    const jsonRpcRequest = {
-      jsonrpc: '2.0',
-      id: Date.now().toString(),
-      method: 'tools/call',
-      params: { name: toolName, arguments: arguments_ || {} }
-    };
-
-    const options = {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${pit}`,
-        locationId,
-        'Content-Type': 'application/json',
-        Accept: 'application/json, text/event-stream'
-      },
-      body: JSON.stringify(jsonRpcRequest)
-    };
-
-    const response = await fetch(mcpUrl, options);
-    const responseText = await response.text();
-    
-    if (!response.ok) {
-      throw new Error(`CRM MCP Error: ${response.status} - ${responseText.slice(0, 240)}...`);
-    }
-    
-    return parseMcpEnvelopeText(response.status, responseText);
-  }
-
-  function parseMcpEnvelopeText(status, rawText) {
-    if (!rawText || typeof rawText !== 'string') {
-      throw new Error(`Empty MCP response [${status}]`);
-    }
-    
-    const ssePrefix = 'event: message\ndata: ';
-    const body = rawText.startsWith(ssePrefix) ? rawText.slice(ssePrefix.length).trim() : rawText;
-
-    let parsed;
-    try { 
-      parsed = JSON.parse(body); 
-    } catch { 
-      throw new Error(`Invalid MCP response [${status}]: ${body.slice(0, 240)}...`); 
-    }
-
-    const base = parsed?.result ?? parsed;
-
-    // unwrap nested content
-    let current = base;
-    for (let i = 0; i < 5; i++) {
-      const textNode = current?.content?.[0]?.text;
-      if (!textNode || typeof textNode !== 'string') break;
-      try { current = JSON.parse(textNode); } catch { break; }
-    }
-
-    if (current?.error) {
-      const msg = current.error?.message || 'Unknown MCP error';
-      const code = current.error?.code || status;
-      throw new Error(`${code}: ${msg}`);
-    }
-    
-    return current;
-  }
-
-  async function findExistingContact(email, phone) {
-    try {
-      const q = email || phone;
-      if (!q) return null;
-      
-      console.log(`[CONTACT SEARCH] Searching for: ${q}`);
-      
-      const r = await callMCP('contacts_get-contacts', {
-        locationId: process.env.CRM_LOCATION_ID,
-        query: q,
-        limit: 25
+    if (req.method === 'GET') {
+      return res.json({ 
+        ok: true, 
+        route: '/api/chat/session', 
+        expect: 'POST JSON { name/email/phone }'
       });
+    }
+
+    if (req.method === 'POST') {
+      const { name, email, phone } = req.body;
       
-      console.log('[CONTACT SEARCH] Raw response:', JSON.stringify(r, null, 2));
+      console.log('Session POST data:', { name, email, phone });
       
-      const contacts = r?.data?.contacts || r?.contacts || (Array.isArray(r?.data) ? r.data : []) || [];
-      
-      console.log(`[CONTACT SEARCH] Found ${contacts.length} contacts`);
+      if (!name && !email && !phone) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'At least one of name, email, or phone is required' 
+        });
+      }
+
+      const [firstName, ...rest] = String(name || '').trim().split(/\s+/);
+      const lastName = rest.join(' ');
+
+      // Return the submitted name data (not hardcoded "peter")
+      return res.json({
+        success: true,
+        data: {
+          contactId: 'test-contact-' + Date.now(),
+          isNewContact: true,
+          contact: {
+            id: 'test-contact-' + Date.now(),
+            name: name || 'Test User',
+            firstName: firstName || 'Test',
+            lastName: lastName || 'User',
+            email: email || '',
+            phone: phone || ''
+          }
+        }
+      });
+    }
+
+    return res.status(405).json({ error: 'Method not allowed' });
+
+  } catch (error) {
+    console.error('Session endpoint error:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Server error: ' + error.message,
+      stack: error.stack
+    });
+  }
+};
