@@ -1,103 +1,237 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useEffect } from 'react';
+import { MainLayout } from '@/components/layout/main-layout';
+import { Sidebar } from '@/components/layout/sidebar';
+import { ContactSidebar } from '@/components/layout/contact-sidebar';
+import { toast } from 'sonner';
+
+// Mock data for development
+const mockConversations = {
+  waiting: [
+    {
+      id: '1',
+      contactName: 'John Smith',
+      lastMessage: 'Hi, I need help with my account setup. Can someone assist me?',
+      lastMessageTime: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+      unreadCount: 2,
+      channel: 'chat' as const,
+      tags: ['new-customer', 'urgent'],
+      waitTime: 5,
+      slaStatus: 'normal' as const
+    },
+    {
+      id: '2',
+      contactName: 'Sarah Johnson',
+      lastMessage: 'I\'m having trouble logging into my dashboard',
+      lastMessageTime: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
+      unreadCount: 1,
+      channel: 'chat' as const,
+      tags: ['support'],
+      waitTime: 12,
+      slaStatus: 'warning' as const
+    }
+  ],
+  assigned: [
+    {
+      id: '3',
+      contactName: 'Mike Davis',
+      lastMessage: 'Thank you for the help! That resolved my issue.',
+      lastMessageTime: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+      unreadCount: 0,
+      channel: 'chat' as const,
+      tags: ['resolved'],
+      assignedTo: 'Agent Smith'
+    }
+  ],
+  all: []
+};
+
+// Initialize all conversations
+mockConversations.all = [...mockConversations.waiting, ...mockConversations.assigned];
+
+const mockContact = {
+  id: '1',
+  name: 'John Smith',
+  firstName: 'John',
+  lastName: 'Smith',
+  email: 'john.smith@example.com',
+  phone: '+1 (555) 123-4567',
+  city: 'New York',
+  state: 'NY',
+  tags: ['new-customer', 'urgent', 'vip'],
+  dateAdded: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+  lastActivity: new Date(Date.now() - 5 * 60 * 1000).toISOString()
+};
+
+const mockOpportunities = [
+  {
+    id: '1',
+    name: 'Enterprise Package Upgrade',
+    stage: 'Proposal',
+    value: 15000,
+    pipeline: 'Sales Pipeline',
+    probability: 75,
+    closeDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+  }
+];
+
+const mockAppointments = [
+  {
+    id: '1',
+    title: 'Follow-up Call',
+    date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+    type: 'Phone Call',
+    status: 'scheduled' as const
+  }
+];
+
+export default function ChatDeskPage() {
+  const [agentStatus, setAgentStatus] = useState<'available' | 'busy' | 'away' | 'offline'>('available');
+  const [activeTab, setActiveTab] = useState<'waiting' | 'assigned' | 'all'>('waiting');
+  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [conversations, setConversations] = useState(mockConversations);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const queueStats = {
+    waiting: conversations.waiting.length,
+    assigned: conversations.assigned.length,
+    total: conversations.all.length
+  };
+
+  const handleStatusChange = (status: 'available' | 'busy' | 'away' | 'offline') => {
+    setAgentStatus(status);
+    toast.success(`Status changed to ${status}`);
+  };
+
+  const handleSearch = (query: string) => {
+    toast.info(`Searching for: ${query}`);
+    // TODO: Implement search functionality
+  };
+
+  const handleConversationSelect = (conversationId: string) => {
+    setSelectedConversation(conversationId);
+    toast.info(`Selected conversation: ${conversationId}`);
+  };
+
+  const handleConversationClaim = (conversationId: string) => {
+    // Move conversation from waiting to assigned
+    const conversation = conversations.waiting.find(c => c.id === conversationId);
+    if (conversation) {
+      const updatedConversation = { ...conversation, assignedTo: 'Current Agent' };
+      setConversations(prev => ({
+        waiting: prev.waiting.filter(c => c.id !== conversationId),
+        assigned: [...prev.assigned, updatedConversation],
+        all: prev.all.map(c => c.id === conversationId ? updatedConversation : c)
+      }));
+      toast.success(`Claimed conversation with ${conversation.contactName}`);
+    }
+  };
+
+  const handleRefresh = () => {
+    setIsLoading(true);
+    // Simulate API call
+    setTimeout(() => {
+      setIsLoading(false);
+      toast.success('Queue refreshed');
+    }, 1000);
+  };
+
+  const handleTagContact = (tags: string[]) => {
+    toast.success('Contact tags updated');
+    // TODO: Implement tag update
+  };
+
+  const handleCreateOpportunity = () => {
+    toast.info('Create opportunity dialog would open');
+    // TODO: Implement opportunity creation
+  };
+
+  const handleScheduleCallback = () => {
+    toast.info('Schedule callback dialog would open');
+    // TODO: Implement callback scheduling
+  };
+
+  const handleEscalate = () => {
+    toast.info('Escalation dialog would open');
+    // TODO: Implement escalation
+  };
+
+  const handleCloseConversation = () => {
+    if (selectedConversation) {
+      toast.success('Conversation closed');
+      setSelectedConversation(null);
+      // TODO: Implement conversation closing
+    }
+  };
+
+  // Auto-refresh every 3 seconds (as per FRD)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // TODO: Fetch latest conversations from API
+      console.log('Auto-refreshing conversations...');
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <MainLayout
+      agentName="Agent Smith"
+      agentStatus={agentStatus}
+      queueStats={queueStats}
+      onStatusChange={handleStatusChange}
+      onSearch={handleSearch}
+    >
+      {/* Left Sidebar - Queue */}
+      <Sidebar
+        conversations={conversations}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onConversationSelect={handleConversationSelect}
+        onConversationClaim={handleConversationClaim}
+        onRefresh={handleRefresh}
+        isLoading={isLoading}
+      />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col bg-gray-50">
+        {selectedConversation ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center text-gray-500">
+              <div className="text-lg font-medium mb-2">Chat Interface</div>
+              <p className="text-sm">
+                Conversation ID: {selectedConversation}
+              </p>
+              <p className="text-xs text-gray-400 mt-2">
+                Multi-chat tabs and messaging components will be implemented in the next phases
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center text-gray-500">
+              <div className="text-lg font-medium mb-2">Welcome to iKunnect Agent Chat Desk</div>
+              <p className="text-sm">
+                Select a conversation from the queue to start chatting
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Right Sidebar - Contact Context */}
+      <ContactSidebar
+        contact={selectedConversation ? mockContact : undefined}
+        opportunities={selectedConversation ? mockOpportunities : []}
+        appointments={selectedConversation ? mockAppointments : []}
+        conversationId={selectedConversation || undefined}
+        onTagContact={handleTagContact}
+        onCreateOpportunity={handleCreateOpportunity}
+        onScheduleCallback={handleScheduleCallback}
+        onEscalate={handleEscalate}
+        onCloseConversation={handleCloseConversation}
+      />
+    </MainLayout>
   );
 }
