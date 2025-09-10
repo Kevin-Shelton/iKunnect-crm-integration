@@ -11,6 +11,21 @@ export async function POST(
     
     const { context, requestType = 'draft' } = body;
 
+    // Validate OpenAI configuration
+    if (!process.env.OPENAI_API_TOKEN) {
+      return NextResponse.json(
+        { error: 'OpenAI API token not configured' },
+        { status: 500 }
+      );
+    }
+
+    if (!process.env.OPENAI_PROMPT_ID) {
+      return NextResponse.json(
+        { error: 'OpenAI Prompt ID not configured' },
+        { status: 500 }
+      );
+    }
+
     const crmClient = createCRMClient();
 
     // Get conversation and recent messages for context
@@ -49,48 +64,91 @@ export async function POST(
       (contact.email ? ` (${contact.email})` : '') +
       (contact.phone ? ` (${contact.phone})` : '') : '';
 
-    // For now, we'll create a simple AI response
-    // In a real implementation, this would call OpenAI or another AI service
-    const _aiPrompt = `
-You are a helpful customer service agent. Based on the conversation history and context, suggest a professional and helpful response.
-
-${contactInfo ? `Contact Information: ${contactInfo}` : ''}
+    // Prepare context for the AI prompt
+    const aiContext = `
+Contact Information: ${contactInfo || 'No contact information available'}
 ${context ? `Additional Context: ${context}` : ''}
 
-Recent Conversation:
-${messageHistory}
+Recent Conversation History:
+${messageHistory || 'No recent messages'}
 
-Please provide a suggested response that is:
-- Professional and friendly
-- Helpful and relevant to the conversation
-- Concise but complete
-- Appropriate for customer service
-`;
+Request Type: ${requestType}
+`.trim();
 
-    // Simulate AI response (replace with actual AI service call)
-    const aiSuggestions = [
-      "Thank you for reaching out! I'd be happy to help you with that. Let me look into this for you right away.",
-      "I understand your concern. Let me check on this and get back to you with a solution.",
-      "Thanks for the information. Based on what you've shared, I can help you resolve this issue.",
-      "I appreciate your patience. Let me review your account and provide you with the best options available.",
-      "That's a great question! I'll be glad to walk you through the process step by step."
-    ];
+    try {
+      // Call OpenAI with the published prompt using the responses API
+      const response = await fetch('https://api.openai.com/v1/responses', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: {
+            id: process.env.OPENAI_PROMPT_ID,
+            version: "1"
+          },
+          input: aiContext
+        })
+      });
 
-    const suggestion = aiSuggestions[Math.floor(Math.random() * aiSuggestions.length)];
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      }
 
-    return NextResponse.json({
-      success: true,
-      suggestion,
-      confidence: 0.85,
-      reasoning: 'Generated based on conversation context and customer service best practices',
-      context: {
-        conversationId,
-        messageCount: messages.length,
-        hasContact: !!contact,
-        requestType
-      },
-      timestamp: new Date().toISOString()
-    });
+      const data = await response.json();
+      const suggestion = data.choices?.[0]?.message?.content || data.response;
+
+      if (!suggestion) {
+        throw new Error('No response generated from OpenAI');
+      }
+
+      return NextResponse.json({
+        success: true,
+        suggestion: suggestion.trim(),
+        confidence: 0.9,
+        reasoning: 'Generated using OpenAI published prompt for customer service',
+        context: {
+          conversationId,
+          messageCount: messages.length,
+          hasContact: !!contact,
+          requestType,
+          promptId: process.env.OPENAI_PROMPT_ID,
+          promptVersion: "1"
+        },
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (openaiError) {
+      console.error('[API] OpenAI Error:', openaiError);
+      
+      // Fallback to simple response if OpenAI fails
+      const fallbackSuggestions = [
+        "Thank you for reaching out! I'd be happy to help you with that. Let me look into this for you right away.",
+        "I understand your concern. Let me check on this and get back to you with a solution.",
+        "Thanks for the information. Based on what you've shared, I can help you resolve this issue.",
+        "I appreciate your patience. Let me review your account and provide you with the best options available.",
+        "That's a great question! I'll be glad to walk you through the process step by step."
+      ];
+
+      const suggestion = fallbackSuggestions[Math.floor(Math.random() * fallbackSuggestions.length)];
+
+      return NextResponse.json({
+        success: true,
+        suggestion,
+        confidence: 0.6,
+        reasoning: 'Fallback response due to AI service unavailability',
+        context: {
+          conversationId,
+          messageCount: messages.length,
+          hasContact: !!contact,
+          requestType,
+          fallback: true,
+          error: openaiError instanceof Error ? openaiError.message : 'Unknown OpenAI error'
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
 
   } catch (error) {
     console.error('[API] Error generating AI draft:', error);
