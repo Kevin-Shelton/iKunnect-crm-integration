@@ -109,7 +109,7 @@ const mockConversations: Conversation[] = [
   }
 ];
 
-export function useConversations(agentId?: string): UseConversationsReturn {
+export function useConversations(_agentId?: string): UseConversationsReturn {
   const [conversations, setConversations] = useState<ConversationQueue>({
     waiting: [],
     assigned: [],

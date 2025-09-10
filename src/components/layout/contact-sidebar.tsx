@@ -12,8 +12,6 @@ import {
   Phone, 
   MapPin, 
   Calendar, 
-  DollarSign,
-  Tag,
   Plus,
   Edit,
   ExternalLink,
@@ -74,14 +72,14 @@ export function ContactSidebar({
   contact,
   opportunities = [],
   appointments = [],
-  conversationId,
+  conversationId: _conversationId,
   onTagContact,
   onCreateOpportunity,
   onUpdateOpportunity,
   onScheduleCallback,
   onEscalate,
   onCloseConversation,
-  isLoading = false
+  isLoading: _isLoading = false
 }: ContactSidebarProps) {
   const [isTagging, setIsTagging] = useState(false);
   const [newTag, setNewTag] = useState('');

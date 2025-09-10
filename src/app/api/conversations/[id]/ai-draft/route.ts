@@ -3,10 +3,10 @@ import { createCRMClient } from '@/lib/mcp';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const conversationId = params.id;
+    const { id: conversationId } = await params;
     const body = await request.json();
     
     const { context, requestType = 'draft' } = body;
@@ -51,7 +51,7 @@ export async function POST(
 
     // For now, we'll create a simple AI response
     // In a real implementation, this would call OpenAI or another AI service
-    const aiPrompt = `
+    const _aiPrompt = `
 You are a helpful customer service agent. Based on the conversation history and context, suggest a professional and helpful response.
 
 ${contactInfo ? `Contact Information: ${contactInfo}` : ''}

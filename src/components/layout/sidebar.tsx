@@ -11,7 +11,6 @@ import {
   MessageSquare, 
   Phone, 
   Mail,
-  Tag,
   MoreVertical,
   RefreshCw
 } from 'lucide-react';
@@ -181,7 +180,7 @@ export function Sidebar({
           </Button>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(value) => onTabChange?.(value as any)}>
+        <Tabs value={activeTab} onValueChange={(value) => onTabChange?.(value as 'waiting' | 'assigned' | 'all')}>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="waiting" className="text-xs">
               Waiting ({conversations.waiting.length})

@@ -7,7 +7,24 @@ import { ContactSidebar } from '@/components/layout/contact-sidebar';
 import { toast } from 'sonner';
 
 // Mock data for development
-const mockConversations = {
+type MockConversation = {
+  id: string;
+  contactName: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
+  channel: 'chat' | 'sms' | 'email' | 'whatsapp' | 'facebook';
+  tags: string[];
+  waitTime?: number;
+  slaStatus?: 'normal' | 'warning' | 'breach';
+  assignedTo?: string;
+};
+
+const mockConversations: {
+  waiting: MockConversation[];
+  assigned: MockConversation[];
+  all: MockConversation[];
+} = {
   waiting: [
     {
       id: '1',
@@ -137,7 +154,7 @@ export default function ChatDeskPage() {
     }, 1000);
   };
 
-  const handleTagContact = (tags: string[]) => {
+  const handleTagContact = (_tags: string[]) => {
     toast.success('Contact tags updated');
     // TODO: Implement tag update
   };

@@ -32,7 +32,7 @@ export class CRMMCPClient {
   /**
    * Generic method to call any MCP tool
    */
-  async callTool<T = any>(tool: string, input: Record<string, any> = {}): Promise<MCPResponse<T>> {
+  async callTool<T = unknown>(tool: string, input: Record<string, unknown> = {}): Promise<MCPResponse<T>> {
     try {
       const payload: MCPToolCall = { tool, input };
       
@@ -59,7 +59,7 @@ export class CRMMCPClient {
       let data;
       try {
         data = JSON.parse(responseText);
-      } catch (parseError) {
+      } catch {
         console.error(`[CRM MCP] Failed to parse response for ${tool}:`, responseText);
         throw new Error(`Invalid JSON response from MCP ${tool}: ${responseText}`);
       }
@@ -76,7 +76,7 @@ export class CRMMCPClient {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
-        data: null
+        data: undefined
       };
     }
   }
@@ -87,7 +87,7 @@ export class CRMMCPClient {
    * Create or update a contact
    */
   async upsertContact(contactData: ContactInput): Promise<MCPResponse<Contact>> {
-    return this.callTool<Contact>('contacts_upsert-contact', contactData);
+    return this.callTool<Contact>('contacts_upsert-contact', contactData as unknown as Record<string, unknown>);
   }
 
   /**
@@ -112,7 +112,7 @@ export class CRMMCPClient {
    * Search for a contact by email or phone
    */
   async searchContact(email?: string, phone?: string): Promise<MCPResponse<Contact[]>> {
-    const searchParams: any = {};
+    const searchParams: Record<string, string> = {};
     if (email) searchParams.email = email;
     if (phone) searchParams.phone = phone;
     
@@ -125,7 +125,7 @@ export class CRMMCPClient {
    * Search for conversations
    */
   async searchConversations(params: ConversationSearchInput): Promise<MCPResponse<ConversationSearchResponse>> {
-    return this.callTool<ConversationSearchResponse>('conversations_search-conversation', params);
+    return this.callTool<ConversationSearchResponse>('conversations_search-conversation', params as unknown as Record<string, unknown>);
   }
 
   /**
@@ -142,7 +142,7 @@ export class CRMMCPClient {
    * Send a new message
    */
   async sendMessage(messageData: MessageInput): Promise<MCPResponse<Message>> {
-    return this.callTool<Message>('conversations_send-a-new-message', messageData);
+    return this.callTool<Message>('conversations_send-a-new-message', messageData as unknown as Record<string, unknown>);
   }
 
   /**
@@ -166,7 +166,7 @@ export class CRMMCPClient {
   /**
    * Assign conversation to agent
    */
-  async assignConversation(conversationId: string, agentId: string): Promise<MCPResponse<any>> {
+  async assignConversation(conversationId: string, agentId: string): Promise<MCPResponse<{ success: boolean }>> {
     return this.callTool('conversations_assign-conversation', {
       conversationId,
       assignedTo: agentId
@@ -176,7 +176,7 @@ export class CRMMCPClient {
   /**
    * Close a conversation
    */
-  async closeConversation(conversationId: string): Promise<MCPResponse<any>> {
+  async closeConversation(conversationId: string): Promise<MCPResponse<{ success: boolean }>> {
     return this.callTool('conversations_close-conversation', { conversationId });
   }
 
@@ -186,7 +186,7 @@ export class CRMMCPClient {
    * Create a new opportunity
    */
   async createOpportunity(opportunityData: OpportunityInput): Promise<MCPResponse<Opportunity>> {
-    return this.callTool<Opportunity>('opportunities_create-opportunity', opportunityData);
+    return this.callTool<Opportunity>('opportunities_create-opportunity', opportunityData as unknown as Record<string, unknown>);
   }
 
   /**
@@ -218,14 +218,14 @@ export class CRMMCPClient {
   /**
    * Add tags to a contact
    */
-  async addContactTags(contactId: string, tags: string[]): Promise<MCPResponse<any>> {
+  async addContactTags(contactId: string, tags: string[]): Promise<MCPResponse<{ success: boolean }>> {
     return this.callTool('contacts_add-tags', { contactId, tags });
   }
 
   /**
    * Remove tags from a contact
    */
-  async removeContactTags(contactId: string, tags: string[]): Promise<MCPResponse<any>> {
+  async removeContactTags(contactId: string, tags: string[]): Promise<MCPResponse<{ success: boolean }>> {
     return this.callTool('contacts_remove-tags', { contactId, tags });
   }
 
@@ -258,20 +258,22 @@ export class CRMMCPClient {
       const firstMessageResult = await this.sendMessage({
         contactId,
         body: 'Chat session started. How can I help you today?',
-        channel: channel as any
+        channel: channel as 'chat' | 'sms' | 'email' | 'whatsapp' | 'facebook' | 'instagram'
       });
 
       if (firstMessageResult.success && firstMessageResult.data) {
         const conversationId = firstMessageResult.data.conversationId || 
-                              (firstMessageResult.data as any).id;
+                              (firstMessageResult.data as { id?: string }).id;
         
-        return {
-          success: true,
-          data: {
-            conversationId,
-            isNew: true
-          }
-        };
+        if (conversationId) {
+          return {
+            success: true,
+            data: {
+              conversationId,
+              isNew: true
+            }
+          };
+        }
       }
 
       return {
@@ -336,7 +338,7 @@ export class CRMMCPClient {
   /**
    * Health check method to test API connectivity
    */
-  async healthCheck(): Promise<MCPResponse<any>> {
+  async healthCheck(): Promise<MCPResponse<{ status: string; timestamp: string; locationId: string }>> {
     try {
       // Try to get contacts with limit 1 as a simple health check
       const result = await this.getContacts({ limit: 1 });
@@ -394,19 +396,20 @@ export function parseMcpEnvelope(status: number, rawText: string) {
   const ssePrefix = 'event: message\ndata: ';
   const body = rawText.startsWith(ssePrefix) ? rawText.slice(ssePrefix.length).trim() : rawText;
 
-  let parsed: any;
+  let parsed: unknown;
   try {
     parsed = JSON.parse(body);
   } catch {
     throw new Error(`Invalid MCP response [${status}]: ${body.slice(0, 240)}...`);
   }
   
-  const base = parsed?.result ?? parsed;
+  const base = (parsed as { result?: unknown } | undefined)?.result ?? parsed;
 
   // Unwrap nested { content:[{ type:'text', text:'{...}' }]}
-  let current: any = base;
+  let current: unknown = base;
   for (let i = 0; i < 5; i++) {
-    const textNode = current?.content?.[0]?.text;
+    const currentObj = current as { content?: Array<{ text?: string }> };
+    const textNode = currentObj?.content?.[0]?.text;
     if (!textNode || typeof textNode !== 'string') break;
     try {
       current = JSON.parse(textNode);
@@ -415,8 +418,9 @@ export function parseMcpEnvelope(status: number, rawText: string) {
     }
   }
 
-  if (current?.error) {
-    const msg = current.error?.message || 'Unknown MCP error';
+  const currentObj = current as { error?: { message?: string } };
+  if (currentObj?.error) {
+    const msg = currentObj.error?.message || 'Unknown MCP error';
     throw new Error(`MCP Error: ${msg}`);
   }
 

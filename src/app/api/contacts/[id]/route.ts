@@ -4,10 +4,10 @@ import { ContactInput } from '@/lib/types';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const contactId = params.id;
+    const { id: contactId } = await params;
 
     const crmClient = createCRMClient();
 
@@ -46,10 +46,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const contactId = params.id;
+    const { id: contactId } = await params;
     const body = await request.json();
 
     // Validate input
@@ -63,7 +63,7 @@ export async function PATCH(
     
     for (const [key, value] of Object.entries(body)) {
       if (allowedFields.includes(key)) {
-        updateData[key as keyof ContactInput] = value;
+        (updateData as Record<string, unknown>)[key] = value;
       }
     }
 

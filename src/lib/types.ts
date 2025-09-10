@@ -10,11 +10,11 @@ export interface CRMConfig {
 // MCP Tool Call Structure
 export interface MCPToolCall {
   tool: string;
-  input: Record<string, any>;
+  input: Record<string, unknown>;
 }
 
 // Generic MCP Response Structure
-export interface MCPResponse<T = any> {
+export interface MCPResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -36,7 +36,7 @@ export interface ContactInput {
   timezone?: string;
   dnd?: boolean;
   tags?: string[];
-  customFields?: Record<string, any>;
+  customFields?: Record<string, string | number | boolean>;
   source?: string;
   assignedTo?: string;
 }
@@ -58,7 +58,7 @@ export interface Contact {
   timezone?: string;
   dnd?: boolean;
   tags?: string[];
-  customFields?: Record<string, any>;
+  customFields?: Record<string, string | number | boolean>;
   source?: string;
   assignedTo?: string;
   dateAdded?: string;

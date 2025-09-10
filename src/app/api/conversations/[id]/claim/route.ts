@@ -3,10 +3,10 @@ import { createCRMClient } from '@/lib/mcp';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const conversationId = params.id;
+    const { id: conversationId } = await params;
     const body = await request.json();
     
     const { agentId } = body;
