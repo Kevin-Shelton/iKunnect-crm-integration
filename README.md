@@ -1,36 +1,231 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# iKunnect Agent Chat Desk
 
-## Getting Started
+A modern, Next.js 15-powered Agent Chat Desk interface for iKunnect agents to handle live conversations via GoHighLevel MCP integration.
 
-First, run the development server:
+## 🚀 Features
 
+### ✅ **Implemented (Phase 1-3)**
+- **Modern UI**: Built with Next.js 15, TailwindCSS, and shadcn/ui
+- **Queue Management**: Real-time conversation queue with Waiting/Assigned/All tabs
+- **Multi-Panel Layout**: Queue sidebar, chat area, and contact context
+- **Contact Management**: Complete contact info, tags, opportunities, and appointments
+- **SLA Monitoring**: Visual indicators for response time breaches
+- **Conversation Claiming**: One-click claim functionality for agents
+- **Toast Notifications**: Real-time feedback for all actions
+- **Responsive Design**: Works on desktop and mobile devices
+
+### 🚧 **In Development (Phase 4-10)**
+- Multi-chat tabs (max 6 simultaneous conversations)
+- Real-time messaging with AI assistant integration
+- Keyboard shortcuts and accessibility features
+- Authentication via iKunnect JWT
+- WebSocket/SSE real-time updates
+- Advanced queue filtering and search
+
+## 🛠 Technology Stack
+
+- **Frontend**: Next.js 15 (App Router), React 18, TypeScript
+- **Styling**: TailwindCSS, shadcn/ui components
+- **State Management**: Zustand, React Query
+- **Icons**: Lucide React
+- **Notifications**: Sonner (toast notifications)
+- **Backend**: Next.js API Routes
+- **Integration**: GoHighLevel MCP API
+- **Deployment**: Vercel
+
+## 📋 Prerequisites
+
+- Node.js 18+ 
+- npm or yarn
+- GoHighLevel account with MCP access
+
+## 🚀 Quick Start
+
+### 1. Clone and Install
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/Kevin-Shelton/iKunnect-crm-integration.git
+cd iKunnect-crm-integration
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Environment Setup
+Create `.env.local` file:
+```env
+# GoHighLevel MCP Configuration
+GHL_MCP_BASE_URL=https://services.leadconnectorhq.com/mcp/
+GHL_PRIVATE_INTEGRATION_TOKEN=your_private_integration_token_here
+GHL_LOCATION_ID=your_location_id_here
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# Application Configuration
+NEXT_PUBLIC_APP_NAME=iKunnect Agent Chat Desk
+NEXT_PUBLIC_APP_VERSION=1.0.0
+NEXT_PUBLIC_POLLING_INTERVAL=3000
+NEXT_PUBLIC_MAX_CHAT_TABS=6
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. Development
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000)
 
-## Learn More
+### 4. Production Build
+```bash
+npm run build
+npm start
+```
 
-To learn more about Next.js, take a look at the following resources:
+## 📁 Project Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+├── app/                    # Next.js 15 App Router
+│   ├── api/               # API routes for MCP integration
+│   │   ├── conversations/ # Conversation management
+│   │   ├── contacts/      # Contact operations
+│   │   └── health/        # Health check
+│   ├── globals.css        # Global styles
+│   └── page.tsx          # Main chat desk page
+├── components/
+│   ├── layout/           # Layout components
+│   │   ├── header.tsx    # Top navigation bar
+│   │   ├── sidebar.tsx   # Queue management sidebar
+│   │   ├── contact-sidebar.tsx # Contact context panel
+│   │   └── main-layout.tsx     # Main layout wrapper
+│   └── ui/               # shadcn/ui components
+├── hooks/
+│   └── use-conversations.ts # Conversation data management
+├── lib/
+│   ├── mcp.ts           # GoHighLevel MCP client
+│   ├── types.ts         # TypeScript definitions
+│   └── utils.ts         # Utility functions
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🔌 API Endpoints
 
-## Deploy on Vercel
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | System health check |
+| `/api/conversations` | GET | List conversations by queue |
+| `/api/conversations/[id]/messages` | GET | Get conversation messages |
+| `/api/conversations/[id]/send` | POST | Send message |
+| `/api/conversations/[id]/claim` | POST | Claim conversation |
+| `/api/conversations/[id]/ai-draft` | POST | Get AI message draft |
+| `/api/contacts/[id]` | GET/PATCH | Contact operations |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🎯 Usage
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Agent Workflow
+1. **Login**: Authenticate with iKunnect credentials
+2. **Queue Management**: View waiting conversations in priority order
+3. **Claim Conversations**: Click "Claim Chat" to assign conversations
+4. **Multi-Chat**: Handle up to 6 simultaneous conversations
+5. **AI Assistance**: Get AI-powered message suggestions
+6. **Contact Actions**: Tag contacts, create opportunities, schedule callbacks
+
+### Queue Priority
+- **🔴 SLA Breach**: 10+ minutes wait time
+- **🟡 SLA Warning**: 5-9 minutes wait time  
+- **🟢 Normal**: <5 minutes wait time
+
+## 🔧 Configuration
+
+### Environment Variables
+- `GHL_MCP_BASE_URL`: GoHighLevel MCP endpoint
+- `GHL_PRIVATE_INTEGRATION_TOKEN`: Your PIT token
+- `GHL_LOCATION_ID`: Your location identifier
+- `NEXT_PUBLIC_POLLING_INTERVAL`: Auto-refresh interval (ms)
+- `NEXT_PUBLIC_MAX_CHAT_TABS`: Maximum chat tabs
+
+### SLA Settings
+- Warning threshold: 5 minutes
+- Breach threshold: 10 minutes
+- Auto-refresh: 3 seconds
+
+## 🚀 Deployment
+
+### Vercel (Recommended)
+```bash
+npm install -g vercel
+vercel --prod
+```
+
+### Manual Deployment
+```bash
+npm run build
+# Deploy the .next folder to your hosting provider
+```
+
+## 🧪 Development
+
+### Mock Data
+The application includes comprehensive mock data for development:
+- Sample conversations with different SLA statuses
+- Contact information with tags and opportunities
+- Realistic message threads and timestamps
+
+### Testing
+```bash
+npm run lint        # ESLint
+npm run type-check  # TypeScript checking
+```
+
+## 📈 Roadmap
+
+### Phase 4: Queue Management Enhancement
+- [ ] Real API integration
+- [ ] Advanced filtering and sorting
+- [ ] Bulk operations
+
+### Phase 5: Multi-Chat Interface  
+- [ ] Tab management (max 6 tabs)
+- [ ] Keyboard shortcuts (Alt+1-6)
+- [ ] Unread indicators
+
+### Phase 6: Messaging Components
+- [ ] Real-time message threads
+- [ ] File attachments
+- [ ] Emoji support
+
+### Phase 7: AI Assistant
+- [ ] OpenAI integration
+- [ ] Auto-reply mode
+- [ ] Message drafting
+
+### Phase 8: Contact Actions
+- [ ] Opportunity management
+- [ ] Appointment scheduling
+- [ ] Escalation workflows
+
+### Phase 9: Authentication & Alerts
+- [ ] JWT authentication
+- [ ] Sound notifications
+- [ ] SLA breach alerts
+
+### Phase 10: Production Ready
+- [ ] Performance optimization
+- [ ] Error handling
+- [ ] Analytics integration
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## 📄 License
+
+MIT License - see LICENSE file for details
+
+## 🆘 Support
+
+For support and questions:
+- Create an issue on GitHub
+- Contact: Kevin Shelton (CIO/CTO)
+
+---
+
+**Built with ❤️ for iKunnect Agents**
+
