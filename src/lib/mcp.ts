@@ -22,11 +22,19 @@ export class CRMMCPClient {
   constructor(config: CRMConfig) {
     this.config = config;
     this.headers = {
-      'Authorization': `Bearer ${config.pit}`,
-      'locationId': config.locationId,
       'Content-Type': 'application/json',
       'User-Agent': 'iKunnect-Agent-Chat-Desk/1.0.0'
     };
+
+    // Only add Authorization header if token is provided
+    if (config.pit) {
+      this.headers['Authorization'] = `Bearer ${config.pit}`;
+    }
+
+    // Only add locationId header if provided
+    if (config.locationId) {
+      this.headers['locationId'] = config.locationId;
+    }
   }
 
   /**
@@ -375,13 +383,18 @@ export function createCRMClient(config?: Partial<CRMConfig>): CRMMCPClient {
     locationId: config?.locationId || process.env.GHL_LOCATION_ID || ''
   };
 
-  // Validate required configuration
-  if (!fullConfig.pit) {
-    throw new Error('GHL_PRIVATE_INTEGRATION_TOKEN environment variable or pit config is required');
+  // Validate configuration (now optional since MCP server may handle authentication)
+  if (fullConfig.pit && !fullConfig.pit.trim()) {
+    console.warn('[CRM MCP] Empty integration token provided, MCP server should handle authentication');
   }
   
-  if (!fullConfig.locationId) {
-    throw new Error('GHL_LOCATION_ID environment variable or locationId config is required');
+  if (fullConfig.locationId && !fullConfig.locationId.trim()) {
+    console.warn('[CRM MCP] Empty location ID provided, MCP server should handle location context');
+  }
+
+  // Only validate if we're not using server-side authentication
+  if (!fullConfig.mcpUrl || !fullConfig.mcpUrl.trim()) {
+    throw new Error('MCP URL is required (GHL_MCP_BASE_URL environment variable or mcpUrl config)');
   }
 
   return new CRMMCPClient(fullConfig);
