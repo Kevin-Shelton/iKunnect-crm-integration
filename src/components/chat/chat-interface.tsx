@@ -114,7 +114,6 @@ export function ChatInterface({ conversationId: _conversationId }: ChatInterface
       {/* Chat Tabs */}
       <ChatTabs 
         tabs={chatTabs}
-        activeTabId={activeTabId}
         onTabSelect={setActiveTabId}
         onTabClose={handleCloseTab}
       />
@@ -165,7 +164,6 @@ export function ChatInterface({ conversationId: _conversationId }: ChatInterface
           <div className="flex-1 overflow-hidden">
             <MessageThread 
               messages={activeTab?.messages || []}
-              contactName={activeTab?.contactName || 'Customer'}
             />
           </div>
 
@@ -209,13 +207,16 @@ export function ChatInterface({ conversationId: _conversationId }: ChatInterface
           <div className="w-80 border-l bg-gray-50">
             <AiAssistant 
               conversationId={activeTabId}
-              messages={activeTab?.messages || []}
-              onSuggestionSelect={(suggestion) => {
+              contactName={activeTab?.contactName || 'Customer'}
+              conversationContext={activeTab?.lastMessage || ''}
+              onUseSuggestion={(suggestion) => {
                 setMessage(suggestion);
                 if (textareaRef.current) {
                   textareaRef.current.focus();
                 }
               }}
+              onClose={() => setShowAiAssistant(false)}
+              isVisible={showAiAssistant}
             />
           </div>
         )}
