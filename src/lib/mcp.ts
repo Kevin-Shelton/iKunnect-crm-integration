@@ -35,14 +35,19 @@ export class CRMMCPClient {
   /**
    * Generic method to call GoHighLevel MCP server
    */
-  async callTool<T = unknown>(tool: string, input: Record<string, unknown> = {}): Promise<MCPResponse<T>> {
+  async callTool<T = unknown>(tool: string, input: Record<string, unknown> = {}, useSimpleFormat: boolean = false): Promise<MCPResponse<T>> {
     try {
-      console.log(`[GHL MCP] Calling tool: ${tool}`, { input });
+      console.log(`[GHL MCP] Calling tool: ${tool}`, { input, useSimpleFormat });
 
-      // Use the exact format from GoHighLevel documentation
-      const payload = {
+      // Use different formats based on tool requirements
+      const payload = useSimpleFormat ? {
         tool: tool,
         input: input
+      } : {
+        jsonrpc: "2.0",
+        method: tool,
+        params: input,
+        id: Date.now()
       };
 
       const response = await fetch(this.mcpUrl, {
@@ -87,15 +92,26 @@ export class CRMMCPClient {
       
       console.log(`[GHL MCP] Tool ${tool} parsed data:`, data);
       
-      // Handle simple response format (not JSON-RPC)
-      if (data.error) {
-        throw new Error(`MCP ${tool} failed: ${JSON.stringify(data.error)}`);
+      // Handle both simple and JSON-RPC response formats
+      if (useSimpleFormat) {
+        // Simple format response
+        if (data.error) {
+          throw new Error(`MCP ${tool} failed: ${JSON.stringify(data.error)}`);
+        }
+        return {
+          success: true,
+          data: data as T
+        };
+      } else {
+        // JSON-RPC 2.0 response format
+        if (data.error) {
+          throw new Error(`MCP ${tool} failed: ${JSON.stringify(data.error)}`);
+        }
+        return {
+          success: true,
+          data: data.result as T
+        };
       }
-      
-      return {
-        success: true,
-        data: data as T
-      };
 
     } catch (error) {
       console.error(`[GHL MCP] Error calling tool ${tool}:`, error);
@@ -113,7 +129,7 @@ export class CRMMCPClient {
     try {
       // Use locations_get-location as health check with the current location ID
       const locationId = this.headers.locationId;
-      const result = await this.callTool('locations_get-location', { locationId });
+      const result = await this.callTool('locations_get-location', { locationId }, true); // Use simple format
       
       return {
         success: true,
@@ -129,15 +145,15 @@ export class CRMMCPClient {
   /**
    * Create or update a contact
    */
-  async upsertContact(contactData: ContactInput): Promise<MCPResponse<Contact>> {
-    return this.callTool<Contact>('contacts_upsert-contact', contactData as unknown as Record<string, unknown>);
+  async upsertContact(contactData: Partial<Contact>): Promise<MCPResponse<Contact>> {
+    return this.callTool<Contact>('contacts_upsert-contact', contactData); // Use JSON-RPC format
   }
 
   /**
-   * Get a contact by ID
+   * Get a specific contact by ID
    */
   async getContact(contactId: string): Promise<MCPResponse<Contact>> {
-    return this.callTool<Contact>('contacts_get-contact', { contactId });
+    return this.callTool<Contact>('contacts_get-contact', { contactId }); // Use JSON-RPC format
   }
 
   /**
@@ -148,7 +164,7 @@ export class CRMMCPClient {
     startAfter?: string;
     query?: string;
   } = {}): Promise<MCPResponse<{ items: Contact[]; total: number }>> {
-    return this.callTool('contacts_get-contacts', params);
+    return this.callTool('contacts_get-contacts', params); // Use JSON-RPC format
   }
 
   /**
@@ -158,7 +174,7 @@ export class CRMMCPClient {
     limit?: number;
     startAfter?: string;
   } = {}): Promise<MCPResponse<{ conversations: Conversation[] }>> {
-    return this.callTool('conversations_search-conversation', params);
+    return this.callTool('conversations_search-conversation', params); // Use JSON-RPC format
   }
 
   /**
