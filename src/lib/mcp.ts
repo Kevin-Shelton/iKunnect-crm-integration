@@ -161,7 +161,7 @@ export class CRMMCPClient {
     startAfter?: string;
     query?: string;
   } = {}): Promise<MCPResponse<{ items: Contact[]; total: number }>> {
-    return this.callTool('contacts_get-contacts', params);
+    return this.callTool('contacts/get-contacts', params);
   }
 
   /**
@@ -171,7 +171,7 @@ export class CRMMCPClient {
     limit?: number;
     startAfter?: string;
   } = {}): Promise<MCPResponse<{ conversations: Conversation[] }>> {
-    return this.callTool('conversations_search-conversation', params);
+    return this.callTool('conversations/search-conversation', params);
   }
 
   /**
