@@ -25,7 +25,7 @@ export async function GET(_request: NextRequest) {
       });
       console.log('[DEBUG] All Conversations Result:', {
         success: allConversationsResult.success,
-        itemCount: allConversationsResult.data?.items?.length || 0,
+        itemCount: allConversationsResult.data?.conversations?.length || 0,
         error: allConversationsResult.error
       });
     } catch (convError) {
@@ -104,10 +104,10 @@ export async function POST(request: NextRequest) {
     let result;
     switch (action) {
       case 'searchConversations':
-        result = await crmClient.searchConversations(params);
+        result = await crmClient.getAllConversations(params);
         break;
-      case 'getConversation':
-        result = await crmClient.getConversation(params.conversationId);
+      case 'getMessages':
+        result = await crmClient.getMessages(params.conversationId);
         break;
       case 'sendMessage':
         result = await crmClient.sendMessage(params);

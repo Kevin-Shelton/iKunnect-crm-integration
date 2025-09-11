@@ -45,14 +45,13 @@ export async function GET(request: NextRequest) {
     // Get all open conversations
     console.log('[API] Calling getAllConversations...');
     const allConversationsResult = await crmClient.getAllConversations({
-      limit: limit * 3, // Get more to filter locally
-      status: 'open'
+      limit: limit * 3 // Get more to filter locally
     });
 
     console.log('[API] MCP Response:', {
       success: allConversationsResult.success,
       dataExists: !!allConversationsResult.data,
-      itemCount: allConversationsResult.data?.items?.length || 0,
+      itemCount: allConversationsResult.data?.conversations?.length || 0,
       error: allConversationsResult.error
     });
 
@@ -69,7 +68,7 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
-    const allConversations = allConversationsResult.data?.items || [];
+    const allConversations = allConversationsResult.data?.conversations || [];
     console.log('[API] Processing conversations:', allConversations.length);
 
     // If no conversations from MCP, check for recent widget conversations
@@ -85,11 +84,11 @@ export async function GET(request: NextRequest) {
         
         console.log('[API] Recent conversations check:', {
           success: recentResult.success,
-          count: recentResult.data?.items?.length || 0
+          count: recentResult.data?.conversations?.length || 0
         });
 
-        if (recentResult.success && recentResult.data?.items && recentResult.data.items.length > 0) {
-          const recentConversations = recentResult.data.items;
+        if (recentResult.success && recentResult.data?.conversations && recentResult.data.conversations.length > 0) {
+          const recentConversations = recentResult.data.conversations;
           console.log('[API] Found recent conversations:', recentConversations.map(c => ({
             id: c.id,
             status: c.status,

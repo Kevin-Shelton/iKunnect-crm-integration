@@ -34,26 +34,30 @@ export async function POST(
 
     const crmClient = createCRMClient();
 
-    // Get conversation and recent messages for context
-    const [conversationResult, messagesResult] = await Promise.all([
-      crmClient.getConversation(conversationId),
-      crmClient.getMessages(conversationId, 10) // Get last 10 messages for context
-    ]);
+    // Get recent messages for context (conversation details will be in the messages)
+    const messagesResult = await crmClient.getMessages(conversationId);
 
-    if (!conversationResult.success) {
+    if (!messagesResult.success) {
       return NextResponse.json(
-        { error: 'Conversation not found', details: conversationResult.error },
+        { error: 'Messages not found', details: messagesResult.error },
         { status: 404 }
       );
     }
 
-    const conversation = conversationResult.data;
-    const messages = messagesResult.success ? messagesResult.data?.items || [] : [];
+    const messages = messagesResult.data?.messages || [];
+    
+    if (messages.length === 0) {
+      return NextResponse.json(
+        { error: 'No messages found in conversation' },
+        { status: 404 }
+      );
+    }
 
     // Get contact information for better context
     let contact = null;
-    if (conversation?.contactId) {
-      const contactResult = await crmClient.getContact(conversation.contactId);
+    const contactId = messages[0]?.contactId;
+    if (contactId) {
+      const contactResult = await crmClient.getContact(contactId);
       if (contactResult.success) {
         contact = contactResult.data;
       }
@@ -62,7 +66,7 @@ export async function POST(
     // Build context for AI
     const messageHistory = messages
       .slice(-5) // Last 5 messages
-      .map(msg => `${msg.direction === 'inbound' ? 'Customer' : 'Agent'}: ${msg.body}`)
+      .map(msg => `${msg.direction === 'inbound' ? 'Customer' : 'Agent'}: ${msg.body || 'No content'}`)
       .join('\n');
 
     const contactInfo = contact ? 

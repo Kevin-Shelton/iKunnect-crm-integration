@@ -13,7 +13,7 @@ export async function GET(
     const crmClient = createCRMClient();
 
     // Get messages for the conversation
-    const messagesResult = await crmClient.getMessages(conversationId, limit);
+    const messagesResult = await crmClient.getMessages(conversationId);
 
     if (!messagesResult.success) {
       return NextResponse.json(
@@ -22,13 +22,11 @@ export async function GET(
       );
     }
 
-    // Get conversation details
-    const conversationResult = await crmClient.getConversation(conversationId);
-    
-    // Get contact details if conversation has contactId
+    // Get contact details from the first message if available
     let contact = null;
-    if (conversationResult.success && conversationResult.data?.contactId) {
-      const contactResult = await crmClient.getContact(conversationResult.data.contactId);
+    const messages = messagesResult.data?.messages || [];
+    if (messages.length > 0 && messages[0].contactId) {
+      const contactResult = await crmClient.getContact(messages[0].contactId);
       if (contactResult.success) {
         contact = contactResult.data;
       }
@@ -36,10 +34,9 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      messages: messagesResult.data?.items || [],
-      conversation: conversationResult.data || null,
+      messages: messages,
       contact,
-      total: messagesResult.data?.total || 0,
+      total: messages.length,
       timestamp: new Date().toISOString()
     });
 

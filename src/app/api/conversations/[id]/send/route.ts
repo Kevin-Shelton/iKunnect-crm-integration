@@ -21,19 +21,11 @@ export async function POST(
 
     const crmClient = createCRMClient();
 
-    // Get conversation details to get contactId
-    const conversationResult = await crmClient.getConversation(conversationId);
+    // Note: GoHighLevel MCP doesn't have getConversation, so we'll send the message directly
+    // The contactId will be handled by the MCP server based on the conversationId
     
-    if (!conversationResult.success || !conversationResult.data?.contactId) {
-      return NextResponse.json(
-        { error: 'Conversation not found or missing contact ID' },
-        { status: 404 }
-      );
-    }
-
     const messageData: MessageInput = {
       conversationId,
-      contactId: conversationResult.data.contactId,
       body: message.trim(),
       direction: 'outbound',
       channel: 'chat'

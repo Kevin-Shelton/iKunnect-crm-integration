@@ -17,86 +17,52 @@ import {
 
 export class CRMMCPClient {
   private config: CRMConfig;
-  private openaiApiKey: string;
-  private promptId: string;
+  private mcpUrl: string;
+  private headers: Record<string, string>;
 
   constructor(config: CRMConfig) {
     this.config = config;
-    this.openaiApiKey = process.env.OPENAI_API_KEY || '';
-    this.promptId = 'pmpt_68c20a2b85a0819392a1c4f6a2ee6bec071cc812df14c6ef';
+    this.mcpUrl = 'https://services.leadconnectorhq.com/mcp/';
+    
+    this.headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.pit}`,
+      'locationId': config.locationId
+    };
   }
 
   /**
-   * Generic method to call the OpenAI assistant with MCP tools
+   * Generic method to call GoHighLevel MCP server
    */
   async callTool<T = unknown>(tool: string, input: Record<string, unknown> = {}): Promise<MCPResponse<T>> {
     try {
-      // Use OpenAI Chat Completions API with the assistant that has MCP tools
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      console.log(`[GHL MCP] Calling tool: ${tool}`, { input });
+
+      // Use GoHighLevel MCP format from documentation
+      const payload = {
+        tool: tool,
+        input: input
+      };
+
+      const response = await fetch(this.mcpUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.openaiApiKey}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4", // or whatever model your assistant uses
-          messages: [
-            {
-              role: "system",
-              content: `You are a customer service assistant with access to GoHighLevel CRM data. Use the National_Lawyers tool to ${tool} with the following parameters: ${JSON.stringify(input)}`
-            },
-            {
-              role: "user", 
-              content: `Please execute ${tool} with parameters: ${JSON.stringify(input)}`
-            }
-          ],
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "National_Lawyers",
-                description: "Access GoHighLevel CRM data and perform operations",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    action: {
-                      type: "string",
-                      description: "The action to perform"
-                    },
-                    parameters: {
-                      type: "object",
-                      description: "Parameters for the action"
-                    }
-                  },
-                  required: ["action", "parameters"]
-                }
-              }
-            }
-          ],
-          tool_choice: {
-            type: "function",
-            function: { name: "National_Lawyers" }
-          }
-        })
+        headers: this.headers,
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error(`[GHL MCP] Tool ${tool} failed:`, {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        
+        throw new Error(`MCP ${tool} failed: ${response.status} ${errorText}`);
       }
 
       const data = await response.json();
-      
-      // Extract the tool call result from the OpenAI response
-      if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.tool_calls) {
-        const toolCall = data.choices[0].message.tool_calls[0];
-        if (toolCall && toolCall.function && toolCall.function.arguments) {
-          const result = JSON.parse(toolCall.function.arguments);
-          return {
-            success: true,
-            data: result as T
-          };
-        }
-      }
+      console.log(`[GHL MCP] Tool ${tool} succeeded:`, data);
       
       return {
         success: true,
@@ -104,7 +70,7 @@ export class CRMMCPClient {
       };
 
     } catch (error) {
-      console.error(`MCP Tool Error (${tool}):`, error);
+      console.error(`[GHL MCP] Error calling tool ${tool}:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -169,59 +135,27 @@ export class CRMMCPClient {
   }
 
   /**
-   * Search for a contact by email or phone
-   */
-  async searchContact(email?: string, phone?: string): Promise<MCPResponse<Contact[]>> {
-    const searchParams: Record<string, string> = {};
-    if (email) searchParams.email = email;
-    if (phone) searchParams.phone = phone;
-    
-    return this.callTool('contacts_search-contact', searchParams);
-  }
-
-  // Conversation Management Methods
-  
-  /**
    * Search for conversations
-   */
-  async searchConversations(params: ConversationSearchInput): Promise<MCPResponse<ConversationSearchResponse>> {
-    return this.callTool<ConversationSearchResponse>('conversations_search-conversation', params as unknown as Record<string, unknown>);
-  }
-
-  /**
-   * Get messages from a conversation
-   */
-  async getMessages(conversationId: string, limit: number = 25): Promise<MCPResponse<MessagesResponse>> {
-    return this.callTool<MessagesResponse>('conversations_get-messages', {
-      conversationId,
-      limit
-    });
-  }
-
-  /**
-   * Send a new message
-   */
-  async sendMessage(messageData: MessageInput): Promise<MCPResponse<Message>> {
-    return this.callTool<Message>('conversations_send-a-new-message', messageData as unknown as Record<string, unknown>);
-  }
-
-  /**
-   * Get conversation details
-   */
-  async getConversation(conversationId: string): Promise<MCPResponse<Conversation>> {
-    return this.callTool('conversations_get-conversation', { conversationId });
-  }
-
-  /**
-   * Get all conversations for queue management
    */
   async getAllConversations(params: {
     limit?: number;
-    status?: 'open' | 'closed';
-    assignedTo?: string;
-  } = {}): Promise<MCPResponse<ConversationSearchResponse>> {
-    // Use search-conversation method as there's no get-all-conversations in the documentation
-    return this.callTool<ConversationSearchResponse>('conversations_search-conversation', params);
+    startAfter?: string;
+  } = {}): Promise<MCPResponse<{ conversations: Conversation[] }>> {
+    return this.callTool('conversations_search-conversation', params);
+  }
+
+  /**
+   * Get messages for a conversation
+   */
+  async getMessages(conversationId: string): Promise<MCPResponse<{ messages: Message[] }>> {
+    return this.callTool('conversations_get-messages', { conversationId });
+  }
+
+  /**
+   * Send a new message to a conversation
+   */
+  async sendMessage(messageData: MessageInput): Promise<MCPResponse<Message>> {
+    return this.callTool('conversations_send-a-new-message', messageData as unknown as Record<string, unknown>);
   }
 
   /**
@@ -298,14 +232,12 @@ export class CRMMCPClient {
   async findOrCreateConversation(contactId: string, channel: string = 'chat'): Promise<MCPResponse<{ conversationId: string; isNew: boolean }>> {
     try {
       // First, try to find an existing conversation
-      const searchResult = await this.searchConversations({
-        contactId,
-        limit: 1,
-        sort: 'desc'
+      const searchResult = await this.getAllConversations({
+        limit: 10 // Get recent conversations to find one for this contact
       });
 
-      if (searchResult.success && searchResult.data?.items && searchResult.data.items.length > 0) {
-        const existingConversation = searchResult.data.items[0];
+      if (searchResult.success && searchResult.data?.conversations && searchResult.data.conversations.length > 0) {
+        const existingConversation = searchResult.data.conversations[0];
         return {
           success: true,
           data: {
@@ -357,13 +289,15 @@ export class CRMMCPClient {
     try {
       // First try to find existing contact
       if (contactData.email || contactData.phone) {
-        const searchResult = await this.searchContact(contactData.email, contactData.phone);
+        const searchResult = await this.getContacts({
+          limit: 10 // Get recent contacts to find matching one
+        });
         
-        if (searchResult.success && searchResult.data && searchResult.data.length > 0) {
+        if (searchResult.success && searchResult.data && searchResult.data.items && searchResult.data.items.length > 0) {
           return {
             success: true,
             data: {
-              contact: searchResult.data[0],
+              contact: searchResult.data.items[0],
               isNew: false
             }
           };
