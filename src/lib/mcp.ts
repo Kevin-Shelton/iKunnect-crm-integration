@@ -26,6 +26,7 @@ export class CRMMCPClient {
     
     this.headers = {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       'Authorization': `Bearer ${config.pit}`,
       'locationId': config.locationId
     };
