@@ -39,10 +39,12 @@ export class CRMMCPClient {
     try {
       console.log(`[GHL MCP] Calling tool: ${tool}`, { input });
 
-      // Use GoHighLevel MCP format from documentation
+      // Use proper JSON-RPC 2.0 format as expected by the server
       const payload = {
-        tool: tool,
-        input: input
+        jsonrpc: "2.0",
+        method: tool,
+        params: input,
+        id: Date.now() // Use timestamp as unique ID
       };
 
       const response = await fetch(this.mcpUrl, {
@@ -68,9 +70,14 @@ export class CRMMCPClient {
       const data = await response.json();
       console.log(`[GHL MCP] Tool ${tool} succeeded:`, data);
       
+      // Handle JSON-RPC 2.0 response format
+      if (data.error) {
+        throw new Error(`MCP ${tool} failed: ${JSON.stringify(data.error)}`);
+      }
+      
       return {
         success: true,
-        data: data as T
+        data: data.result as T
       };
 
     } catch (error) {
