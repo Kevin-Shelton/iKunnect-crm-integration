@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Send, Paperclip, Smile, MoreVertical, Bot, Sparkles, MessageCircle } from 'lucide-react';
+import { Send, Paperclip, Smile, MoreVertical, Bot, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ChatTabs } from './chat-tabs';
 import { MessageThread } from './message-thread';
+import { AiAssistant } from './ai-assistant';
 
 interface Message {
   id: string;
@@ -118,8 +119,7 @@ export function ChatInterface({ conversationId: _conversationId }: ChatInterface
 
   const [activeTabId, setActiveTabId] = useState('1');
   const [messageInput, setMessageInput] = useState('');
-  const [isAiDraftLoading, setIsAiDraftLoading] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+  const [isAiAssistantVisible, setIsAiAssistantVisible] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const activeTab = chatTabs.find(tab => tab.id === activeTabId);
@@ -129,7 +129,7 @@ export function ChatInterface({ conversationId: _conversationId }: ChatInterface
       tabs.map(tab => ({ ...tab, isActive: tab.id === tabId }))
     );
     setActiveTabId(tabId);
-    setAiSuggestion(null); // Clear AI suggestion when switching tabs
+    setIsAiAssistantVisible(false); // Close AI assistant when switching tabs
   };
 
   const handleTabClose = (tabId: string) => {
@@ -166,7 +166,7 @@ export function ChatInterface({ conversationId: _conversationId }: ChatInterface
     );
 
     setMessageInput('');
-    setAiSuggestion(null);
+    setIsAiAssistantVisible(false);
 
     // TODO: Send message via API
     try {
@@ -199,46 +199,18 @@ export function ChatInterface({ conversationId: _conversationId }: ChatInterface
     }
   };
 
-  const handleAiDraft = async () => {
-    if (!activeTab || isAiDraftLoading) return;
-
-    setIsAiDraftLoading(true);
-    try {
-      const context = `
-        Contact: ${activeTab.contactName}
-        Channel: ${activeTab.channel}
-        Recent messages: ${activeTab.messages.slice(-3).map(m => `${m.sender}: ${m.content}`).join('\n')}
-      `;
-
-      const response = await fetch(`/api/conversations/${activeTabId}/ai-draft`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          context,
-          requestType: 'draft'
-        })
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        setAiSuggestion(data.suggestion);
-      } else {
-        console.error('AI draft failed:', data.error);
-      }
-    } catch (error) {
-      console.error('AI draft error:', error);
-    } finally {
-      setIsAiDraftLoading(false);
-    }
+  const handleToggleAiAssistant = () => {
+    setIsAiAssistantVisible(!isAiAssistantVisible);
   };
 
-  const handleUseAiSuggestion = () => {
-    if (aiSuggestion) {
-      setMessageInput(aiSuggestion);
-      setAiSuggestion(null);
-      textareaRef.current?.focus();
-    }
+  const handleUseSuggestion = (content: string) => {
+    setMessageInput(content);
+    setIsAiAssistantVisible(false);
+    textareaRef.current?.focus();
+  };
+
+  const handleCloseAiAssistant = () => {
+    setIsAiAssistantVisible(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -306,35 +278,19 @@ export function ChatInterface({ conversationId: _conversationId }: ChatInterface
           {/* Message Thread */}
           <MessageThread messages={activeTab.messages} />
 
-          {/* AI Suggestion */}
-          {aiSuggestion && (
-            <div className="mx-4 mb-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-start space-x-2">
-                <Sparkles className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-blue-900 mb-2">{aiSuggestion}</p>
-                  <div className="flex space-x-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleUseAiSuggestion}
-                      className="text-blue-700 border-blue-300 hover:bg-blue-100"
-                    >
-                      Use Suggestion
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setAiSuggestion(null)}
-                      className="text-blue-700 hover:bg-blue-100"
-                    >
-                      Dismiss
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* AI Assistant */}
+          <AiAssistant
+            conversationId={activeTabId}
+            contactName={activeTab.contactName}
+            conversationContext={`
+              Contact: ${activeTab.contactName}
+              Channel: ${activeTab.channel}
+              Recent messages: ${activeTab.messages.slice(-3).map(m => `${m.sender}: ${m.content}`).join('\n')}
+            `}
+            onUseSuggestion={handleUseSuggestion}
+            onClose={handleCloseAiAssistant}
+            isVisible={isAiAssistantVisible}
+          />
 
           {/* Message Input */}
           <div className="p-4 border-t border-gray-200 bg-white">
@@ -355,16 +311,11 @@ export function ChatInterface({ conversationId: _conversationId }: ChatInterface
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleAiDraft}
-                  disabled={isAiDraftLoading}
-                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                  title="Get AI suggestion"
+                  onClick={handleToggleAiAssistant}
+                  className={`text-purple-600 hover:text-purple-700 hover:bg-purple-50 ${isAiAssistantVisible ? 'bg-purple-100' : ''}`}
+                  title="Toggle AI Assistant"
                 >
-                  {isAiDraftLoading ? (
-                    <div className="w-4 h-4 animate-spin rounded-full border-2 border-purple-600 border-t-transparent" />
-                  ) : (
-                    <Bot className="w-4 h-4" />
-                  )}
+                  <Bot className="w-4 h-4" />
                 </Button>
                 
                 <Button variant="ghost" size="sm">
