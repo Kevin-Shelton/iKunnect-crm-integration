@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Sidebar } from '@/components/layout/sidebar';
 import { ContactSidebar } from '@/components/layout/contact-sidebar';
+import { ChatInterface } from '@/components/chat/chat-interface';
 import { toast } from 'sonner';
 
 // Mock data for development
@@ -212,30 +213,7 @@ export default function ChatDeskPage() {
       />
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-gray-50">
-        {selectedConversation ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center text-gray-500">
-              <div className="text-lg font-medium mb-2">Chat Interface</div>
-              <p className="text-sm">
-                Conversation ID: {selectedConversation}
-              </p>
-              <p className="text-xs text-gray-400 mt-2">
-                Multi-chat tabs and messaging components will be implemented in the next phases
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center text-gray-500">
-              <div className="text-lg font-medium mb-2">Welcome to iKunnect Agent Chat Desk</div>
-              <p className="text-sm">
-                Select a conversation from the queue to start chatting
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      <ChatInterface conversationId={selectedConversation || undefined} />
 
       {/* Right Sidebar - Contact Context */}
       <ContactSidebar
