@@ -27,27 +27,55 @@ export class CRMMCPClient {
   }
 
   /**
-   * Generic method to call the OpenAI prompt-based MCP
+   * Generic method to call the OpenAI assistant with MCP tools
    */
   async callTool<T = unknown>(tool: string, input: Record<string, unknown> = {}): Promise<MCPResponse<T>> {
     try {
-      // Use OpenAI prompt-based approach
-      const response = await fetch('https://api.openai.com/v1/responses', {
+      // Use OpenAI Chat Completions API with the assistant that has MCP tools
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.openaiApiKey}`,
         },
         body: JSON.stringify({
-          prompt: {
-            id: this.promptId,
-            version: "2"
-          },
-          // Include the tool and input as context for the prompt
-          context: {
-            tool: tool,
-            input: input,
-            locationId: this.config.locationId
+          model: "gpt-4", // or whatever model your assistant uses
+          messages: [
+            {
+              role: "system",
+              content: `You are a customer service assistant with access to GoHighLevel CRM data. Use the National_Lawyers tool to ${tool} with the following parameters: ${JSON.stringify(input)}`
+            },
+            {
+              role: "user", 
+              content: `Please execute ${tool} with parameters: ${JSON.stringify(input)}`
+            }
+          ],
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "National_Lawyers",
+                description: "Access GoHighLevel CRM data and perform operations",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    action: {
+                      type: "string",
+                      description: "The action to perform"
+                    },
+                    parameters: {
+                      type: "object",
+                      description: "Parameters for the action"
+                    }
+                  },
+                  required: ["action", "parameters"]
+                }
+              }
+            }
+          ],
+          tool_choice: {
+            type: "function",
+            function: { name: "National_Lawyers" }
           }
         })
       });
@@ -57,6 +85,18 @@ export class CRMMCPClient {
       }
 
       const data = await response.json();
+      
+      // Extract the tool call result from the OpenAI response
+      if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.tool_calls) {
+        const toolCall = data.choices[0].message.tool_calls[0];
+        if (toolCall && toolCall.function && toolCall.function.arguments) {
+          const result = JSON.parse(toolCall.function.arguments);
+          return {
+            success: true,
+            data: result as T
+          };
+        }
+      }
       
       return {
         success: true,
