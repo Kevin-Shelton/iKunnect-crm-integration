@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Smile, MoreVertical, Bot, Sparkles } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Send, Paperclip, Smile, MoreVertical, Bot, Sparkles, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -32,7 +32,7 @@ interface ChatInterfaceProps {
   conversationId?: string;
 }
 
-export function ChatInterface({ conversationId }: ChatInterfaceProps) {
+export function ChatInterface({ conversationId: _conversationId }: ChatInterfaceProps) {
   const [chatTabs, setChatTabs] = useState<ChatTab[]>([
     {
       id: '1',
