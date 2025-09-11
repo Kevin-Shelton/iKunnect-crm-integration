@@ -112,8 +112,8 @@ export async function POST(request: NextRequest) {
       case 'sendMessage':
         result = await crmClient.sendMessage(params);
         break;
-      case 'createContact':
-        result = await crmClient.createContact(params);
+      case 'upsertContact':
+        result = await crmClient.upsertContact(params);
         break;
       default:
         return NextResponse.json({

@@ -23,6 +23,7 @@ export class CRMMCPClient {
     this.config = config;
     this.headers = {
       'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
       'User-Agent': 'iKunnect-Agent-Chat-Desk/1.0.0'
     };
 
@@ -42,7 +43,13 @@ export class CRMMCPClient {
    */
   async callTool<T = unknown>(tool: string, input: Record<string, unknown> = {}): Promise<MCPResponse<T>> {
     try {
-      const payload: MCPToolCall = { tool, input };
+      // Use proper JSON-RPC 2.0 format
+      const payload = {
+        jsonrpc: "2.0",
+        method: tool,
+        params: input,
+        id: Math.random().toString(36).substring(7)
+      };
       
       console.log(`[CRM MCP] Calling tool: ${tool}`, { input });
       
@@ -66,17 +73,18 @@ export class CRMMCPClient {
 
       let data;
       try {
-        data = JSON.parse(responseText);
-      } catch {
-        console.error(`[CRM MCP] Failed to parse response for ${tool}:`, responseText);
-        throw new Error(`Invalid JSON response from MCP ${tool}: ${responseText}`);
+        // Handle SSE format response
+        data = parseMcpEnvelope(response.status, responseText);
+      } catch (parseError) {
+        console.error(`[CRM MCP] Failed to parse response for ${tool}:`, parseError);
+        throw new Error(`Invalid response from MCP ${tool}: ${parseError instanceof Error ? parseError.message : 'Parse error'}`);
       }
 
       console.log(`[CRM MCP] Tool ${tool} succeeded:`, data);
       
       return {
         success: true,
-        data
+        data: data
       };
     } catch (error) {
       console.error(`[CRM MCP] Error calling tool ${tool}:`, error);

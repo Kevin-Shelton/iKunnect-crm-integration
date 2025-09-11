@@ -88,12 +88,12 @@ export async function GET(request: NextRequest) {
           count: recentResult.data?.items?.length || 0
         });
 
-        if (recentResult.success && recentResult.data?.items?.length > 0) {
+        if (recentResult.success && recentResult.data?.items && recentResult.data.items.length > 0) {
           const recentConversations = recentResult.data.items;
           console.log('[API] Found recent conversations:', recentConversations.map(c => ({
             id: c.id,
             status: c.status,
-            lastMessage: c.lastMessage,
+            lastMessageBody: c.lastMessageBody,
             assignedTo: c.assignedTo
           })));
           
