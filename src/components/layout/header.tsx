@@ -7,7 +7,9 @@ import {
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import { 
@@ -18,8 +20,20 @@ import {
   Search,
   MessageSquare,
   Clock,
-  Users
+  Users,
+  Keyboard,
+  HelpCircle,
+  BellOff,
+  ChevronDown
 } from 'lucide-react';
+import { useAuth, useAgentStatus } from '@/contexts/auth-context';
+import { useAlerts } from '@/components/alerts/alert-system';
+import { 
+  useKeyboardShortcuts, 
+  createChatShortcuts, 
+  createAgentShortcuts,
+  useShortcutHelp 
+} from '@/hooks/use-keyboard-shortcuts';
 
 interface HeaderProps {
   agentName?: string;
