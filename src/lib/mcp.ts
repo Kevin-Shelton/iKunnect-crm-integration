@@ -67,8 +67,27 @@ export class CRMMCPClient {
         throw new Error(`MCP ${tool} failed: ${response.status} ${errorText}`);
       }
 
-      const data = await response.json();
-      console.log(`[GHL MCP] Tool ${tool} succeeded:`, data);
+      const responseText = await response.text();
+      console.log(`[GHL MCP] Tool ${tool} raw response:`, responseText);
+      
+      // Handle Server-Sent Events format
+      let data;
+      if (responseText.startsWith('event:')) {
+        // Parse SSE format: "event: message\ndata: {...}"
+        const lines = responseText.split('\n');
+        const dataLine = lines.find(line => line.startsWith('data:'));
+        if (dataLine) {
+          const jsonData = dataLine.substring(5).trim(); // Remove "data:" prefix
+          data = JSON.parse(jsonData);
+        } else {
+          throw new Error(`No data found in SSE response: ${responseText}`);
+        }
+      } else {
+        // Regular JSON response
+        data = JSON.parse(responseText);
+      }
+      
+      console.log(`[GHL MCP] Tool ${tool} parsed data:`, data);
       
       // Handle JSON-RPC 2.0 response format
       if (data.error) {
