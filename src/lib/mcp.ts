@@ -164,7 +164,8 @@ export class CRMMCPClient {
     startAfter?: string;
     query?: string;
   } = {}): Promise<MCPResponse<{ items: Contact[]; total: number }>> {
-    return this.callTool('contacts_get-contacts', params); // Use JSON-RPC format
+    // Try different method name variations
+    return this.callTool('get-contacts', params); // Remove prefix
   }
 
   /**
@@ -174,7 +175,8 @@ export class CRMMCPClient {
     limit?: number;
     startAfter?: string;
   } = {}): Promise<MCPResponse<{ conversations: Conversation[] }>> {
-    return this.callTool('conversations_search-conversation', params); // Use JSON-RPC format
+    // Try different method name variations  
+    return this.callTool('search-conversation', params); // Remove prefix
   }
 
   /**
