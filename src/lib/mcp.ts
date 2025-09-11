@@ -39,12 +39,15 @@ export class CRMMCPClient {
     try {
       console.log(`[GHL MCP] Calling tool: ${tool}`, { input });
 
-      // Use proper JSON-RPC 2.0 format as expected by the server
+      // Try hybrid approach - JSON-RPC 2.0 with tool/input format as params
       const payload = {
         jsonrpc: "2.0",
-        method: tool,
-        params: input,
-        id: Date.now() // Use timestamp as unique ID
+        method: "call_tool", // Generic method name
+        params: {
+          tool: tool,
+          input: input
+        },
+        id: Date.now()
       };
 
       const response = await fetch(this.mcpUrl, {
@@ -161,7 +164,7 @@ export class CRMMCPClient {
     startAfter?: string;
     query?: string;
   } = {}): Promise<MCPResponse<{ items: Contact[]; total: number }>> {
-    return this.callTool('contacts/get-contacts', params);
+    return this.callTool('contacts_get-contacts', params);
   }
 
   /**
@@ -171,7 +174,7 @@ export class CRMMCPClient {
     limit?: number;
     startAfter?: string;
   } = {}): Promise<MCPResponse<{ conversations: Conversation[] }>> {
-    return this.callTool('conversations/search-conversation', params);
+    return this.callTool('conversations_search-conversation', params);
   }
 
   /**
