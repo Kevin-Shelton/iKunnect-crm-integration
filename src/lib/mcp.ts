@@ -56,7 +56,10 @@ export class CRMMCPClient {
         console.error(`[GHL MCP] Tool ${tool} failed:`, {
           status: response.status,
           statusText: response.statusText,
-          body: errorText
+          headers: Object.fromEntries(response.headers.entries()),
+          body: errorText,
+          requestPayload: payload,
+          requestHeaders: this.headers
         });
         
         throw new Error(`MCP ${tool} failed: ${response.status} ${errorText}`);
