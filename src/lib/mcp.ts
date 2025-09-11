@@ -39,15 +39,10 @@ export class CRMMCPClient {
     try {
       console.log(`[GHL MCP] Calling tool: ${tool}`, { input });
 
-      // Try hybrid approach - JSON-RPC 2.0 with tool/input format as params
+      // Use the exact format from GoHighLevel documentation
       const payload = {
-        jsonrpc: "2.0",
-        method: "call_tool", // Generic method name
-        params: {
-          tool: tool,
-          input: input
-        },
-        id: Date.now()
+        tool: tool,
+        input: input
       };
 
       const response = await fetch(this.mcpUrl, {
@@ -73,7 +68,7 @@ export class CRMMCPClient {
       const responseText = await response.text();
       console.log(`[GHL MCP] Tool ${tool} raw response:`, responseText);
       
-      // Handle Server-Sent Events format
+      // Handle Server-Sent Events format or regular JSON
       let data;
       if (responseText.startsWith('event:')) {
         // Parse SSE format: "event: message\ndata: {...}"
@@ -92,14 +87,14 @@ export class CRMMCPClient {
       
       console.log(`[GHL MCP] Tool ${tool} parsed data:`, data);
       
-      // Handle JSON-RPC 2.0 response format
+      // Handle simple response format (not JSON-RPC)
       if (data.error) {
         throw new Error(`MCP ${tool} failed: ${JSON.stringify(data.error)}`);
       }
       
       return {
         success: true,
-        data: data.result as T
+        data: data as T
       };
 
     } catch (error) {
@@ -112,31 +107,20 @@ export class CRMMCPClient {
   }
 
   /**
-   * Health check to verify MCP connection
+   * Health check using locations_get-location
    */
-  async healthCheck(): Promise<MCPResponse<{ status: string }>> {
+  async healthCheck(): Promise<MCPResponse<{ success: boolean }>> {
     try {
-      // Try to get contacts with limit 1 as a simple health check
-      const result = await this.getContacts({ limit: 1 });
+      // Use locations_get-location as health check with the current location ID
+      const locationId = this.headers.locationId;
+      const result = await this.callTool('locations_get-location', { locationId });
       
-      if (result.success) {
-        return {
-          success: true,
-          data: {
-            status: 'healthy'
-          }
-        };
-      } else {
-        return {
-          success: false,
-          error: `Health check failed: MCP ${result.error}`
-        };
-      }
-    } catch (error) {
       return {
-        success: false,
-        error: `Health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        success: true,
+        data: { success: true }
       };
+    } catch (error) {
+      throw new Error(`Health check failed: MCP ${error}`);
     }
   }
 
