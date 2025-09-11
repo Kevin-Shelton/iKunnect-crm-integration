@@ -41,75 +41,7 @@ interface UseConversationsReturn {
   closeConversation: (conversationId: string) => Promise<boolean>;
 }
 
-// Mock data for development - will be replaced with real API calls
-const mockConversations: Conversation[] = [
-  {
-    id: '1',
-    contactName: 'John Smith',
-    lastMessage: 'Hi, I need help with my account setup. Can someone assist me?',
-    lastMessageTime: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-    unreadCount: 2,
-    channel: 'chat',
-    tags: ['new-customer', 'urgent'],
-    waitTime: 5,
-    slaStatus: 'normal',
-    contactId: 'contact-1',
-    status: 'open'
-  },
-  {
-    id: '2',
-    contactName: 'Sarah Johnson',
-    lastMessage: 'I\'m having trouble logging into my dashboard',
-    lastMessageTime: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
-    unreadCount: 1,
-    channel: 'chat',
-    tags: ['support'],
-    waitTime: 12,
-    slaStatus: 'warning',
-    contactId: 'contact-2',
-    status: 'open'
-  },
-  {
-    id: '3',
-    contactName: 'Mike Davis',
-    lastMessage: 'Thank you for the help! That resolved my issue.',
-    lastMessageTime: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-    unreadCount: 0,
-    channel: 'chat',
-    tags: ['resolved'],
-    assignedTo: 'Agent Smith',
-    contactId: 'contact-3',
-    status: 'open'
-  },
-  {
-    id: '4',
-    contactName: 'Emily Chen',
-    lastMessage: 'Can you help me understand the pricing options?',
-    lastMessageTime: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
-    unreadCount: 3,
-    channel: 'email',
-    tags: ['sales', 'pricing'],
-    waitTime: 8,
-    slaStatus: 'normal',
-    contactId: 'contact-4',
-    status: 'open'
-  },
-  {
-    id: '5',
-    contactName: 'Robert Wilson',
-    lastMessage: 'The integration is not working as expected',
-    lastMessageTime: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    unreadCount: 1,
-    channel: 'chat',
-    tags: ['technical', 'integration'],
-    waitTime: 15,
-    slaStatus: 'breach',
-    contactId: 'contact-5',
-    status: 'open'
-  }
-];
-
-export function useConversations(_agentId?: string): UseConversationsReturn {
+export function useConversations(): UseConversationsReturn {
   const [conversations, setConversations] = useState<ConversationQueue>({
     waiting: [],
     assigned: [],
@@ -178,20 +110,30 @@ export function useConversations(_agentId?: string): UseConversationsReturn {
     setError(null);
 
     try {
-      // For now, use mock data. In production, this would be:
-      // const response = await fetch('/api/conversations');
-      // const data = await response.json();
+      const response = await fetch('/api/conversations');
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      if (!response.ok) {
+        throw new Error(`Failed to fetch conversations: ${response.status}`);
+      }
       
-      const processedData = processConversations(mockConversations);
+      const data = await response.json();
+      
+      // If API returns empty or no conversations, show empty state
+      const conversations = data.conversations || [];
+      const processedData = processConversations(conversations);
       setConversations(processedData);
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch conversations';
       setError(errorMessage);
-      toast.error(`Error loading conversations: ${errorMessage}`);
+      console.error('Error loading conversations:', errorMessage);
+      
+      // Set empty state instead of showing mock data
+      setConversations({
+        waiting: [],
+        assigned: [],
+        all: []
+      });
     } finally {
       setIsLoading(false);
     }
@@ -200,8 +142,11 @@ export function useConversations(_agentId?: string): UseConversationsReturn {
   // Refresh conversations
   const refreshConversations = useCallback(async () => {
     await fetchConversations();
-    toast.success('Conversations refreshed');
-  }, [fetchConversations]);
+    // Only show success toast if there's no error
+    if (!error) {
+      toast.success('Conversations refreshed');
+    }
+  }, [fetchConversations, error]);
 
   // Claim a conversation
   const claimConversation = useCallback(async (conversationId: string, agentId: string): Promise<boolean> => {

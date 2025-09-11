@@ -179,7 +179,8 @@ export class CRMMCPClient {
     status?: 'open' | 'closed';
     assignedTo?: string;
   } = {}): Promise<MCPResponse<ConversationSearchResponse>> {
-    return this.callTool<ConversationSearchResponse>('conversations_get-all-conversations', params);
+    // Use search-conversation method as there's no get-all-conversations in the documentation
+    return this.callTool<ConversationSearchResponse>('conversations_search-conversation', params);
   }
 
   /**
