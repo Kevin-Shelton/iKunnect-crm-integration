@@ -1,121 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Sidebar } from '@/components/layout/sidebar';
 import { ContactSidebar } from '@/components/layout/contact-sidebar';
 import { ChatInterface } from '@/components/chat/chat-interface';
+import { useConversations } from '@/hooks/use-conversations';
 import { toast } from 'sonner';
-
-// Mock data for development
-type MockConversation = {
-  id: string;
-  contactName: string;
-  lastMessage: string;
-  lastMessageTime: string;
-  unreadCount: number;
-  channel: 'chat' | 'sms' | 'email' | 'whatsapp' | 'facebook';
-  tags: string[];
-  waitTime?: number;
-  slaStatus?: 'normal' | 'warning' | 'breach';
-  assignedTo?: string;
-};
-
-const mockConversations: {
-  waiting: MockConversation[];
-  assigned: MockConversation[];
-  all: MockConversation[];
-} = {
-  waiting: [
-    {
-      id: '1',
-      contactName: 'John Smith',
-      lastMessage: 'Hi, I need help with my account setup. Can someone assist me?',
-      lastMessageTime: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-      unreadCount: 2,
-      channel: 'chat' as const,
-      tags: ['new-customer', 'urgent'],
-      waitTime: 5,
-      slaStatus: 'normal' as const
-    },
-    {
-      id: '2',
-      contactName: 'Sarah Johnson',
-      lastMessage: 'I\'m having trouble logging into my dashboard',
-      lastMessageTime: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
-      unreadCount: 1,
-      channel: 'chat' as const,
-      tags: ['support'],
-      waitTime: 12,
-      slaStatus: 'warning' as const
-    }
-  ],
-  assigned: [
-    {
-      id: '3',
-      contactName: 'Mike Davis',
-      lastMessage: 'Thank you for the help! That resolved my issue.',
-      lastMessageTime: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-      unreadCount: 0,
-      channel: 'chat' as const,
-      tags: ['resolved'],
-      assignedTo: 'Agent Smith'
-    }
-  ],
-  all: []
-};
-
-// Initialize all conversations
-mockConversations.all = [...mockConversations.waiting, ...mockConversations.assigned];
-
-const mockContact = {
-  id: '1',
-  name: 'John Smith',
-  firstName: 'John',
-  lastName: 'Smith',
-  email: 'john.smith@example.com',
-  phone: '+1 (555) 123-4567',
-  city: 'New York',
-  state: 'NY',
-  tags: ['new-customer', 'urgent', 'vip'],
-  dateAdded: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-  lastActivity: new Date(Date.now() - 5 * 60 * 1000).toISOString()
-};
-
-const mockOpportunities = [
-  {
-    id: '1',
-    name: 'Enterprise Package Upgrade',
-    stage: 'Proposal',
-    value: 15000,
-    pipeline: 'Sales Pipeline',
-    probability: 75,
-    closeDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
-  }
-];
-
-const mockAppointments = [
-  {
-    id: '1',
-    title: 'Follow-up Call',
-    date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-    type: 'Phone Call',
-    status: 'scheduled' as const
-  }
-];
 
 export default function ChatDeskPage() {
   const [agentStatus, setAgentStatus] = useState<'available' | 'busy' | 'away' | 'offline'>('available');
   const [activeTab, setActiveTab] = useState<'waiting' | 'assigned' | 'all'>('waiting');
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-  const [conversations, setConversations] = useState(mockConversations);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const queueStats = {
-    waiting: conversations.waiting.length,
-    assigned: conversations.assigned.length,
-    total: conversations.all.length
-  };
+  
+  // Use real conversations hook instead of mock data
+  const { 
+    conversations, 
+    stats: queueStats, 
+    isLoading, 
+    error,
+    refreshConversations 
+  } = useConversations();
 
   const handleStatusChange = (status: 'available' | 'busy' | 'away' | 'offline') => {
     setAgentStatus(status);
@@ -129,104 +34,88 @@ export default function ChatDeskPage() {
 
   const handleConversationSelect = (conversationId: string) => {
     setSelectedConversation(conversationId);
-    toast.info(`Selected conversation: ${conversationId}`);
   };
 
-  const handleConversationClaim = (conversationId: string) => {
-    // Move conversation from waiting to assigned
-    const conversation = conversations.waiting.find(c => c.id === conversationId);
-    if (conversation) {
-      const updatedConversation = { ...conversation, assignedTo: 'Current Agent' };
-      setConversations(prev => ({
-        waiting: prev.waiting.filter(c => c.id !== conversationId),
-        assigned: [...prev.assigned, updatedConversation],
-        all: prev.all.map(c => c.id === conversationId ? updatedConversation : c)
-      }));
-      toast.success(`Claimed conversation with ${conversation.contactName}`);
+  const handleClaimConversation = async (conversationId: string) => {
+    try {
+      // TODO: Implement claim conversation API call
+      toast.success('Conversation claimed successfully');
+      await refreshConversations();
+    } catch (error) {
+      toast.error('Failed to claim conversation');
     }
   };
 
-  const handleRefresh = () => {
-    setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      toast.success('Queue refreshed');
-    }, 1000);
+  const handleRefresh = async () => {
+    await refreshConversations();
   };
 
-  const handleTagContact = (_tags: string[]) => {
-    toast.success('Contact tags updated');
-    // TODO: Implement tag update
-  };
-
-  const handleCreateOpportunity = () => {
-    toast.info('Create opportunity dialog would open');
-    // TODO: Implement opportunity creation
-  };
-
-  const handleScheduleCallback = () => {
-    toast.info('Schedule callback dialog would open');
-    // TODO: Implement callback scheduling
-  };
-
-  const handleEscalate = () => {
-    toast.info('Escalation dialog would open');
-    // TODO: Implement escalation
-  };
-
-  const handleCloseConversation = () => {
-    if (selectedConversation) {
-      toast.success('Conversation closed');
-      setSelectedConversation(null);
-      // TODO: Implement conversation closing
+  // Get current conversation list based on active tab
+  const getCurrentConversations = () => {
+    switch (activeTab) {
+      case 'waiting':
+        return conversations.waiting;
+      case 'assigned':
+        return conversations.assigned;
+      case 'all':
+        return conversations.all;
+      default:
+        return conversations.all;
     }
   };
 
-  // Auto-refresh every 3 seconds (as per FRD)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // TODO: Fetch latest conversations from API
-      console.log('Auto-refreshing conversations...');
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, []);
+  const currentConversations = getCurrentConversations();
+  const selectedConversationData = selectedConversation 
+    ? currentConversations.find(c => c.id === selectedConversation)
+    : null;
 
   return (
-    <MainLayout
-      agentName="Agent Smith"
-      agentStatus={agentStatus}
-      queueStats={queueStats}
-      onStatusChange={handleStatusChange}
-      onSearch={handleSearch}
-    >
-      {/* Left Sidebar - Queue */}
-      <Sidebar
-        conversations={conversations}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        onConversationSelect={handleConversationSelect}
-        onConversationClaim={handleConversationClaim}
-        onRefresh={handleRefresh}
-        isLoading={isLoading}
-      />
+    <MainLayout>
+      <div className="flex h-full">
+        {/* Left Sidebar - Conversation Queue */}
+        <Sidebar
+          conversations={conversations}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onConversationSelect={handleConversationSelect}
+          onConversationClaim={handleClaimConversation}
+          onRefresh={handleRefresh}
+          isLoading={isLoading}
+        />
 
-      {/* Main Chat Area */}
-      <ChatInterface conversationId={selectedConversation || undefined} />
+        {/* Main Chat Area */}
+        <div className="flex-1 flex">
+          <div className="flex-1">
+            {selectedConversation ? (
+              <ChatInterface 
+                conversationId={selectedConversation}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                  <div className="text-gray-400 text-lg mb-2">
+                    Select a conversation to start chatting
+                  </div>
+                  <div className="text-gray-500 text-sm">
+                    Choose a conversation from the queue to begin helping customers
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
-      {/* Right Sidebar - Contact Context */}
-      <ContactSidebar
-        contact={selectedConversation ? mockContact : undefined}
-        opportunities={selectedConversation ? mockOpportunities : []}
-        appointments={selectedConversation ? mockAppointments : []}
-        conversationId={selectedConversation || undefined}
-        onTagContact={handleTagContact}
-        onCreateOpportunity={handleCreateOpportunity}
-        onScheduleCallback={handleScheduleCallback}
-        onEscalate={handleEscalate}
-        onCloseConversation={handleCloseConversation}
-      />
+          {/* Right Sidebar - Contact Information */}
+          {selectedConversation && (
+            <ContactSidebar
+              conversationId={selectedConversation}
+              contact={undefined} // Will be loaded by the component
+              opportunities={[]}
+              appointments={[]}
+            />
+          )}
+        </div>
+      </div>
     </MainLayout>
   );
 }
+

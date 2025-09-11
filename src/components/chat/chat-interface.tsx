@@ -34,183 +34,36 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ conversationId: _conversationId }: ChatInterfaceProps) {
-  const [chatTabs, setChatTabs] = useState<ChatTab[]>([
-    {
-      id: '1',
-      contactName: 'Mike Davis',
-      lastMessage: 'Thank you for the help!',
-      unreadCount: 0,
-      isActive: true,
-      channel: 'web',
-      slaStatus: 'normal',
-      timestamp: '4 minutes ago',
-      messages: [
-        {
-          id: '1',
-          content: 'Hi, I need help with my account setup.',
-          sender: 'customer',
-          timestamp: '10:30 AM',
-          status: 'read'
-        },
-        {
-          id: '2',
-          content: 'Hello Mike! I\'d be happy to help you with your account setup. What specific issue are you experiencing?',
-          sender: 'agent',
-          timestamp: '10:31 AM',
-          status: 'read'
-        },
-        {
-          id: '3',
-          content: 'I can\'t seem to access the billing section.',
-          sender: 'customer',
-          timestamp: '10:32 AM',
-          status: 'read'
-        },
-        {
-          id: '4',
-          content: 'I see the issue. Let me guide you through the steps to access your billing information.',
-          sender: 'agent',
-          timestamp: '10:33 AM',
-          status: 'read'
-        },
-        {
-          id: '5',
-          content: 'Thank you for the help! That resolved my issue.',
-          sender: 'customer',
-          timestamp: '10:35 AM',
-          status: 'read'
-        }
-      ]
-    },
-    {
-      id: '2',
-      contactName: 'Sarah Johnson',
-      lastMessage: 'When will this be resolved?',
-      unreadCount: 2,
-      isActive: false,
-      channel: 'sms',
-      slaStatus: 'warning',
-      timestamp: '8 minutes ago',
-      messages: [
-        {
-          id: '1',
-          content: 'My order hasn\'t arrived yet and it\'s been 5 days.',
-          sender: 'customer',
-          timestamp: '9:15 AM',
-          status: 'read'
-        },
-        {
-          id: '2',
-          content: 'I apologize for the delay. Let me check your order status right away.',
-          sender: 'agent',
-          timestamp: '9:16 AM',
-          status: 'read'
-        },
-        {
-          id: '3',
-          content: 'When will this be resolved?',
-          sender: 'customer',
-          timestamp: '9:45 AM',
-          status: 'delivered'
-        }
-      ]
-    }
-  ]);
-
-  const [activeTabId, setActiveTabId] = useState('1');
-  const [messageInput, setMessageInput] = useState('');
-  const [isAiAssistantVisible, setIsAiAssistantVisible] = useState(false);
+  // Start with empty chat tabs - will be populated from real API data
+  const [chatTabs, setChatTabs] = useState<ChatTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string>('');
+  const [message, setMessage] = useState('');
+  const [showAiAssistant, setShowAiAssistant] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const activeTab = chatTabs.find(tab => tab.id === activeTabId);
 
-  const handleTabSelect = (tabId: string) => {
-    setChatTabs(tabs => 
-      tabs.map(tab => ({ ...tab, isActive: tab.id === tabId }))
-    );
-    setActiveTabId(tabId);
-    setIsAiAssistantVisible(false); // Close AI assistant when switching tabs
-  };
-
-  const handleTabClose = (tabId: string) => {
-    const remainingTabs = chatTabs.filter(tab => tab.id !== tabId);
-    setChatTabs(remainingTabs);
-    
-    if (activeTabId === tabId && remainingTabs.length > 0) {
-      const newActiveTab = remainingTabs[0];
-      setActiveTabId(newActiveTab.id);
-      setChatTabs(tabs => 
-        tabs.map(tab => ({ ...tab, isActive: tab.id === newActiveTab.id }))
-      );
-    }
-  };
-
-  const handleSendMessage = async () => {
-    if (!messageInput.trim() || !activeTab) return;
+  const handleSendMessage = () => {
+    if (!message.trim() || !activeTab) return;
 
     const newMessage: Message = {
       id: Date.now().toString(),
-      content: messageInput.trim(),
+      content: message.trim(),
       sender: 'agent',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       status: 'sent'
     };
 
-    // Add message to active tab
-    setChatTabs(tabs =>
-      tabs.map(tab =>
-        tab.id === activeTabId
-          ? { ...tab, messages: [...tab.messages, newMessage], lastMessage: messageInput.trim() }
-          : tab
-      )
-    );
+    setChatTabs(prev => prev.map(tab => 
+      tab.id === activeTabId 
+        ? { ...tab, messages: [...tab.messages, newMessage] }
+        : tab
+    ));
 
-    setMessageInput('');
-    setIsAiAssistantVisible(false);
-
-    // TODO: Send message via API
-    try {
-      const response = await fetch(`/api/conversations/${activeTabId}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: messageInput.trim(),
-          agentId: 'current-agent'
-        })
-      });
-
-      if (response.ok) {
-        // Update message status to delivered
-        setChatTabs(tabs =>
-          tabs.map(tab =>
-            tab.id === activeTabId
-              ? {
-                  ...tab,
-                  messages: tab.messages.map(msg =>
-                    msg.id === newMessage.id ? { ...msg, status: 'delivered' } : msg
-                  )
-                }
-              : tab
-          )
-        );
-      }
-    } catch (error) {
-      console.error('Failed to send message:', error);
+    setMessage('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
     }
-  };
-
-  const handleToggleAiAssistant = () => {
-    setIsAiAssistantVisible(!isAiAssistantVisible);
-  };
-
-  const handleUseSuggestion = (content: string) => {
-    setMessageInput(content);
-    setIsAiAssistantVisible(false);
-    textareaRef.current?.focus();
-  };
-
-  const handleCloseAiAssistant = () => {
-    setIsAiAssistantVisible(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -220,16 +73,36 @@ export function ChatInterface({ conversationId: _conversationId }: ChatInterface
     }
   };
 
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMessage(e.target.value);
+    
+    // Auto-resize textarea
+    const textarea = e.target;
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+  };
+
+  const handleCloseTab = (tabId: string) => {
+    setChatTabs(prev => {
+      const newTabs = prev.filter(tab => tab.id !== tabId);
+      if (activeTabId === tabId && newTabs.length > 0) {
+        setActiveTabId(newTabs[0].id);
+      }
+      return newTabs;
+    });
+  };
+
+  // Show empty state if no conversations
   if (chatTabs.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
-        <div className="text-center space-y-4">
-          <MessageCircle className="w-12 h-12 text-gray-400 mx-auto" />
-          <div className="space-y-2">
-            <h3 className="text-lg font-medium text-gray-900">No Active Conversations</h3>
-            <p className="text-sm text-gray-500">
-              Select a conversation from the queue to start chatting
-            </p>
+      <div className="h-full flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <div className="text-gray-500 text-lg mb-2">
+            No active conversations
+          </div>
+          <div className="text-gray-400 text-sm">
+            Conversations will appear here when customers start chatting
           </div>
         </div>
       </div>
@@ -237,108 +110,116 @@ export function ChatInterface({ conversationId: _conversationId }: ChatInterface
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-white">
       {/* Chat Tabs */}
-      <ChatTabs
+      <ChatTabs 
         tabs={chatTabs}
-        onTabSelect={handleTabSelect}
-        onTabClose={handleTabClose}
-        maxTabs={6}
+        activeTabId={activeTabId}
+        onTabSelect={setActiveTabId}
+        onTabClose={handleCloseTab}
       />
 
-      {/* Active Chat Content */}
-      {activeTab && (
-        <>
+      {/* Main Chat Area */}
+      <div className="flex-1 flex">
+        {/* Messages Area */}
+        <div className="flex-1 flex flex-col">
           {/* Chat Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
-            <div className="flex items-center space-x-3">
-              <div>
-                <h3 className="text-sm font-medium text-gray-900">{activeTab.contactName}</h3>
-                <div className="flex items-center space-x-2">
-                  <Badge variant="outline" className="text-xs">
-                    {activeTab.channel.toUpperCase()}
-                  </Badge>
-                  {activeTab.slaStatus !== 'normal' && (
-                    <Badge 
-                      variant={activeTab.slaStatus === 'warning' ? 'secondary' : 'destructive'}
-                      className="text-xs"
-                    >
-                      SLA {activeTab.slaStatus}
+          <div className="border-b px-6 py-4 bg-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                  {activeTab?.contactName.charAt(0) || 'C'}
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">
+                    {activeTab?.contactName || 'Customer'}
+                  </h3>
+                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <Badge variant={activeTab?.slaStatus === 'breach' ? 'destructive' : 
+                                  activeTab?.slaStatus === 'warning' ? 'secondary' : 'default'}>
+                      {activeTab?.slaStatus || 'normal'}
                     </Badge>
-                  )}
+                    <span>•</span>
+                    <span>{activeTab?.channel || 'web'}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <Button variant="ghost" size="sm">
-              <MoreVertical className="w-4 h-4" />
-            </Button>
-          </div>
-
-          {/* Message Thread */}
-          <MessageThread messages={activeTab.messages} />
-
-          {/* AI Assistant */}
-          <AiAssistant
-            conversationId={activeTabId}
-            contactName={activeTab.contactName}
-            conversationContext={`
-              Contact: ${activeTab.contactName}
-              Channel: ${activeTab.channel}
-              Recent messages: ${activeTab.messages.slice(-3).map(m => `${m.sender}: ${m.content}`).join('\n')}
-            `}
-            onUseSuggestion={handleUseSuggestion}
-            onClose={handleCloseAiAssistant}
-            isVisible={isAiAssistantVisible}
-          />
-
-          {/* Message Input */}
-          <div className="p-4 border-t border-gray-200 bg-white">
-            <div className="flex items-end space-x-2">
-              <div className="flex-1">
-                <Textarea
-                  ref={textareaRef}
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Type your message..."
-                  className="min-h-[40px] max-h-32 resize-none"
-                  rows={1}
-                />
-              </div>
-              
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center space-x-2">
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleToggleAiAssistant}
-                  className={`text-purple-600 hover:text-purple-700 hover:bg-purple-50 ${isAiAssistantVisible ? 'bg-purple-100' : ''}`}
-                  title="Toggle AI Assistant"
+                  onClick={() => setShowAiAssistant(!showAiAssistant)}
+                  className={showAiAssistant ? 'bg-blue-50 text-blue-600' : ''}
                 >
-                  <Bot className="w-4 h-4" />
+                  <Bot className="h-4 w-4 mr-2" />
+                  AI Assistant
                 </Button>
-                
                 <Button variant="ghost" size="sm">
-                  <Paperclip className="w-4 h-4" />
-                </Button>
-                
-                <Button variant="ghost" size="sm">
-                  <Smile className="w-4 h-4" />
-                </Button>
-                
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!messageInput.trim()}
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Send className="w-4 h-4" />
+                  <MoreVertical className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           </div>
-        </>
-      )}
+
+          {/* Messages */}
+          <div className="flex-1 overflow-hidden">
+            <MessageThread 
+              messages={activeTab?.messages || []}
+              contactName={activeTab?.contactName || 'Customer'}
+            />
+          </div>
+
+          {/* Message Input */}
+          <div className="border-t bg-white p-4">
+            <div className="flex items-end space-x-3">
+              <div className="flex-1">
+                <div className="relative">
+                  <Textarea
+                    ref={textareaRef}
+                    value={message}
+                    onChange={handleTextareaChange}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Type your message..."
+                    className="min-h-[44px] max-h-[120px] resize-none pr-12"
+                    rows={1}
+                  />
+                  <div className="absolute right-2 bottom-2 flex items-center space-x-1">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <Paperclip className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <Smile className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <Button 
+                onClick={handleSendMessage}
+                disabled={!message.trim()}
+                className="h-11"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* AI Assistant Sidebar */}
+        {showAiAssistant && (
+          <div className="w-80 border-l bg-gray-50">
+            <AiAssistant 
+              conversationId={activeTabId}
+              messages={activeTab?.messages || []}
+              onSuggestionSelect={(suggestion) => {
+                setMessage(suggestion);
+                if (textareaRef.current) {
+                  textareaRef.current.focus();
+                }
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
