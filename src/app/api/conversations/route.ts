@@ -17,8 +17,29 @@ export async function GET(request: NextRequest) {
     try {
       const healthCheck = await crmClient.healthCheck();
       console.log('[API] MCP Health Check:', healthCheck);
+      
+      if (!healthCheck.success) {
+        return NextResponse.json({
+          success: false,
+          error: 'MCP server health check failed',
+          details: healthCheck.error,
+          conversations: [],
+          queue: { waiting: [], assigned: [], all: [] },
+          stats: { waiting: 0, assigned: 0, total: 0 },
+          timestamp: new Date().toISOString()
+        }, { status: 503 });
+      }
     } catch (healthError) {
       console.error('[API] MCP Health Check Failed:', healthError);
+      return NextResponse.json({
+        success: false,
+        error: 'Cannot connect to MCP server',
+        details: healthError instanceof Error ? healthError.message : 'Health check failed',
+        conversations: [],
+        queue: { waiting: [], assigned: [], all: [] },
+        stats: { waiting: 0, assigned: 0, total: 0 },
+        timestamp: new Date().toISOString()
+      }, { status: 503 });
     }
 
     // Get all open conversations
@@ -37,46 +58,15 @@ export async function GET(request: NextRequest) {
 
     if (!allConversationsResult.success) {
       console.error('[API] MCP Error:', allConversationsResult.error);
-      
-      // Return mock data as fallback
-      const mockConversations = [
-        {
-          id: 'mock_001',
-          contactId: 'contact_001',
-          contactName: 'Test Customer',
-          lastMessage: 'This is a test message from the chat widget',
-          lastMessageTime: new Date().toISOString(),
-          channel: 'web',
-          status: 'waiting',
-          assignedTo: undefined,
-          unreadCount: 1,
-          tags: ['test', 'widget'],
-          priority: 'normal',
-          locationId: process.env.GHL_LOCATION_ID || 'default_location'
-        }
-      ];
-
-      const mockQueue: ConversationQueue = {
-        waiting: mockConversations,
-        assigned: [],
-        all: mockConversations
-      };
-
-      const mockStats: QueueStats = {
-        waiting: 1,
-        assigned: 0,
-        total: 1
-      };
-
       return NextResponse.json({
-        success: true,
-        conversations: mockConversations,
-        queue: mockQueue,
-        stats: mockStats,
-        timestamp: new Date().toISOString(),
-        fallback: true,
-        mcpError: allConversationsResult.error
-      });
+        success: false,
+        error: 'Failed to fetch conversations from MCP',
+        details: allConversationsResult.error,
+        conversations: [],
+        queue: { waiting: [], assigned: [], all: [] },
+        stats: { waiting: 0, assigned: 0, total: 0 },
+        timestamp: new Date().toISOString()
+      }, { status: 500 });
     }
 
     const allConversations = allConversationsResult.data?.items || [];
@@ -106,6 +96,61 @@ export async function GET(request: NextRequest) {
             lastMessage: c.lastMessage,
             assignedTo: c.assignedTo
           })));
+          
+          // Use recent conversations if they exist
+          const allRecentConversations = recentConversations;
+          
+          // Categorize conversations
+          const waiting = allRecentConversations.filter(conv => !conv.assignedTo);
+          const assigned = allRecentConversations.filter(conv => conv.assignedTo);
+          const agentAssigned = agentId ? assigned.filter(conv => conv.assignedTo === agentId) : [];
+
+          console.log('[API] Recent conversation categories:', {
+            waiting: waiting.length,
+            assigned: assigned.length,
+            agentAssigned: agentAssigned.length
+          });
+
+          // Prepare queue data
+          const queue: ConversationQueue = {
+            waiting: waiting.slice(0, limit),
+            assigned: agentId ? agentAssigned.slice(0, limit) : assigned.slice(0, limit),
+            all: allRecentConversations.slice(0, limit)
+          };
+
+          const stats: QueueStats = {
+            waiting: waiting.length,
+            assigned: assigned.length,
+            total: allRecentConversations.length
+          };
+
+          // Return based on requested bucket
+          let conversations;
+          switch (bucket) {
+            case 'waiting':
+              conversations = queue.waiting;
+              break;
+            case 'assigned':
+              conversations = queue.assigned;
+              break;
+            default:
+              conversations = queue.all;
+          }
+
+          return NextResponse.json({
+            success: true,
+            conversations,
+            queue,
+            stats,
+            timestamp: new Date().toISOString(),
+            debug: {
+              mcpConnected: true,
+              totalFromMcp: allRecentConversations.length,
+              bucket,
+              agentId,
+              source: 'recent_conversations'
+            }
+          });
         }
       } catch (recentError) {
         console.error('[API] Error checking recent conversations:', recentError);
@@ -165,48 +210,23 @@ export async function GET(request: NextRequest) {
         mcpConnected: true,
         totalFromMcp: allConversations.length,
         bucket,
-        agentId
+        agentId,
+        source: 'live_conversations'
       }
     });
 
   } catch (error) {
     console.error('[API] Error fetching conversations:', error);
     
-    // Return mock data as fallback for any error
-    const mockConversations = [
-      {
-        id: 'error_fallback_001',
-        contactId: 'contact_error',
-        contactName: 'Connection Test',
-        lastMessage: 'MCP connection error - this is fallback data',
-        lastMessageTime: new Date().toISOString(),
-        channel: 'web',
-        status: 'waiting',
-        assignedTo: undefined,
-        unreadCount: 1,
-        tags: ['error', 'fallback'],
-        priority: 'high',
-        locationId: process.env.GHL_LOCATION_ID || 'default_location'
-      }
-    ];
-
     return NextResponse.json({
-      success: true,
-      conversations: mockConversations,
-      queue: {
-        waiting: mockConversations,
-        assigned: [],
-        all: mockConversations
-      },
-      stats: {
-        waiting: 1,
-        assigned: 0,
-        total: 1
-      },
-      timestamp: new Date().toISOString(),
-      fallback: true,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
+      success: false,
+      error: 'Internal server error while fetching conversations',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      conversations: [],
+      queue: { waiting: [], assigned: [], all: [] },
+      stats: { waiting: 0, assigned: 0, total: 0 },
+      timestamp: new Date().toISOString()
+    }, { status: 500 });
   }
 }
 
