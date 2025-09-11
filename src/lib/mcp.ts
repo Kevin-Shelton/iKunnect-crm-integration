@@ -17,85 +17,86 @@ import {
 
 export class CRMMCPClient {
   private config: CRMConfig;
-  private headers: Record<string, string>;
+  private openaiApiKey: string;
+  private promptId: string;
 
   constructor(config: CRMConfig) {
     this.config = config;
-    this.headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream',
-      'User-Agent': 'iKunnect-Agent-Chat-Desk/1.0.0'
-    };
-
-    // Only add Authorization header if token is provided
-    if (config.pit) {
-      this.headers['Authorization'] = `Bearer ${config.pit}`;
-    }
-
-    // Only add locationId header if provided
-    if (config.locationId) {
-      this.headers['locationId'] = config.locationId;
-    }
+    this.openaiApiKey = process.env.OPENAI_API_KEY || '';
+    this.promptId = 'pmpt_68c20a2b85a0819392a1c4f6a2ee6bec071cc812df14c6ef';
   }
 
   /**
-   * Generic method to call any MCP tool
+   * Generic method to call the OpenAI prompt-based MCP
    */
   async callTool<T = unknown>(tool: string, input: Record<string, unknown> = {}): Promise<MCPResponse<T>> {
     try {
-      // Use GoHighLevel MCP format: {"tool": "...", "input": {...}}
-      const payload = {
-        tool: tool,
-        input: input
-      };
-      
-      console.log(`[CRM MCP] Calling tool: ${tool}`, { input });
-      
-      const response = await fetch(this.config.mcpUrl, {
+      // Use OpenAI prompt-based approach
+      const response = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
-        headers: this.headers,
-        body: JSON.stringify(payload)
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.openaiApiKey}`,
+        },
+        body: JSON.stringify({
+          prompt: {
+            id: this.promptId,
+            version: "2"
+          },
+          // Include the tool and input as context for the prompt
+          context: {
+            tool: tool,
+            input: input,
+            locationId: this.config.locationId
+          }
+        })
       });
 
-      const responseText = await response.text();
-      
       if (!response.ok) {
-        console.error(`[CRM MCP] Tool ${tool} failed:`, {
-          status: response.status,
-          statusText: response.statusText,
-          body: responseText
-        });
-        
-        throw new Error(`MCP ${tool} failed: ${response.status} ${responseText}`);
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
       }
 
-      let data;
-      try {
-        // Try parsing as regular JSON first
-        data = JSON.parse(responseText);
-      } catch {
-        // If that fails, try SSE format parsing
-        try {
-          data = parseMcpEnvelope(response.status, responseText);
-        } catch (parseError) {
-          console.error(`[CRM MCP] Failed to parse response for ${tool}:`, parseError);
-          throw new Error(`Invalid response from MCP ${tool}: ${parseError instanceof Error ? parseError.message : 'Parse error'}`);
-        }
-      }
-
-      console.log(`[CRM MCP] Tool ${tool} succeeded:`, data);
+      const data = await response.json();
       
       return {
         success: true,
         data: data as T
       };
+
     } catch (error) {
-      console.error(`[CRM MCP] Error calling tool ${tool}:`, error);
-      
+      console.error(`MCP Tool Error (${tool}):`, error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        data: undefined
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
+   * Health check to verify MCP connection
+   */
+  async healthCheck(): Promise<MCPResponse<{ status: string }>> {
+    try {
+      // Try to get contacts with limit 1 as a simple health check
+      const result = await this.getContacts({ limit: 1 });
+      
+      if (result.success) {
+        return {
+          success: true,
+          data: {
+            status: 'healthy'
+          }
+        };
+      } else {
+        return {
+          success: false,
+          error: `Health check failed: MCP ${result.error}`
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: `Health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
   }
@@ -351,37 +352,6 @@ export class CRMMCPClient {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error in contact creation'
-      };
-    }
-  }
-
-  /**
-   * Health check method to test API connectivity
-   */
-  async healthCheck(): Promise<MCPResponse<{ status: string; timestamp: string; locationId: string }>> {
-    try {
-      // Try to get contacts with limit 1 as a simple health check
-      const result = await this.getContacts({ limit: 1 });
-      
-      if (result.success) {
-        return {
-          success: true,
-          data: {
-            status: 'healthy',
-            timestamp: new Date().toISOString(),
-            locationId: this.config.locationId
-          }
-        };
-      }
-      
-      return {
-        success: false,
-        error: 'Health check failed: ' + result.error
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Health check error: ' + (error instanceof Error ? error.message : 'Unknown error')
       };
     }
   }
