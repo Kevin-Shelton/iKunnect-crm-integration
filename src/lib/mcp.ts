@@ -43,12 +43,10 @@ export class CRMMCPClient {
    */
   async callTool<T = unknown>(tool: string, input: Record<string, unknown> = {}): Promise<MCPResponse<T>> {
     try {
-      // Use proper JSON-RPC 2.0 format
+      // Use GoHighLevel MCP format: {"tool": "...", "input": {...}}
       const payload = {
-        jsonrpc: "2.0",
-        method: tool,
-        params: input,
-        id: Math.random().toString(36).substring(7)
+        tool: tool,
+        input: input
       };
       
       console.log(`[CRM MCP] Calling tool: ${tool}`, { input });
@@ -73,11 +71,16 @@ export class CRMMCPClient {
 
       let data;
       try {
-        // Handle SSE format response
-        data = parseMcpEnvelope(response.status, responseText);
-      } catch (parseError) {
-        console.error(`[CRM MCP] Failed to parse response for ${tool}:`, parseError);
-        throw new Error(`Invalid response from MCP ${tool}: ${parseError instanceof Error ? parseError.message : 'Parse error'}`);
+        // Try parsing as regular JSON first
+        data = JSON.parse(responseText);
+      } catch {
+        // If that fails, try SSE format parsing
+        try {
+          data = parseMcpEnvelope(response.status, responseText);
+        } catch (parseError) {
+          console.error(`[CRM MCP] Failed to parse response for ${tool}:`, parseError);
+          throw new Error(`Invalid response from MCP ${tool}: ${parseError instanceof Error ? parseError.message : 'Parse error'}`);
+        }
       }
 
       console.log(`[CRM MCP] Tool ${tool} succeeded:`, data);
