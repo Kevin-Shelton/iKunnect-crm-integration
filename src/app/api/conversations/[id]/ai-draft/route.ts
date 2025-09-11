@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createCRMClient } from '@/lib/mcp';
+import OpenAI from 'openai';
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_TOKEN,
+});
 
 export async function POST(
   request: NextRequest,
@@ -77,27 +83,16 @@ Request Type: ${requestType}
 
     try {
       // Call OpenAI with the published prompt using the responses API
-      const response = await fetch('https://api.openai.com/v1/responses', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_TOKEN}`,
-          'Content-Type': 'application/json',
+      const response = await openai.responses.create({
+        prompt: {
+          id: process.env.OPENAI_PROMPT_ID!,
+          version: "1"
         },
-        body: JSON.stringify({
-          prompt: {
-            id: process.env.OPENAI_PROMPT_ID,
-            version: "1"
-          },
-          input: aiContext
-        })
+        input: aiContext
       });
 
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const suggestion = data.choices?.[0]?.message?.content || data.response;
+      const suggestion = (response as { response?: string; choices?: Array<{ message?: { content?: string } }> }).response || 
+                        (response as { response?: string; choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content;
 
       if (!suggestion) {
         throw new Error('No response generated from OpenAI');
