@@ -84,7 +84,7 @@ export class CRMMCPClient {
       
       return {
         success: true,
-        data: data
+        data: data as T
       };
     } catch (error) {
       console.error(`[CRM MCP] Error calling tool ${tool}:`, error);
