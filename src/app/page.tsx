@@ -89,8 +89,7 @@ export default function Home() {
           conversations={conversations}
           activeTab={activeTab}
           onTabChange={setActiveTab}
-          selectedConversation={selectedConversation}
-          onSelectConversation={handleSelectConversation}
+          onConversationSelect={handleSelectConversation}
           onRefresh={refreshConversations}
           isLoading={isLoading}
         />
