@@ -96,9 +96,7 @@ export default function Home() {
         
         <div className="flex-1 flex">
           <ChatInterface
-            conversation={selectedConversationData}
-            onSendMessage={(message) => console.log('Send:', message)}
-            onCloseConversation={() => setSelectedConversation(null)}
+            conversationId={selectedConversation}
           />
           
           {selectedConversationData && (
