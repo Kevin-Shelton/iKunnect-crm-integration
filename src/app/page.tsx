@@ -96,7 +96,7 @@ export default function Home() {
         
         <div className="flex-1 flex">
           <ChatInterface
-            conversationId={selectedConversation}
+            conversationId={selectedConversation || undefined}
           />
           
           {selectedConversationData && (
