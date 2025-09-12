@@ -99,7 +99,17 @@ export function Sidebar({
               {conversation.contactName}
             </p>
             <p className="text-xs text-gray-500">
-              {formatDistanceToNow(new Date(conversation.lastMessageTime), { addSuffix: true })}
+              {(() => {
+                try {
+                  const dateValue = conversation.lastMessageDate || conversation.lastMessageTime;
+                  if (!dateValue) return 'No messages';
+                  const date = new Date(dateValue);
+                  if (isNaN(date.getTime())) return 'Invalid date';
+                  return formatDistanceToNow(date, { addSuffix: true });
+                } catch (error) {
+                  return 'Unknown time';
+                }
+              })()}
             </p>
           </div>
           {conversation.unreadCount > 0 && (
