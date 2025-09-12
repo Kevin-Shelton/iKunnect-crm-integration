@@ -6,6 +6,8 @@ import chatStorage, { ConversationSummary } from '@/lib/chat-storage';
 function convertToFrontendFormat(conversation: ConversationSummary) {
   return {
     id: conversation.id,
+    contactId: conversation.contactId,
+    locationId: 'default', // Default location ID for chat events
     contactName: conversation.contact?.name || `Customer ${conversation.contactId.slice(-4)}`,
     lastMessage: conversation.lastMessageBody || '',
     lastMessageTime: conversation.lastMessageTime || conversation.updatedAt,
@@ -13,7 +15,6 @@ function convertToFrontendFormat(conversation: ConversationSummary) {
     channel: 'chat' as const, // Default to chat since these come from chat events
     tags: conversation.tags || [],
     assignedTo: conversation.assignedTo || undefined,
-    contactId: conversation.contactId,
     status: conversation.status === 'waiting' ? 'open' : 'open' // Map to frontend status
   };
 }
