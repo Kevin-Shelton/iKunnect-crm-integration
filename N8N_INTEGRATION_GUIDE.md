@@ -20,13 +20,13 @@ GoHighLevel → n8n Workflow → AI Agent (MCP) → Agent Desk
 ### Available Endpoints
 
 #### 1. Chat Events Endpoint (Main Integration Point)
-- **URL:** `https://your-vercel-url.vercel.app/api/chat-events`
+- **URL:** `https://i-kunnect-crm-int.vercel.app/api/chat-events`
 - **Method:** `POST`
 - **Purpose:** Receives mirrored messages from n8n workflows
 - **Security:** HMAC SHA-256 signature verification
 
 #### 2. Conversations Endpoint (Read-Only)
-- **URL:** `https://your-vercel-url.vercel.app/api/conversations`
+- **URL:** `https://i-kunnect-crm-int.vercel.app/api/conversations`
 - **Method:** `GET`
 - **Purpose:** Retrieves all conversations for the Agent Desk UI
 
