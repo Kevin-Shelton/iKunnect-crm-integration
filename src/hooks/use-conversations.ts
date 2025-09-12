@@ -12,13 +12,11 @@ interface QueueStats {
 
 interface UseConversationsReturn {
   conversations: ConversationQueue;
-  stats: QueueStats;
+  queueStats: QueueStats;
   isLoading: boolean;
   error: string | null;
   refreshConversations: () => Promise<void>;
-  claimConversation: (conversationId: string, agentId: string) => Promise<boolean>;
-  assignConversation: (conversationId: string, agentId: string) => Promise<boolean>;
-  closeConversation: (conversationId: string) => Promise<boolean>;
+  claimConversation: (conversationId: string) => Promise<void>;
 }
 
 export function useConversations(): UseConversationsReturn {
@@ -27,193 +25,62 @@ export function useConversations(): UseConversationsReturn {
     assigned: [],
     all: []
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Calculate SLA status based on wait time
-  const calculateSlaStatus = (waitTime?: number): 'normal' | 'warning' | 'breach' => {
-    if (!waitTime) return 'normal';
-    if (waitTime >= 10) return 'breach'; // 10+ minutes = breach
-    if (waitTime >= 5) return 'warning';  // 5-9 minutes = warning
-    return 'normal';
-  };
-
-  // Process conversations and categorize them
-  const processConversations = useCallback((rawConversations: Conversation[]) => {
-    const now = Date.now();
-    
-    const processedConversations = rawConversations.map(conv => {
-      // Calculate wait time for unassigned conversations
-      // @ts-ignore - waitTime property will be removed in future cleanup
-      const waitTime = !conv.assignedTo 
-        // @ts-ignore - waitTime property will be removed in future cleanup
-        ? Math.floor((now - new Date(conv.lastMessageDate).getTime()) / (1000 * 60))
-        : conv.waitTime;
-      
-      return {
-        ...conv,
-        waitTime,
-        // slaStatus: calculateSlaStatus(waitTime)
-      };
-    });
-
-      // @ts-ignore - slaStatus property will be removed in future cleanup
-    // Sort by priority: SLA breach > warning > normal, then by wait time
-      // @ts-ignore - slaStatus property will be removed in future cleanup
-    const sortByPriority = (a: Conversation, b: Conversation) => {
-      const priorityOrder = { breach: 3, warning: 2, normal: 1 };
-      const aPriority = priorityOrder[a.// slaStatus || 'normal'];
-      const bPriority = priorityOrder[b.// slaStatus || 'normal'];
-      
-      if (aPriority !== bPriority) {
-      // @ts-ignore - waitTime property will be removed in future cleanup
-        return bPriority - aPriority; // Higher priority first
-      }
-      
-      // If same priority, sort by wait time (longest first)
-      return (b.waitTime || 0) - (a.waitTime || 0);
-    };
-
-    const waiting = processedConversations
-      .filter(conv => !conv.assignedTo && conv.status === 'open')
-      .sort(sortByPriority);
-
-    const assigned = processedConversations
-      .filter(conv => conv.assignedTo && conv.status === 'open')
-      .sort((a, b) => new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime());
-
-    const all = processedConversations
-      .filter(conv => conv.status === 'open')
-      .sort((a, b) => new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime());
-
-    return { waiting, assigned, all };
-  }, []);
 
   // Fetch conversations from API
   const fetchConversations = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
     try {
-      const response = await fetch('/api/conversations');
+      setIsLoading(true);
+      setError(null);
       
+      const response = await fetch('/api/conversations');
       if (!response.ok) {
-        throw new Error(`Failed to fetch conversations: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      
-      // If API returns empty or no conversations, show empty state
-      const conversations = data.conversations || [];
-      const processedData = processConversations(conversations);
-      setConversations(processedData);
-      
+      setConversations(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch conversations';
       setError(errorMessage);
-      console.error('Error loading conversations:', errorMessage);
-      
-      // Set empty state instead of showing mock data
-      setConversations({
-        waiting: [],
-        assigned: [],
-        all: []
-      });
+      toast.error('Failed to load conversations');
+      console.error('Error fetching conversations:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [processConversations]);
+  }, []);
 
   // Refresh conversations
   const refreshConversations = useCallback(async () => {
     await fetchConversations();
-    // Only show success toast if there's no error
-    if (!error) {
-      toast.success('Conversations refreshed');
-    }
-  }, [fetchConversations, error]);
+  }, [fetchConversations]);
 
   // Claim a conversation
-  const claimConversation = useCallback(async (conversationId: string, agentId: string): Promise<boolean> => {
+  const claimConversation = useCallback(async (conversationId: string) => {
     try {
-      // For now, update local state. In production, this would be:
-      // const response = await fetch(`/api/conversations/${conversationId}/claim`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ agentId })
-      // });
-      
-      setConversations(prev => {
-        const conversation = prev.waiting.find(c => c.id === conversationId);
-        if (!conversation) return prev;
-
-        const updatedConversation = { ...conversation, assignedTo: agentId };
-        const newWaiting = prev.waiting.filter(c => c.id !== conversationId);
-        const newAssigned = [...prev.assigned, updatedConversation];
-        const newAll = prev.all.map(c => c.id === conversationId ? updatedConversation : c);
-
-        return {
-          waiting: newWaiting,
-          assigned: newAssigned,
-          all: newAll
-        };
+      const response = await fetch(`/api/conversations/${conversationId}/claim`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
-      toast.success(`Conversation claimed successfully`);
-      return true;
+      if (!response.ok) {
+        throw new Error('Failed to claim conversation');
+      }
+
+      toast.success('Conversation claimed successfully');
+      await refreshConversations();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to claim conversation';
-      toast.error(`Error claiming conversation: ${errorMessage}`);
-      return false;
+      toast.error(errorMessage);
+      console.error('Error claiming conversation:', err);
     }
-  }, []);
+  }, [refreshConversations]);
 
-  // Assign a conversation to an agent
-  const assignConversation = useCallback(async (conversationId: string, agentId: string): Promise<boolean> => {
-    try {
-      // Similar to claim, but for reassigning existing conversations
-      setConversations(prev => {
-        const newAll = prev.all.map(c => 
-          c.id === conversationId ? { ...c, assignedTo: agentId } : c
-        );
-        
-        return processConversations(newAll);
-      });
-
-      toast.success(`Conversation assigned to ${agentId}`);
-      return true;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to assign conversation';
-      toast.error(`Error assigning conversation: ${errorMessage}`);
-      return false;
-    }
-  }, [processConversations]);
-
-  // Close a conversation
-  const closeConversation = useCallback(async (conversationId: string): Promise<boolean> => {
-    try {
-      // For now, remove from local state. In production, this would be:
-      // const response = await fetch(`/api/conversations/${conversationId}/close`, {
-      //   method: 'POST'
-      // });
-      
-      setConversations(prev => ({
-        waiting: prev.waiting.filter(c => c.id !== conversationId),
-        assigned: prev.assigned.filter(c => c.id !== conversationId),
-        all: prev.all.filter(c => c.id !== conversationId)
-      }));
-
-      toast.success('Conversation closed');
-      return true;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to close conversation';
-      toast.error(`Error closing conversation: ${errorMessage}`);
-      return false;
-    }
-  }, []);
-
-  // Calculate stats
-  const stats: QueueStats = {
+  // Calculate queue stats
+  const queueStats: QueueStats = {
     waiting: conversations.waiting.length,
     assigned: conversations.assigned.length,
     total: conversations.all.length
@@ -224,24 +91,22 @@ export function useConversations(): UseConversationsReturn {
     fetchConversations();
   }, [fetchConversations]);
 
-  // Auto-refresh every 3 seconds (as per FRD)
+  // Auto-refresh every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       fetchConversations();
-    }, 3000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [fetchConversations]);
 
   return {
     conversations,
-    stats,
+    queueStats,
     isLoading,
     error,
     refreshConversations,
-    claimConversation,
-    assignConversation,
-    closeConversation
+    claimConversation
   };
 }
 
