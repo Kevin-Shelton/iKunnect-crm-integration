@@ -150,7 +150,7 @@ export function AlertProvider({ children }: AlertProviderProps) {
 function AlertDisplay() {
   const { alerts, removeAlert, soundEnabled, setSoundEnabled } = useAlerts();
 
-  if (alerts.length === 0) return null;
+  if ((alerts || []).length === 0) return null;
 
   const getAlertIcon = (type: AlertType) => {
     switch (type) {
@@ -242,7 +242,7 @@ function AlertDisplay() {
                   {alert.timestamp.toLocaleTimeString()}
                 </p>
 
-                {alert.actions && alert.actions.length > 0 && (
+                {alert.actions && (alert.actions || []).length > 0 && (
                   <div className="flex space-x-2 mt-3">
                     {alert.actions.map((action, index) => (
                       <Button
@@ -268,11 +268,11 @@ function AlertDisplay() {
         </Card>
       ))}
 
-      {alerts.length > 5 && (
+      {(alerts || []).length > 5 && (
         <Card className="bg-gray-50">
           <CardContent className="p-2 text-center">
             <p className="text-xs text-gray-600">
-              +{alerts.length - 5} more alerts
+              +{(alerts || []).length - 5} more alerts
             </p>
           </CardContent>
         </Card>

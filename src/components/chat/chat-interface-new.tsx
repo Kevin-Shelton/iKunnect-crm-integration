@@ -21,7 +21,7 @@ export function ChatInterface({
   const [showAiAssistant, setShowAiAssistant] = useState(false);
 
   // Show empty state if no conversations
-  if (!conversations || conversations.length === 0) {
+  if (!conversations || (conversations || []).length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <EmptyState 
