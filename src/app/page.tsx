@@ -1,121 +1,130 @@
 'use client';
 
 import { useState } from 'react';
-import { MainLayout } from '@/components/layout/main-layout';
 import { Sidebar } from '@/components/layout/sidebar';
+import { Header } from '@/components/layout/header';
 import { ContactSidebar } from '@/components/layout/contact-sidebar';
 import { ChatInterface } from '@/components/chat/chat-interface';
 import { useConversations } from '@/hooks/use-conversations';
-import { toast } from 'sonner';
 
-export default function ChatDeskPage() {
+export default function Home() {
   const [agentStatus, setAgentStatus] = useState<'available' | 'busy' | 'away' | 'offline'>('available');
   const [activeTab, setActiveTab] = useState<'waiting' | 'assigned' | 'all'>('waiting');
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   
-  // Use real conversations hook instead of mock data
+  // Use real conversations hook with safe defaults
   const { 
-    conversations, 
-    queueStats, 
-    isLoading, 
-    error,
-    refreshConversations 
-  } = useConversations();
+    conversations = { waiting: [], assigned: [], all: [] }, 
+    queueStats = { waiting: 0, assigned: 0, total: 0 }, 
+    isLoading = false, 
+    error = null,
+    refreshConversations = () => Promise.resolve()
+  } = useConversations() || {};
 
   const handleStatusChange = (status: 'available' | 'busy' | 'away' | 'offline') => {
     setAgentStatus(status);
-    toast.success(`Status changed to ${status}`);
   };
 
   const handleSearch = (query: string) => {
-    toast.info(`Searching for: ${query}`);
-    // TODO: Implement search functionality
+    console.log('Search:', query);
   };
 
-  const handleConversationSelect = (conversationId: string) => {
+  const handleSelectConversation = (conversationId: string) => {
     setSelectedConversation(conversationId);
   };
 
-  const handleClaimConversation = async (conversationId: string) => {
-    try {
-      // TODO: Implement claim conversation API call
-      toast.success('Conversation claimed successfully');
-      await refreshConversations();
-    } catch (error) {
-      toast.error('Failed to claim conversation');
+  const handleCloseConversation = (conversationId: string) => {
+    console.log('Close conversation:', conversationId);
+    if (selectedConversation === conversationId) {
+      setSelectedConversation(null);
     }
   };
 
-  const handleRefresh = async () => {
-    await refreshConversations();
-  };
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading Agent Desk...</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Get current conversation list based on active tab
-  const getCurrentConversations = () => {
-    switch (activeTab) {
-      case 'waiting':
-        return conversations.waiting;
-      case 'assigned':
-        return conversations.assigned;
-      case 'all':
-        return conversations.all;
-      default:
-        return conversations.all;
-    }
-  };
+  // Show error state
+  if (error) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">⚠️ Error Loading</div>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  const currentConversations = getCurrentConversations();
+  // Get current conversation data safely
   const selectedConversationData = selectedConversation 
-    ? currentConversations.find(c => c.id === selectedConversation)
+    ? [...(conversations?.waiting || []), ...(conversations?.assigned || []), ...(conversations?.all || [])]
+        .find(conv => conv.id === selectedConversation)
     : null;
 
   return (
-    <MainLayout>
-      <div className="flex h-full">
-        {/* Left Sidebar - Conversation Queue */}
+    <div className="h-screen flex flex-col bg-gray-50">
+      <Header 
+        agentStatus={agentStatus}
+        onStatusChange={handleStatusChange}
+        onSearch={handleSearch}
+      />
+      
+      <div className="flex-1 flex overflow-hidden">
         <Sidebar
           conversations={conversations}
           activeTab={activeTab}
           onTabChange={setActiveTab}
-          onConversationSelect={handleConversationSelect}
-          onConversationClaim={handleClaimConversation}
-          onRefresh={handleRefresh}
+          selectedConversation={selectedConversation}
+          onSelectConversation={handleSelectConversation}
+          onRefresh={refreshConversations}
           isLoading={isLoading}
         />
-
-        {/* Main Chat Area */}
+        
         <div className="flex-1 flex">
-          <div className="flex-1">
-            {selectedConversation ? (
-              <ChatInterface 
-                conversationId={selectedConversation}
-              />
-            ) : (
-              <div className="h-full flex items-center justify-center bg-gray-50">
-                <div className="text-center">
-                  <div className="text-gray-400 text-lg mb-2">
-                    Select a conversation to start chatting
-                  </div>
-                  <div className="text-gray-500 text-sm">
-                    Choose a conversation from the queue to begin helping customers
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right Sidebar - Contact Information */}
-          {selectedConversation && (
+          <ChatInterface
+            conversation={selectedConversationData}
+            onSendMessage={(message) => console.log('Send:', message)}
+            onCloseConversation={() => setSelectedConversation(null)}
+          />
+          
+          {selectedConversationData && (
             <ContactSidebar
-              conversationId={selectedConversation}
-              contact={undefined} // Will be loaded by the component
+              contact={selectedConversationData.contact || {
+                id: selectedConversationData.contactId || 'unknown',
+                name: selectedConversationData.contactName || 'Unknown Contact',
+                email: '',
+                phone: '',
+                tags: []
+              }}
               opportunities={[]}
               appointments={[]}
+              conversationId={selectedConversation}
+              onTagContact={() => {}}
+              onCreateOpportunity={() => {}}
+              onUpdateOpportunity={() => {}}
+              onScheduleCallback={() => {}}
+              onEscalate={() => {}}
+              onCloseConversation={() => setSelectedConversation(null)}
             />
           )}
         </div>
       </div>
-    </MainLayout>
+    </div>
   );
 }
 
