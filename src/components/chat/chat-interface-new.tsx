@@ -1,0 +1,105 @@
+import React, { useState } from 'react';
+import { ChatTabs } from './chat-tabs';
+import { RealTimeMessages } from './real-time-messages';
+import { AiAssistant } from './ai-assistant';
+import { EmptyState } from '../layout/empty-state';
+
+interface ChatInterfaceProps {
+  conversations: any[];
+  selectedConversationId: string | null;
+  onSelectConversation: (id: string) => void;
+  onCloseConversation: (id: string) => void;
+}
+
+export function ChatInterface({ 
+  conversations, 
+  selectedConversationId, 
+  onSelectConversation, 
+  onCloseConversation 
+}: ChatInterfaceProps) {
+  const [showAiAssistant, setShowAiAssistant] = useState(false);
+
+  // Show empty state if no conversations
+  if (!conversations || conversations.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <EmptyState 
+          title="No active conversations"
+          description="Conversations will appear here when customers start chatting through the GoHighLevel widget"
+          icon="💬"
+        />
+      </div>
+    );
+  }
+
+  const selectedConversation = conversations.find(c => c.id === selectedConversationId);
+
+  return (
+    <div className="flex-1 flex flex-col">
+      {/* Chat tabs */}
+      <ChatTabs
+        conversations={conversations}
+        selectedConversationId={selectedConversationId}
+        onSelectConversation={onSelectConversation}
+        onCloseConversation={onCloseConversation}
+      />
+
+      {/* Main chat area */}
+      <div className="flex-1 flex">
+        {/* Real-time message thread */}
+        <div className="flex-1 flex flex-col">
+          {selectedConversationId ? (
+            <div className="flex-1 flex flex-col">
+              {/* Header */}
+              <div className="border-b border-gray-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-gray-900">
+                      {selectedConversation?.contact?.name || 'Customer'}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      Conversation ID: {selectedConversationId}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowAiAssistant(!showAiAssistant)}
+                    className="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100"
+                  >
+                    {showAiAssistant ? 'Hide' : 'Show'} AI Assistant
+                  </button>
+                </div>
+              </div>
+
+              {/* Real-time messages */}
+              <div className="flex-1 overflow-y-auto">
+                <RealTimeMessages 
+                  conversationId={selectedConversationId}
+                  className="h-full"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <EmptyState 
+                title="Select a conversation"
+                description="Choose a conversation from the tabs above to view real-time messages"
+                icon="👆"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* AI Assistant sidebar */}
+        {showAiAssistant && selectedConversationId && (
+          <div className="w-80 border-l border-gray-200">
+            <AiAssistant
+              conversation={selectedConversation}
+              onClose={() => setShowAiAssistant(false)}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
