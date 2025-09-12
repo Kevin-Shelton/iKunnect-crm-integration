@@ -15,19 +15,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-
-interface Conversation {
-  id: string;
-  contactName: string;
-  lastMessage: string;
-  lastMessageTime: string;
-  unreadCount: number;
-  channel: 'chat' | 'sms' | 'email' | 'whatsapp' | 'facebook';
-  tags: string[];
-  assignedTo?: string;
-  waitTime?: number; // in minutes
-  slaStatus?: 'normal' | 'warning' | 'breach';
-}
+import { Conversation } from '@/lib/types';
 
 interface SidebarProps {
   conversations: {
