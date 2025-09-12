@@ -16,7 +16,7 @@ export default function ChatDeskPage() {
   // Use real conversations hook instead of mock data
   const { 
     conversations, 
-    stats: queueStats, 
+    queueStats, 
     isLoading, 
     error,
     refreshConversations 
