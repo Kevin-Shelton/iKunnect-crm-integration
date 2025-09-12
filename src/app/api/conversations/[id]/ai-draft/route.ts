@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createCRMClient } from '@/lib/mcp';
 import OpenAI from 'openai';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_TOKEN,
-});
+// Initialize OpenAI client conditionally
+const getOpenAIClient = () => {
+  const apiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_API_TOKEN;
+  if (!apiKey) {
+    return null;
+  }
+  return new OpenAI({
+    apiKey,
+  });
+};
 
 export async function POST(
   request: NextRequest,
@@ -18,9 +24,10 @@ export async function POST(
     const { context, requestType = 'draft' } = body;
 
     // Validate OpenAI configuration
-    if (!process.env.OPENAI_API_TOKEN) {
+    const openai = getOpenAIClient();
+    if (!openai) {
       return NextResponse.json(
-        { error: 'OpenAI API token not configured' },
+        { error: 'OpenAI API key not configured' },
         { status: 500 }
       );
     }
