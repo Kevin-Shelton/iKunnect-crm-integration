@@ -408,7 +408,7 @@ export function ContactSidebar({
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center justify-between">
-                Opportunities ({opportunities.length})
+                Opportunities ({(opportunities || []).length})
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -420,11 +420,11 @@ export function ContactSidebar({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {opportunities.length === 0 ? (
+              {(opportunities || []).length === 0 ? (
                 <p className="text-xs text-gray-500">No opportunities</p>
               ) : (
                 <div className="space-y-2">
-                  {opportunities.map((opp) => (
+                  {(opportunities || []).map((opp) => (
                     <div 
                       key={opp.id} 
                       className="p-2 border rounded-lg hover:bg-gray-50 cursor-pointer"
@@ -449,7 +449,7 @@ export function ContactSidebar({
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center justify-between">
-                Appointments ({appointments.length})
+                Appointments ({(appointments || []).length})
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -461,11 +461,11 @@ export function ContactSidebar({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {appointments.length === 0 ? (
+              {(appointments || []).length === 0 ? (
                 <p className="text-xs text-gray-500">No upcoming appointments</p>
               ) : (
                 <div className="space-y-2">
-                  {appointments.slice(0, 3).map((apt) => (
+                  {(appointments || []).slice(0, 3).map((apt) => (
                     <div key={apt.id} className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-medium truncate">{apt.title}</span>
