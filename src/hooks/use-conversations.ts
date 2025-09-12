@@ -2,27 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-
-interface Conversation {
-  id: string;
-  contactName: string;
-  lastMessage: string;
-  lastMessageTime: string;
-  unreadCount: number;
-  channel: 'chat' | 'sms' | 'email' | 'whatsapp' | 'facebook';
-  tags: string[];
-  assignedTo?: string;
-  waitTime?: number;
-  slaStatus?: 'normal' | 'warning' | 'breach';
-  contactId?: string;
-  status?: 'open' | 'closed';
-}
-
-interface ConversationQueue {
-  waiting: Conversation[];
-  assigned: Conversation[];
-  all: Conversation[];
-}
+import { Conversation, ConversationQueue } from '@/lib/types';
 
 interface QueueStats {
   waiting: number;
