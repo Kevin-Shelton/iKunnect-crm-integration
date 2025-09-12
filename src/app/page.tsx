@@ -111,7 +111,7 @@ export default function Home() {
               }}
               opportunities={[]}
               appointments={[]}
-              conversationId={selectedConversation}
+              conversationId={selectedConversation || undefined}
               onTagContact={() => {}}
               onCreateOpportunity={() => {}}
               onUpdateOpportunity={() => {}}
