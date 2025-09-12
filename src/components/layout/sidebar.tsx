@@ -113,14 +113,14 @@ export function Sidebar({
 
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-1">
-          {conversation.tags.slice(0, 2).map((tag) => (
+          {(conversation.tags || []).slice(0, 2).map((tag) => (
             <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0.5">
               {tag}
             </Badge>
           ))}
-          {conversation.tags.length > 2 && (
+          {(conversation.tags || []).length > 2 && (
             <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-              +{conversation.tags.length - 2}
+              +{(conversation.tags || []).length - 2}
             </Badge>
           )}
         </div>
