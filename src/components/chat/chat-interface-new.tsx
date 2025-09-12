@@ -25,9 +25,9 @@ export function ChatInterface({
     return (
       <div className="flex-1 flex items-center justify-center">
         <EmptyState 
+          type="no_conversations"
           title="No active conversations"
-          description="Conversations will appear here when customers start chatting through the GoHighLevel widget"
-          icon="💬"
+          message="Conversations will appear here when customers start chatting through the GoHighLevel widget"
         />
       </div>
     );
