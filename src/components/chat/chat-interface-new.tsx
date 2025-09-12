@@ -64,7 +64,7 @@ export function ChatInterface({
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium text-gray-900">
-                      {selectedConversation?.contact?.name || 'Customer'}
+                      {selectedConversation?.contactName || 'Customer'}
                     </h3>
                     <p className="text-sm text-gray-500">
                       Conversation ID: {selectedConversationId}
