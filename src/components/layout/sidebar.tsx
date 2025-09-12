@@ -108,7 +108,7 @@ export function Sidebar({
       </div>
 
       <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-        {conversation.lastMessage}
+        {conversation.lastMessageBody}
       </p>
 
       <div className="flex items-center justify-between">
