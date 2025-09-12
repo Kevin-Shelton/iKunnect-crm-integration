@@ -106,7 +106,8 @@ export default function Home() {
                 name: selectedConversationData.contactName || 'Unknown Contact',
                 email: '',
                 phone: '',
-                tags: []
+                tags: [],
+                dateAdded: new Date().toISOString()
               }}
               opportunities={[]}
               appointments={[]}
