@@ -168,13 +168,13 @@ export function Sidebar({
         <Tabs value={activeTab} onValueChange={(value) => onTabChange?.(value as 'waiting' | 'assigned' | 'all')}>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="waiting" className="text-xs">
-              Waiting ({conversations.waiting.length})
+              Waiting ({conversations?.waiting?.length || 0})
             </TabsTrigger>
             <TabsTrigger value="assigned" className="text-xs">
-              Assigned ({conversations.assigned.length})
+              Assigned ({conversations?.assigned?.length || 0})
             </TabsTrigger>
             <TabsTrigger value="all" className="text-xs">
-              All ({conversations.all.length})
+              All ({conversations?.all?.length || 0})
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -184,39 +184,39 @@ export function Sidebar({
       <ScrollArea className="flex-1">
         <Tabs value={activeTab}>
           <TabsContent value="waiting" className="mt-0">
-            {conversations.waiting.length === 0 ? (
+            {(conversations?.waiting?.length || 0) === 0 ? (
               <div className="p-4 text-center text-gray-500">
                 <MessageSquare className="h-8 w-8 mx-auto mb-2 text-gray-300" />
                 <p className="text-sm">No waiting conversations</p>
               </div>
             ) : (
-              conversations.waiting.map((conversation) => (
+              (conversations?.waiting || []).map((conversation) => (
                 <ConversationItem key={conversation.id} conversation={conversation} />
               ))
             )}
           </TabsContent>
 
           <TabsContent value="assigned" className="mt-0">
-            {conversations.assigned.length === 0 ? (
+            {(conversations?.assigned?.length || 0) === 0 ? (
               <div className="p-4 text-center text-gray-500">
-                <User className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                <MessageSquare className="h-8 w-8 mx-auto mb-2 text-gray-300" />
                 <p className="text-sm">No assigned conversations</p>
               </div>
             ) : (
-              conversations.assigned.map((conversation) => (
+              (conversations?.assigned || []).map((conversation) => (
                 <ConversationItem key={conversation.id} conversation={conversation} />
               ))
             )}
           </TabsContent>
 
           <TabsContent value="all" className="mt-0">
-            {conversations.all.length === 0 ? (
+            {(conversations?.all?.length || 0) === 0 ? (
               <div className="p-4 text-center text-gray-500">
                 <MessageSquare className="h-8 w-8 mx-auto mb-2 text-gray-300" />
                 <p className="text-sm">No conversations</p>
               </div>
             ) : (
-              conversations.all.map((conversation) => (
+              (conversations?.all || []).map((conversation) => (
                 <ConversationItem key={conversation.id} conversation={conversation} />
               ))
             )}
