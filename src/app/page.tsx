@@ -101,7 +101,7 @@ export default function Home() {
           
           {selectedConversationData && (
             <ContactSidebar
-              contact={selectedConversationData.contact || {
+              contact={{
                 id: selectedConversationData.contactId || 'unknown',
                 name: selectedConversationData.contactName || 'Unknown Contact',
                 email: '',
