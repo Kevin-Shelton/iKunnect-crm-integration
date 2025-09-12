@@ -39,10 +39,18 @@ export function ChatInterface({
     <div className="flex-1 flex flex-col">
       {/* Chat tabs */}
       <ChatTabs
-        conversations={conversations}
-        selectedConversationId={selectedConversationId}
-        onSelectConversation={onSelectConversation}
-        onCloseConversation={onCloseConversation}
+        tabs={conversations.map(conv => ({
+          id: conv.id,
+          contactName: conv.contactName || `Customer ${conv.contactId.slice(-4)}`,
+          lastMessage: conv.lastMessageBody || '',
+          unreadCount: conv.unreadCount || 0,
+          isActive: conv.id === selectedConversationId,
+          channel: 'web' as const,
+          slaStatus: 'normal' as const,
+          timestamp: conv.lastMessageDate || ''
+        }))}
+        onTabSelect={onSelectConversation}
+        onTabClose={onCloseConversation}
       />
 
       {/* Main chat area */}
