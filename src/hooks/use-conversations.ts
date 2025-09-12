@@ -40,12 +40,37 @@ export function useConversations(): UseConversationsReturn {
       }
       
       const data = await response.json();
-      setConversations(data);
+      
+      // Handle the API response structure
+      if (data.success && data.queue) {
+        setConversations(data.queue);
+      } else if (data.success && data.conversations) {
+        // Fallback: if only conversations array is provided, create queue structure
+        setConversations({
+          waiting: [],
+          assigned: [],
+          all: data.conversations
+        });
+      } else {
+        // Default empty structure
+        setConversations({
+          waiting: [],
+          assigned: [],
+          all: []
+        });
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch conversations';
       setError(errorMessage);
       toast.error('Failed to load conversations');
       console.error('Error fetching conversations:', err);
+      
+      // Set empty structure on error
+      setConversations({
+        waiting: [],
+        assigned: [],
+        all: []
+      });
     } finally {
       setIsLoading(false);
     }

@@ -19,6 +19,7 @@ import { Conversation, ConversationQueue } from '@/lib/types';
 
 interface SidebarProps {
   conversations: ConversationQueue;
+  queueStats?: { waiting: number; assigned: number; total: number };
   activeTab?: 'waiting' | 'assigned' | 'all';
   onTabChange?: (tab: 'waiting' | 'assigned' | 'all') => void;
   onConversationSelect?: (conversationId: string) => void;
@@ -29,6 +30,7 @@ interface SidebarProps {
 
 export function Sidebar({
   conversations,
+  queueStats,
   activeTab = 'waiting',
   onTabChange,
   onConversationSelect,
@@ -168,13 +170,13 @@ export function Sidebar({
         <Tabs value={activeTab} onValueChange={(value) => onTabChange?.(value as 'waiting' | 'assigned' | 'all')}>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="waiting" className="text-xs">
-              Waiting ({conversations?.waiting?.length || 0})
+              Waiting ({queueStats?.waiting || conversations?.waiting?.length || 0})
             </TabsTrigger>
             <TabsTrigger value="assigned" className="text-xs">
-              Assigned ({conversations?.assigned?.length || 0})
+              Assigned ({queueStats?.assigned || conversations?.assigned?.length || 0})
             </TabsTrigger>
             <TabsTrigger value="all" className="text-xs">
-              All ({conversations?.all?.length || 0})
+              All ({queueStats?.total || conversations?.all?.length || 0})
             </TabsTrigger>
           </TabsList>
         </Tabs>

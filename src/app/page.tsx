@@ -11,14 +11,15 @@ import { Conversation, ConversationQueue } from '@/lib/types';
 export default function Home() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [selectedContact, setSelectedContact] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'waiting' | 'assigned' | 'all'>('waiting');
 
   // Use conversations hook with safe defaults
   const {
     conversations = { waiting: [], assigned: [], all: [] } as ConversationQueue,
     queueStats = { waiting: 0, assigned: 0, total: 0 },
-    loading = false,
+    isLoading = false,
     error = null,
-    refetch = () => {}
+    refreshConversations = () => {}
   } = useConversations() || {};
 
   // Safe conversation selection
@@ -45,7 +46,7 @@ export default function Home() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex h-screen bg-gray-50">
         <div className="flex-1 flex items-center justify-center">
@@ -66,7 +67,7 @@ export default function Home() {
             <div className="text-red-600 mb-4">⚠️ Error loading conversations</div>
             <p className="text-gray-600 mb-4">{error}</p>
             <button 
-              onClick={refetch}
+              onClick={refreshConversations}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             >
               Try Again
@@ -91,7 +92,11 @@ export default function Home() {
           <Sidebar
             conversations={conversations}
             queueStats={queueStats}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
             onConversationSelect={handleConversationSelect}
+            onRefresh={refreshConversations}
+            isLoading={isLoading}
           />
         </div>
 
