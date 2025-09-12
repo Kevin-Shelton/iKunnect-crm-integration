@@ -125,15 +125,6 @@ export function Sidebar({
           )}
         </div>
 
-        {conversation.waitTime && (
-          <Badge 
-            variant="outline" 
-            className={`text-xs px-1.5 py-0.5 ${getSlaStatusColor(conversation.slaStatus)}`}
-          >
-            <Clock className="h-3 w-3 mr-1" />
-            {conversation.waitTime}m
-          </Badge>
-        )}
       </div>
 
       {activeTab === 'waiting' && (
