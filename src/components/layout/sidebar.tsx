@@ -85,7 +85,7 @@ export function Sidebar({
             <p className="text-xs text-gray-500">
               {(() => {
                 try {
-                  const dateValue = conversation.lastMessageDate || conversation.lastMessageTime;
+                  const dateValue = conversation.lastMessageDate;
                   if (!dateValue) return 'No messages';
                   const date = new Date(dateValue);
                   if (isNaN(date.getTime())) return 'Invalid date';
