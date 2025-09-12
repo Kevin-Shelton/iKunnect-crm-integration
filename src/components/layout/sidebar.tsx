@@ -96,7 +96,7 @@ export function Sidebar({
               })()}
             </p>
           </div>
-          {conversation.unreadCount > 0 && (
+          {(conversation.unreadCount ?? 0) > 0 && (
             <Badge variant="default" className="bg-blue-500 text-white text-xs px-1.5 py-0.5">
               {conversation.unreadCount}
             </Badge>
