@@ -15,14 +15,10 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { Conversation } from '@/lib/types';
+import { Conversation, ConversationQueue } from '@/lib/types';
 
 interface SidebarProps {
-  conversations: {
-    waiting: Conversation[];
-    assigned: Conversation[];
-    all: Conversation[];
-  };
+  conversations: ConversationQueue;
   activeTab?: 'waiting' | 'assigned' | 'all';
   onTabChange?: (tab: 'waiting' | 'assigned' | 'all') => void;
   onConversationSelect?: (conversationId: string) => void;
