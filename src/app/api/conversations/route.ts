@@ -15,7 +15,7 @@ function convertToFrontendFormat(conversation: ConversationSummary) {
     channel: 'chat' as const, // Default to chat since these come from chat events
     tags: conversation.tags || [],
     assignedTo: conversation.assignedTo || undefined,
-    status: conversation.status === 'waiting' ? 'open' : 'open' // Map to frontend status
+    status: (conversation.status === 'waiting' ? 'open' : 'open') as 'open' | 'closed' // Map to frontend status
   };
 }
 
