@@ -102,8 +102,15 @@ export function ChatInterface({
         {showAiAssistant && selectedConversationId && (
           <div className="w-80 border-l border-gray-200">
             <AiAssistant
-              conversation={selectedConversation}
+              conversationId={selectedConversationId}
+              contactName={selectedConversation?.contactName || 'Customer'}
+              conversationContext={`Conversation with ${selectedConversation?.contactName || 'Customer'}`}
+              onUseSuggestion={(content) => {
+                // Handle AI suggestion usage
+                console.log('AI suggestion:', content);
+              }}
               onClose={() => setShowAiAssistant(false)}
+              isVisible={showAiAssistant}
             />
           </div>
         )}
