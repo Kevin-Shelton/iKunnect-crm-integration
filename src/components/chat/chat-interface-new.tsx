@@ -4,8 +4,21 @@ import { RealTimeMessages } from './real-time-messages';
 import { AiAssistant } from './ai-assistant';
 import { EmptyState } from '../layout/empty-state';
 
+interface Conversation {
+  id: string;
+  contactName: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
+  channel: 'chat' | 'sms' | 'email' | 'whatsapp' | 'facebook';
+  tags: string[];
+  assignedTo?: string;
+  contactId?: string;
+  status?: 'open' | 'closed';
+}
+
 interface ChatInterfaceProps {
-  conversations: any[];
+  conversations: Conversation[];
   selectedConversationId: string | null;
   onSelectConversation: (id: string) => void;
   onCloseConversation: (id: string) => void;

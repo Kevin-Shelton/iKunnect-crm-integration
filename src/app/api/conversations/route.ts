@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ConversationQueue, QueueStats } from '@/lib/types';
-import chatStorage from '@/lib/chat-storage';
+import chatStorage, { ConversationSummary } from '@/lib/chat-storage';
 
 // Helper function to convert chat storage conversation to frontend format
-function convertToFrontendFormat(conversation: any) {
+function convertToFrontendFormat(conversation: ConversationSummary) {
   return {
     id: conversation.id,
     contactName: conversation.contact?.name || `Customer ${conversation.contactId.slice(-4)}`,
