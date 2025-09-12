@@ -3,19 +3,7 @@ import { ChatTabs } from './chat-tabs';
 import { RealTimeMessages } from './real-time-messages';
 import { AiAssistant } from './ai-assistant';
 import { EmptyState } from '../layout/empty-state';
-
-interface Conversation {
-  id: string;
-  contactName: string;
-  lastMessage: string;
-  lastMessageTime: string;
-  unreadCount: number;
-  channel: 'chat' | 'sms' | 'email' | 'whatsapp' | 'facebook';
-  tags: string[];
-  assignedTo?: string;
-  contactId?: string;
-  status?: 'open' | 'closed';
-}
+import { Conversation } from '@/lib/types';
 
 interface ChatInterfaceProps {
   conversations: Conversation[];
@@ -94,9 +82,9 @@ export function ChatInterface({
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <EmptyState 
+                type="no_conversations"
                 title="Select a conversation"
-                description="Choose a conversation from the tabs above to view real-time messages"
-                icon="👆"
+                message="Choose a conversation from the tabs above to view real-time messages"
               />
             </div>
           )}

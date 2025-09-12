@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ConversationQueue, QueueStats } from '@/lib/types';
+import { ConversationQueue, QueueStats, Conversation } from '@/lib/types';
 import chatStorage, { ConversationSummary } from '@/lib/chat-storage';
 
 // Helper function to convert chat storage conversation to frontend format
-function convertToFrontendFormat(conversation: ConversationSummary) {
+function convertToFrontendFormat(conversation: ConversationSummary): Conversation {
   return {
     id: conversation.id,
     contactId: conversation.contactId,
     locationId: 'default', // Default location ID for chat events
     contactName: conversation.contact?.name || `Customer ${conversation.contactId.slice(-4)}`,
-    lastMessage: conversation.lastMessageBody || '',
-    lastMessageTime: conversation.lastMessageTime || conversation.updatedAt,
+    lastMessageBody: conversation.lastMessageBody || '',
+    lastMessageDate: conversation.lastMessageTime || conversation.updatedAt,
     unreadCount: conversation.unreadCount || 0,
-    channel: 'chat' as const, // Default to chat since these come from chat events
+    channel: 'chat', // Default to chat since these come from chat events
     tags: conversation.tags || [],
     assignedTo: conversation.assignedTo || undefined,
     status: (conversation.status === 'waiting' ? 'open' : 'open') as 'open' | 'closed' // Map to frontend status
