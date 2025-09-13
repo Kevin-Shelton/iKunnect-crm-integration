@@ -1,0 +1,142 @@
+[
+  {
+    "conversationId": "conv_1757693541524",
+    "contactId": "contact_1757693541524",
+    "direction": "inbound",
+    "actor": "customer",
+    "text": "Hi, I need help with my order",
+    "timestamp": "2025-09-12T16:12:21.934Z",
+    "correlationId": "test_1757693541524_0_inmq2bq9y",
+    "id": "conv_1757693541524-1757693541934-dj5i8cqxp"
+  },
+  {
+    "conversationId": "conv_1757693541524",
+    "contactId": "contact_1757693541524",
+    "direction": "outbound",
+    "actor": "ai",
+    "text": "Hello! I'd be happy to help you with your order. Can you please provide your order number?",
+    "timestamp": "2025-09-12T16:12:24.187Z",
+    "correlationId": "test_1757693543944_1_uadjm3i7c",
+    "id": "conv_1757693541524-1757693544187-vil8evo7c"
+  },
+  {
+    "conversationId": "conv_1757693541524",
+    "contactId": "contact_1757693541524",
+    "direction": "inbound",
+    "actor": "customer",
+    "text": "My order number is #12345",
+    "timestamp": "2025-09-12T16:12:29.437Z",
+    "correlationId": "test_1757693549195_2_8o0yt4j6h",
+    "id": "conv_1757693541524-1757693549437-6j4ejcnzn"
+  },
+  {
+    "conversationId": "conv_1757693541524",
+    "contactId": "contact_1757693541524",
+    "direction": "outbound",
+    "actor": "ai",
+    "text": "Thank you! I can see your order #12345. It looks like it was shipped yesterday and should arrive within 2-3 business days. Would you like me to provide the tracking information?",
+    "timestamp": "2025-09-12T16:12:32.691Z",
+    "correlationId": "test_1757693552442_3_pi9asybl2",
+    "id": "conv_1757693541524-1757693552691-iuilasreh"
+  },
+  {
+    "conversationId": "conv_1757693541524",
+    "contactId": "contact_1757693541524",
+    "direction": "inbound",
+    "actor": "customer",
+    "text": "Yes please, that would be great",
+    "timestamp": "2025-09-12T16:12:36.947Z",
+    "correlationId": "test_1757693556696_4_qn1enskop",
+    "id": "conv_1757693541524-1757693556947-883bxrdp6"
+  },
+  {
+    "conversationId": "conv_1757693541524",
+    "contactId": "contact_1757693541524",
+    "direction": "outbound",
+    "actor": "agent",
+    "text": "Absolutely! Here's your tracking information: Track #TRK123456789. Your package is currently in transit and will be delivered by 3 PM tomorrow. Is there anything else I can help you with?",
+    "timestamp": "2025-09-12T16:14:11.364Z",
+    "correlationId": "test_1757693651104_0o1ts4qyd",
+    "id": "conv_1757693541524-1757693651364-9zmc4z94u"
+  },
+  {
+    "conversationId": "conv_normalized_test",
+    "contactId": "contact_test_123",
+    "direction": "inbound",
+    "actor": "customer",
+    "text": "Hello, I need help with my order",
+    "timestamp": "2025-09-13T01:30:10.952Z",
+    "correlationId": "msg_norm_1",
+    "id": "conv_normalized_test-1757727010952-070z5l96w"
+  },
+  {
+    "conversationId": "conv_normalized_test",
+    "contactId": "contact_test_123",
+    "direction": "outbound",
+    "actor": "ai",
+    "text": "Hello! I'd be happy to help you with your order. Can you please provide your order number?",
+    "timestamp": "2025-09-13T01:30:10.952Z",
+    "correlationId": "msg_norm_2",
+    "id": "conv_normalized_test-1757727010952-1fjxp1kf8"
+  },
+  {
+    "conversationId": "conv_normalized_test",
+    "contactId": "contact_test_123",
+    "direction": "inbound",
+    "actor": "customer",
+    "text": "My order number is #12345",
+    "timestamp": "2025-09-13T01:30:10.953Z",
+    "correlationId": "msg_norm_3",
+    "id": "conv_normalized_test-1757727010953-7hpb2wz41"
+  },
+  {
+    "conversationId": "conv_normalized_test",
+    "contactId": "contact_test_123",
+    "direction": "inbound",
+    "actor": "customer",
+    "text": "Customer joined the chat",
+    "timestamp": "2025-09-13T01:30:10.953Z",
+    "correlationId": "msg_norm_4",
+    "id": "conv_normalized_test-1757727010953-d7v29c0lx"
+  },
+  {
+    "conversationId": "conv_normalized_test",
+    "contactId": "contact_test_123",
+    "direction": "outbound",
+    "actor": "ai",
+    "text": "Thank you! I can see your order #12345. It looks like it was shipped yesterday and should arrive within 2-3 business days.",
+    "timestamp": "2025-09-13T01:30:10.953Z",
+    "correlationId": "msg_norm_5",
+    "id": "conv_normalized_test-1757727010953-e13i4gsfk"
+  },
+  {
+    "conversationId": "conv_123",
+    "contactId": "unknown",
+    "direction": "inbound",
+    "actor": "customer",
+    "text": "Customer message",
+    "timestamp": "2025-09-13T01:32:44.227Z",
+    "correlationId": "1",
+    "id": "conv_123-1757727164227-v050w7mz5"
+  },
+  {
+    "conversationId": "conv_123",
+    "contactId": "unknown",
+    "direction": "outbound",
+    "actor": "agent",
+    "text": "Agent response",
+    "timestamp": "2025-09-13T01:32:44.228Z",
+    "correlationId": "2",
+    "id": "conv_123-1757727164228-6ovce2gvw"
+  },
+  {
+    "conversationId": "conv_123",
+    "contactId": "unknown",
+    "direction": "inbound",
+    "actor": "customer",
+    "text": "Info message",
+    "timestamp": "2025-09-13T01:32:44.228Z",
+    "correlationId": "3",
+    "id": "conv_123-1757727164228-9nmy3ep3k"
+  }
+]

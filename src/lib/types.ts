@@ -1,3 +1,46 @@
+// New types for n8n/MCP-based logic
+export type Direction = 'inbound' | 'outbound';
+export type Sender = 'contact' | 'human_agent' | 'ai_agent' | 'system';
+
+export const enum MsgTypeIndex {
+  TYPE_LIVE_CHAT = 29,
+  TYPE_LIVE_CHAT_INFO_MESSAGE = 30,
+}
+
+export interface GhlMessage {
+  id: string;
+  direction: Direction;
+  type: number;                 // numeric index from GHL
+  messageType?: string;         // e.g., "TYPE_LIVE_CHAT"
+  body?: string;
+  conversationId?: string | null;
+  dateAdded?: string;
+  dateUpdated?: string;
+  locationId?: string;
+  contactId?: string;
+  source?: string | null;       // sometimes "app" or provider tag
+  chatWidgetId?: string | null;
+}
+
+export interface NormalizedMessage {
+  id: string;
+  conversationId: string | null;
+  direction: Direction;
+  sender: Sender;               // derived
+  category: 'chat' | 'info' | 'other';
+  text: string;
+  createdAt?: string;
+  raw: GhlMessage;
+}
+
+export interface MirrorPayload {
+  contact?: { id: string | null; created?: boolean };
+  conversation?: { id: string | null; found?: boolean };
+  messages: GhlMessage[] | NormalizedMessage[];
+  warn?: string;
+}
+
+// Legacy types for existing system compatibility
 // TypeScript type definitions for CRM MCP API integration
 
 // Core Configuration
