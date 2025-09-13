@@ -80,9 +80,8 @@ export async function GET(request: NextRequest) {
           conversationId: message.conversationId,
           contactId: 'contact_test_123',
           direction: message.direction,
-          actor: message.sender === 'contact' ? 'customer' : 
-                 message.sender === 'ai_agent' ? 'ai' : 
-                 message.sender === 'human_agent' ? 'agent' : 'system',
+          actor: (message.sender === 'contact' ? 'customer' : 
+                 message.sender === 'ai_agent' ? 'ai' : 'agent') as 'customer' | 'ai' | 'agent',
           text: message.text,
           timestamp: message.createdAt || new Date().toISOString(),
           correlationId: message.id

@@ -1,152 +1,85 @@
+// /app/api/chat-events/route.ts
+export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
-import chatStorage, { ChatEvent } from '@/lib/chat-storage';
+import { verifyHmac } from '@/lib/hmac';
+import { log } from '@/lib/logger';
+import { normalizeMessages } from '@/lib/normalize';
+import type { MirrorPayload, GhlMessage, NormalizedMessage } from '@/lib/types';
+import { ChatEventStorage } from '@/lib/storage';
 
-// HMAC verification function
-function verifyHmac(body: string, signature: string, secret: string): boolean {
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(body, 'utf8')
-    .digest('hex');
-  
-  // Remove 'sha256=' prefix if present
-  const cleanSignature = signature.replace('sha256=', '');
-  
-  return crypto.timingSafeEqual(
-    Buffer.from(expectedSignature, 'hex'),
-    Buffer.from(cleanSignature, 'hex')
-  );
+function missingEnv(name: string): never {
+  throw new Error(`Missing env: ${name}`);
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    console.log('=== Chat Events Endpoint Called ===');
-    
-    // Get raw body for HMAC verification
-    const body = await request.text();
-    const signature = request.headers.get('x-signature') || '';
-    const secret = process.env.SHARED_HMAC_SECRET || 'your_shared_hmac_secret_here_change_this_in_production';
+function getSecret(): string {
+  const s = process.env.SHARED_HMAC_SECRET;
+  if (!s) missingEnv('SHARED_HMAC_SECRET');
+  return s;
+}
 
-    console.log('Request headers:', Object.fromEntries(request.headers.entries()));
-    console.log('Body length:', body.length);
-    console.log('Signature:', signature);
-
-    console.log('Secret configured:', secret ? 'Yes' : 'No');
-
-    // Verify HMAC signature
-    if (!verifyHmac(body, signature, secret)) {
-      console.error('HMAC verification failed');
-      console.log('Expected signature for body:', crypto.createHmac('sha256', secret).update(body).digest('hex'));
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 401 }
-      );
+export async function POST(req: NextRequest) {
+  const raw = await req.text(); // raw for HMAC
+  const ok = verifyHmac(raw, req.headers.get('x-signature'), getSecret());
+  if (!ok) {
+    if (process.env.REJECT_UNSIGNED === 'true') {
+      return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
     }
+    // allow but warn
+    log.warn('[WARN] unsigned/invalid signature');
+  }
 
-    console.log('✅ HMAC verification passed');
+  // Parse JSON safely
+  let payload: any;
+  try { payload = JSON.parse(raw); }
+  catch { return NextResponse.json({ error: 'invalid json' }, { status: 400 }); }
 
-    // Parse the JSON body
-    let chatEvent: ChatEvent;
-    try {
-      chatEvent = JSON.parse(body);
-    } catch (error) {
-      console.error('Invalid JSON body:', error);
-      return NextResponse.json(
-        { error: 'Invalid JSON body' },
-        { status: 400 }
-      );
-    }
+  // Normalize if messages present
+  let normalizedMessages: NormalizedMessage[] = [];
+  if (Array.isArray(payload?.messages)) {
+    const messages = payload.messages as GhlMessage[];
+    normalizedMessages = normalizeMessages(messages, payload?.conversation?.id ?? null);
+  }
 
-    // Validate required fields
-    const requiredFields = ['conversationId', 'contactId', 'direction', 'actor', 'text', 'timestamp', 'correlationId'];
-    for (const field of requiredFields) {
-      if (!chatEvent[field as keyof ChatEvent]) {
-        console.error(`Missing required field: ${field}`);
-        return NextResponse.json(
-          { error: `Missing required field: ${field}` },
-          { status: 400 }
-        );
+  // Persist to storage system
+  if (normalizedMessages.length > 0) {
+    for (const message of normalizedMessages) {
+      if (message.conversationId) {
+        // Convert normalized message to chat event format
+        const chatEvent = {
+          conversationId: message.conversationId,
+          contactId: payload?.contact?.id || message.raw.contactId || 'unknown',
+          direction: message.direction,
+          actor: (message.sender === 'contact' ? 'customer' : 
+                 message.sender === 'ai_agent' ? 'ai' : 'agent') as 'customer' | 'ai' | 'agent',
+          text: message.text,
+          timestamp: message.createdAt || new Date().toISOString(),
+          correlationId: message.id
+        };
+
+        // Store the event
+        ChatEventStorage.addEvent(chatEvent);
+        log.debug('[Mirror] Stored normalized message:', {
+          conversationId: message.conversationId,
+          sender: message.sender,
+          category: message.category,
+          textLength: message.text.length
+        });
       }
     }
-
-    // Validate enum values
-    if (!['inbound', 'outbound'].includes(chatEvent.direction)) {
-      return NextResponse.json(
-        { error: 'Invalid direction. Must be inbound or outbound' },
-        { status: 400 }
-      );
-    }
-
-    if (!['customer', 'ai', 'agent'].includes(chatEvent.actor)) {
-      return NextResponse.json(
-        { error: 'Invalid actor. Must be customer, ai, or agent' },
-        { status: 400 }
-      );
-    }
-
-    console.log('📨 Valid chat event received:', {
-      conversationId: chatEvent.conversationId,
-      direction: chatEvent.direction,
-      actor: chatEvent.actor,
-      textLength: chatEvent.text.length,
-      timestamp: chatEvent.timestamp
-    });
-
-    // Store the event using shared storage
-    chatStorage.storeEvent(chatEvent);
-
-    const conversationEvents = chatStorage.getConversationEvents(chatEvent.conversationId);
-    console.log(`💾 Stored event. Conversation ${chatEvent.conversationId} now has ${conversationEvents.length} events`);
-
-    // Log current storage state
-    console.log(`📊 Storage stats: ${chatStorage.getConversationCount()} conversations total`);
-
-    return NextResponse.json({
-      success: true,
-      message: 'Chat event received and stored',
-      eventId: chatEvent.correlationId,
-      conversationId: chatEvent.conversationId,
-      totalEvents: conversationEvents.length,
-      totalConversations: chatStorage.getConversationCount()
-    });
-
-  } catch (error) {
-    console.error('Error processing chat event:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
   }
-}
 
-// GET endpoint to retrieve events for a conversation (for UI polling)
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const conversationId = searchParams.get('conversationId');
+  log.debug('[Mirror]', { 
+    route: req.nextUrl.pathname, 
+    contact: payload?.contact, 
+    conv: payload?.conversation,
+    messagesProcessed: normalizedMessages.length
+  });
 
-    if (!conversationId) {
-      return NextResponse.json(
-        { error: 'conversationId parameter required' },
-        { status: 400 }
-      );
-    }
-
-    const events = chatStorage.getConversationEvents(conversationId);
-    
-    return NextResponse.json({
-      success: true,
-      conversationId,
-      events,
-      totalEvents: events.length
-    });
-
-  } catch (error) {
-    console.error('Error retrieving chat events:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+  // Always return 200 to keep n8n fast; include minimal ack
+  return NextResponse.json({ 
+    ok: true, 
+    messagesProcessed: normalizedMessages.length,
+    conversationId: payload?.conversation?.id
+  });
 }
 
