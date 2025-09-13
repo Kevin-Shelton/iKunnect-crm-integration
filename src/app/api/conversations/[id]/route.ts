@@ -6,10 +6,10 @@ import { tapPush } from '@/lib/ring';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const traceId = pickTrace(request.headers);
-  const conversationId = params.id;
+  const { id: conversationId } = await params;
   
   try {
     // Get conversation from new storage system
