@@ -45,7 +45,7 @@ export default function Home() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex h-screen bg-gray-50">
         <div className="flex-1 flex items-center justify-center">
