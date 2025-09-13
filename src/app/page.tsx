@@ -66,7 +66,7 @@ export default function Home() {
             <div className="text-red-600 mb-4">⚠️ Error loading conversations</div>
             <p className="text-gray-600 mb-4">{error}</p>
             <button 
-              onClick={refetch}
+              onClick={refreshConversations}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             >
               Try Again
