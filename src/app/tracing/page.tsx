@@ -36,6 +36,8 @@ export default function TracingPage() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [testNote, setTestNote] = useState('manual_test');
   const [testPayload, setTestPayload] = useState('{"test": "data"}');
+  const [diagnosticSession, setDiagnosticSession] = useState<string | null>(null);
+  const [diagnosticReport, setDiagnosticReport] = useState<any>(null);
 
   const fetchDebugData = async () => {
     try {
@@ -82,6 +84,51 @@ export default function TracingPage() {
       await fetchDebugData();
     } catch (error) {
       console.error('Failed to clear taps:', error);
+    }
+  };
+
+  const startDiagnosticSession = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/diagnostics/start', { method: 'POST' });
+      const data = await response.json();
+      if (data.ok) {
+        setDiagnosticSession(data.sessionId);
+        setDiagnosticReport(null);
+        alert(`Diagnostic session started: ${data.sessionId}\n\nNow initiate your live chat from GoHighLevel!`);
+      } else {
+        alert(`Failed to start session: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Failed to start diagnostic session:', error);
+      alert('Failed to start diagnostic session');
+    }
+    setLoading(false);
+  };
+
+  const getDiagnosticReport = async () => {
+    if (!diagnosticSession) return;
+    
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/diagnostics/report/${diagnosticSession}`);
+      const data = await response.json();
+      if (data.ok) {
+        setDiagnosticReport(data.report);
+      } else {
+        alert(`Failed to get report: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Failed to get diagnostic report:', error);
+      alert('Failed to get diagnostic report');
+    }
+    setLoading(false);
+  };
+
+  const copyReportToClipboard = () => {
+    if (diagnosticReport) {
+      navigator.clipboard.writeText(JSON.stringify(diagnosticReport, null, 2));
+      alert('Diagnostic report copied to clipboard!');
     }
   };
 
@@ -156,6 +203,87 @@ export default function TracingPage() {
               <div className="font-mono">{debugData?.conversations?.length || 0}</div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Diagnostic Session Controls */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            🔍 Live Chat Diagnostics
+            {diagnosticSession && <Badge className="bg-green-100 text-green-800">Session Active</Badge>}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Button 
+              onClick={startDiagnosticSession} 
+              disabled={loading || !!diagnosticSession}
+              className="w-full"
+            >
+              {loading ? "Starting..." : "Start Diagnostic Session"}
+            </Button>
+            <Button 
+              onClick={getDiagnosticReport} 
+              disabled={loading || !diagnosticSession}
+              variant="outline"
+              className="w-full"
+            >
+              {loading ? "Getting Report..." : "Get Report"}
+            </Button>
+            <Button 
+              onClick={copyReportToClipboard} 
+              disabled={!diagnosticReport}
+              variant="outline"
+              className="w-full"
+            >
+              Copy Report
+            </Button>
+          </div>
+          
+          {diagnosticSession && (
+            <div className="p-3 bg-blue-50 rounded">
+              <p className="text-sm font-medium">Active Session: {diagnosticSession}</p>
+              <p className="text-xs text-gray-600 mt-1">
+                Now initiate your live chat from GoHighLevel. The system is capturing all data automatically.
+              </p>
+            </div>
+          )}
+          
+          {diagnosticReport && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium">Diagnostic Report</h4>
+                <Badge className={diagnosticReport.diagnosis?.overallHealth === 'HEALTHY' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                  {diagnosticReport.diagnosis?.overallHealth || 'UNKNOWN'}
+                </Badge>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="text-center">
+                  <div className="font-medium">{diagnosticReport.diagnosis?.webhookWorking ? '✅' : '❌'}</div>
+                  <div className="text-gray-600">Webhook</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-medium">{diagnosticReport.diagnosis?.n8nFlowComplete ? '✅' : '❌'}</div>
+                  <div className="text-gray-600">n8n Flow</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-medium">{diagnosticReport.diagnosis?.mirrorEndpointsWorking ? '✅' : '❌'}</div>
+                  <div className="text-gray-600">Mirror Endpoints</div>
+                </div>
+              </div>
+              
+              <details className="mt-2">
+                <summary className="cursor-pointer text-sm font-medium text-blue-600">
+                  View Full Report JSON
+                </summary>
+                <pre className="text-xs bg-gray-100 p-3 rounded mt-2 overflow-auto max-h-64">
+                  {JSON.stringify(diagnosticReport, null, 2)}
+                </pre>
+              </details>
+            </div>
+          )}
         </CardContent>
       </Card>
 
