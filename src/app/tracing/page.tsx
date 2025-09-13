@@ -281,7 +281,7 @@ export default function TracingPage() {
             <div className="mt-4 p-3 bg-blue-50 rounded">
               <p className="text-sm"><strong>Troubleshooting:</strong></p>
               <ul className="text-xs text-gray-600 mt-1 space-y-1">
-                <li>• First tap missing → webhook didn't fire; check HL → n8n webhook</li>
+                <li>• First tap missing → webhook didn&apos;t fire; check HL → n8n webhook</li>
                 <li>• Taps exist until before_mirror_* but no conversations → Vercel rejected mirror calls; check HMAC</li>
                 <li>• after_assist_response shows suggestions.length = 0 → Fix AI prompt/parsing in n8n workflow</li>
               </ul>
