@@ -16,9 +16,9 @@ export default function Home() {
   const {
     conversations = { waiting: [], assigned: [], all: [] } as ConversationQueue,
     queueStats = { waiting: 0, assigned: 0, total: 0 },
-    loading = false,
+    isLoading = false,
     error = null,
-    refetch = () => {}
+    refreshConversations = () => {}
   } = useConversations() || {};
 
   // Safe conversation selection
