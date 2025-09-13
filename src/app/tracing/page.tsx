@@ -269,7 +269,7 @@ export default function TracingPage() {
         </CardHeader>
         <CardContent>
           <div className="text-sm space-y-2">
-            <p className="font-medium">When you send a live chat "hi", you should see taps in this order:</p>
+            <p className="font-medium">When you send a live chat &quot;hi&quot;, you should see taps in this order:</p>
             <ol className="list-decimal list-inside space-y-1 text-gray-600">
               <li><code>after_extract_identity</code></li>
               <li><code>after_resolve_conversation</code></li>
