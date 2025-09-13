@@ -40,7 +40,15 @@ export function useConversations(): UseConversationsReturn {
       }
       
       const data = await response.json();
-      setConversations(data);
+      
+      // Safe array handling - ensure all arrays exist
+      const safeData = {
+        waiting: Array.isArray(data?.waiting) ? data.waiting : [],
+        assigned: Array.isArray(data?.assigned) ? data.assigned : [],
+        all: Array.isArray(data?.all) ? data.all : []
+      };
+      
+      setConversations(safeData);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch conversations';
       setError(errorMessage);

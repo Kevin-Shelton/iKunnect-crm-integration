@@ -138,5 +138,65 @@
     "timestamp": "2025-09-13T01:32:44.228Z",
     "correlationId": "3",
     "id": "conv_123-1757727164228-9nmy3ep3k"
+  },
+  {
+    "conversationId": "test_conv_123",
+    "contactId": "test_contact_456",
+    "direction": "inbound",
+    "actor": "customer",
+    "text": "Hello test message",
+    "timestamp": "2025-09-13T03:29:08.842Z",
+    "correlationId": "msg_1",
+    "id": "test_conv_123-1757734148842-95z11fcds"
+  },
+  {
+    "conversationId": "conv_normalized_test",
+    "contactId": "contact_test_123",
+    "direction": "inbound",
+    "actor": "customer",
+    "text": "Hello, I need help with my order",
+    "timestamp": "2025-09-13T03:29:40.005Z",
+    "correlationId": "msg_norm_1",
+    "id": "conv_normalized_test-1757734180005-fqx9yg9db"
+  },
+  {
+    "conversationId": "conv_normalized_test",
+    "contactId": "contact_test_123",
+    "direction": "outbound",
+    "actor": "ai",
+    "text": "Hello! I'd be happy to help you with your order. Can you please provide your order number?",
+    "timestamp": "2025-09-13T03:29:40.005Z",
+    "correlationId": "msg_norm_2",
+    "id": "conv_normalized_test-1757734180005-d8q2zpxbg"
+  },
+  {
+    "conversationId": "conv_normalized_test",
+    "contactId": "contact_test_123",
+    "direction": "inbound",
+    "actor": "customer",
+    "text": "My order number is #12345",
+    "timestamp": "2025-09-13T03:29:40.005Z",
+    "correlationId": "msg_norm_3",
+    "id": "conv_normalized_test-1757734180005-smdqj7koi"
+  },
+  {
+    "conversationId": "conv_normalized_test",
+    "contactId": "contact_test_123",
+    "direction": "inbound",
+    "actor": "customer",
+    "text": "Customer joined the chat",
+    "timestamp": "2025-09-13T03:29:40.006Z",
+    "correlationId": "msg_norm_4",
+    "id": "conv_normalized_test-1757734180006-giyo1s1xl"
+  },
+  {
+    "conversationId": "conv_normalized_test",
+    "contactId": "contact_test_123",
+    "direction": "outbound",
+    "actor": "ai",
+    "text": "Thank you! I can see your order #12345. It looks like it was shipped yesterday and should arrive within 2-3 business days.",
+    "timestamp": "2025-09-13T03:29:40.006Z",
+    "correlationId": "msg_norm_5",
+    "id": "conv_normalized_test-1757734180006-7wm3bz8zr"
   }
 ]
