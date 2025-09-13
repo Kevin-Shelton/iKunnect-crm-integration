@@ -1,120 +1,65 @@
+export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
-import { ConversationQueue, QueueStats, Conversation } from '@/lib/types';
-import chatStorage, { ConversationSummary } from '@/lib/chat-storage';
-
-// Helper function to convert chat storage conversation to frontend format
-function convertToFrontendFormat(conversation: ConversationSummary): Conversation {
-  return {
-    id: conversation.id,
-    contactId: conversation.contactId,
-    locationId: 'default', // Default location ID for chat events
-    contactName: conversation.contact?.name || `Customer ${conversation.contactId.slice(-4)}`,
-    lastMessageBody: conversation.lastMessageBody || '',
-    lastMessageDate: conversation.lastMessageTime || conversation.updatedAt,
-    unreadCount: conversation.unreadCount || 0,
-    channel: 'chat', // Default to chat since these come from chat events
-    tags: conversation.tags || [],
-    assignedTo: conversation.assignedTo || undefined,
-    status: (conversation.status === 'waiting' ? 'open' : 'open') as 'open' | 'closed' // Map to frontend status
-  };
-}
+import { listConversations } from '@/lib/chatStorage';
+import { pickTrace, nowIso } from '@/lib/trace';
+import { tapPush } from '@/lib/ring';
 
 export async function GET(request: NextRequest) {
+  const traceId = pickTrace(request.headers);
+  
   try {
     const searchParams = request.nextUrl.searchParams;
-    const bucket = searchParams.get('bucket') || 'all'; // waiting, assigned, all
-    const agentId = searchParams.get('agentId');
-    const limit = parseInt(searchParams.get('limit') || '50');
-
-    console.log('[API] Fetching conversations:', { bucket, agentId, limit });
-
-    // Get conversations from chat events (this is our primary source now)
-    console.log('[API] Getting chat events conversations...');
-    const chatEventConversations = chatStorage.getAllConversationSummaries();
+    const bucket = searchParams.get('bucket') || 'all';
     
-    console.log('[API] Chat events conversations:', {
-      count: chatEventConversations.length,
-      totalStoredConversations: chatStorage.getConversationCount()
-    });
+    // Get conversations from new storage system
+    const conversations = listConversations();
+    
+    // Transform to match expected format
+    const waiting = conversations.filter(c => c.messageCount > 0).map(c => ({
+      id: c.id,
+      contactId: `contact_${c.id}`,
+      contactName: `Customer ${c.id.slice(-4)}`,
+      lastMessage: c.lastText || 'No messages',
+      timestamp: new Date(c.updatedAt).toISOString(),
+      unreadCount: 0,
+      status: 'waiting' as const,
+      priority: 'normal' as const,
+      tags: [] as string[]
+    }));
 
-    // Convert to frontend format
-    const allConversations = chatEventConversations.map(convertToFrontendFormat);
-
-    // Categorize conversations
-    const waiting = allConversations.filter(conv => !conv.assignedTo);
-    const assigned = allConversations.filter(conv => conv.assignedTo);
-    const agentAssigned = agentId ? assigned.filter(conv => conv.assignedTo === agentId) : [];
-
-    console.log('[API] Conversation categories:', {
-      waiting: waiting.length,
-      assigned: assigned.length,
-      agentAssigned: agentAssigned.length,
-      total: allConversations.length
-    });
-
-    // Prepare queue data
-    const queue: ConversationQueue = {
-      waiting: waiting.slice(0, limit),
-      assigned: agentId ? agentAssigned.slice(0, limit) : assigned.slice(0, limit),
-      all: allConversations.slice(0, limit)
+    const response = {
+      waiting,
+      assigned: [] as any[],
+      all: waiting
     };
 
-    const stats: QueueStats = {
-      waiting: waiting.length,
-      assigned: assigned.length,
-      total: allConversations.length
-    };
-
-    // Return based on requested bucket
-    let conversations;
-    switch (bucket) {
-      case 'waiting':
-        conversations = queue.waiting;
-        break;
-      case 'assigned':
-        conversations = queue.assigned;
-        break;
-      default:
-        conversations = queue.all;
-    }
-
-    console.log('[API] Returning conversations:', {
-      bucket,
-      count: conversations.length,
-      stats
-    });
-
-    return NextResponse.json({
-      success: true,
-      conversations,
-      queue,
-      stats,
-      timestamp: new Date().toISOString(),
-      debug: {
-        mcpConnected: false,
-        mcpDisabled: true,
-        totalFromMcp: 0,
-        totalFromChatEvents: chatEventConversations.length,
-        totalCombined: allConversations.length,
-        chatStorageConversations: chatStorage.getConversationCount(),
-        bucket,
-        agentId,
-        source: allConversations.length > 0 ? 'chat_events' : 'none'
+    // Log counts for debugging
+    tapPush({
+      t: nowIso(),
+      route: '/api/conversations',
+      traceId,
+      note: `list_conversations`,
+      data: { 
+        bucket, 
+        counts: { 
+          waiting: waiting.length, 
+          assigned: 0, 
+          total: waiting.length 
+        } 
       }
     });
 
+    console.log('[Desk]', traceId, 'conversations', 'bucket=', bucket, 'count=', waiting.length);
+
+    return NextResponse.json(response);
   } catch (error) {
-    console.error('[API] Error fetching conversations:', error);
-    
-    return NextResponse.json({
-      success: false,
-      error: 'Internal server error while fetching conversations',
-      details: error instanceof Error ? error.message : 'Unknown error',
-      conversations: [],
-      queue: { waiting: [], assigned: [], all: [] },
-      stats: { waiting: 0, assigned: 0, total: 0 },
-      timestamp: new Date().toISOString()
-    }, { status: 500 });
+    tapPush({ t: nowIso(), route: '/api/conversations', traceId, note: 'error', data: { error: String(error) } });
+    console.error('Error fetching conversations:', error);
+    return NextResponse.json({ 
+      waiting: [], 
+      assigned: [], 
+      all: [] 
+    });
   }
 }
 

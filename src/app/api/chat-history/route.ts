@@ -1,36 +1,34 @@
-// /app/api/chat-history/route.ts
 export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyHmac } from '@/lib/hmac';
-import { log } from '@/lib/logger';
 import { normalizeMessages } from '@/lib/normalize';
-import { safeMirrorAck, asArray } from '@/lib/safe';
-import { DeskAckSchema } from '@/lib/schemas';
-import type { MirrorPayload, GhlMessage, NormalizedMessage } from '@/lib/types';
+import { ack, asArray } from '@/lib/safe';
+import { pickTrace, nowIso } from '@/lib/trace';
+import { tapPush } from '@/lib/ring';
+import { upsertMessages } from '@/lib/chatStorage';
+import type { GhlMessage, NormalizedMessage } from '@/lib/types';
 
 function getSecret(): string {
   const s = process.env.SHARED_HMAC_SECRET;
   if (!s) {
-    log.warn('SHARED_HMAC_SECRET missing, using fallback');
+    console.warn('SHARED_HMAC_SECRET missing, using fallback');
     return 'your_shared_hmac_secret_here_change_this_in_production';
   }
   return s;
 }
 
 export async function POST(req: NextRequest) {
+  const traceId = pickTrace(req.headers);
+  
   try {
-    // Environment check
-    if (!process.env.SHARED_HMAC_SECRET) {
-      return NextResponse.json({ error: 'SHARED_HMAC_SECRET missing' }, { status: 400 });
-    }
-
     const raw = await req.text();
     const ok = verifyHmac(raw, req.headers.get('x-signature'), getSecret());
     if (!ok) {
       if (process.env.REJECT_UNSIGNED === 'true') {
+        tapPush({ t: nowIso(), route: '/api/chat-history', traceId, note: 'hmac_fail', data: { error: 'invalid signature' } });
         return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
       }
-      log.warn('[WARN] unsigned/invalid signature');
+      console.warn('[WARN] unsigned/invalid signature');
     }
 
     // Parse JSON safely
@@ -38,7 +36,14 @@ export async function POST(req: NextRequest) {
     try { 
       payload = JSON.parse(raw); 
     } catch { 
+      tapPush({ t: nowIso(), route: '/api/chat-history', traceId, note: 'json_fail', data: { error: 'invalid json' } });
       return NextResponse.json({ error: 'invalid json' }, { status: 400 }); 
+    }
+
+    const convId = payload?.conversation?.id;
+    if (!convId) {
+      tapPush({ t: nowIso(), route: '/api/chat-history', traceId, note: 'no_conv_id', data: { payload } });
+      return NextResponse.json({ error: 'missing conversation.id' }, { status: 400 });
     }
 
     // Normalize inbound payloads
@@ -46,30 +51,27 @@ export async function POST(req: NextRequest) {
     let normalizedMessages: NormalizedMessage[] = [];
     
     if (rawMessages.length > 0) {
-      normalizedMessages = normalizeMessages(rawMessages as GhlMessage[], payload?.conversation?.id ?? null);
+      normalizedMessages = normalizeMessages(rawMessages as GhlMessage[], convId);
+      upsertMessages(convId, normalizedMessages);
     }
 
-    // Update payload with normalized messages
-    payload.messages = normalizedMessages;
-
-    // Structured logging
-    log.debug('[desk-ack]', {
-      route: req.nextUrl.pathname,
-      c: payload?.conversation?.id,
-      cnt: { m: (payload.messages ?? []).length, s: (payload.suggestions ?? []).length },
+    // Push tap after processing
+    tapPush({
+      t: nowIso(),
+      route: '/api/chat-history',
+      traceId,
+      note: `conv ${convId} history+${normalizedMessages.length}`,
+      data: { convId, counts: { messages: normalizedMessages.length } }
     });
 
-    // Always return safe response structure
-    const safeResponse = safeMirrorAck(payload);
-    const validatedResponse = DeskAckSchema.parse(safeResponse);
-    
-    return NextResponse.json(validatedResponse, { status: 200 });
+    console.log('[Desk]', traceId, 'chat-history', 'conv=', convId, 'msg+', normalizedMessages.length);
+
+    return NextResponse.json(ack({ messages: normalizedMessages }), { status: 200 });
 
   } catch (error) {
-    log.warn('[chat-history] Error:', error);
-    // Return safe error response
-    const errorResponse = safeMirrorAck({});
-    return NextResponse.json(errorResponse, { status: 200 });
+    tapPush({ t: nowIso(), route: '/api/chat-history', traceId, note: 'error', data: { error: String(error) } });
+    console.error('[chat-history] Error:', error);
+    return NextResponse.json(ack({}), { status: 200 });
   }
 }
 

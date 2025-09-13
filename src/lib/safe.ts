@@ -18,3 +18,9 @@ export function safeMirrorAck(p: any) {
   };
 }
 
+export function ack(p: any) {
+  const messages = asArray(p?.messages);
+  const suggestions = asArray(p?.suggestions);
+  return { ok: true, counts: { messages: messages.length, suggestions: suggestions.length } };
+}
+

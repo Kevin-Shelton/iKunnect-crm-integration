@@ -1,35 +1,31 @@
-// /app/api/chat-admin/route.ts
 export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyHmac } from '@/lib/hmac';
-import { log } from '@/lib/logger';
-import { safeMirrorAck, asArray } from '@/lib/safe';
-import { DeskAckSchema } from '@/lib/schemas';
-import type { MirrorPayload } from '@/lib/types';
+import { ack, asArray } from '@/lib/safe';
+import { pickTrace, nowIso } from '@/lib/trace';
+import { tapPush } from '@/lib/ring';
 
 function getSecret(): string {
   const s = process.env.SHARED_HMAC_SECRET;
   if (!s) {
-    log.warn('SHARED_HMAC_SECRET missing, using fallback');
+    console.warn('SHARED_HMAC_SECRET missing, using fallback');
     return 'your_shared_hmac_secret_here_change_this_in_production';
   }
   return s;
 }
 
 export async function POST(req: NextRequest) {
+  const traceId = pickTrace(req.headers);
+  
   try {
-    // Environment check
-    if (!process.env.SHARED_HMAC_SECRET) {
-      return NextResponse.json({ error: 'SHARED_HMAC_SECRET missing' }, { status: 400 });
-    }
-
     const raw = await req.text();
     const ok = verifyHmac(raw, req.headers.get('x-signature'), getSecret());
     if (!ok) {
       if (process.env.REJECT_UNSIGNED === 'true') {
+        tapPush({ t: nowIso(), route: '/api/chat-admin', traceId, note: 'hmac_fail', data: { error: 'invalid signature' } });
         return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
       }
-      log.warn('[WARN] unsigned/invalid signature');
+      console.warn('[WARN] unsigned/invalid signature');
     }
 
     // Parse JSON safely
@@ -37,33 +33,40 @@ export async function POST(req: NextRequest) {
     try { 
       payload = JSON.parse(raw); 
     } catch { 
+      tapPush({ t: nowIso(), route: '/api/chat-admin', traceId, note: 'json_fail', data: { error: 'invalid json' } });
       return NextResponse.json({ error: 'invalid json' }, { status: 400 }); 
     }
 
-    // Normalize arrays
-    payload.messages = asArray(payload.messages);
-    payload.suggestions = asArray(payload.suggestions);
+    const convId = payload?.conversation?.id;
+    const action = payload?.action;
+    const agentId = payload?.agentId;
 
-    // Structured logging
-    log.debug('[desk-ack]', {
-      route: req.nextUrl.pathname,
-      c: payload?.conversation?.id,
-      action: payload?.action,
-      agentId: payload?.agentId,
-      cnt: { m: (payload.messages ?? []).length, s: (payload.suggestions ?? []).length },
+    // Normalize arrays
+    const messages = asArray(payload.messages);
+    const suggestions = asArray(payload.suggestions);
+
+    // Push tap after processing
+    tapPush({
+      t: nowIso(),
+      route: '/api/chat-admin',
+      traceId,
+      note: `conv ${convId} admin ${action}`,
+      data: { 
+        convId, 
+        action, 
+        agentId,
+        counts: { messages: messages.length, suggestions: suggestions.length } 
+      }
     });
 
-    // Always return safe response structure
-    const safeResponse = safeMirrorAck(payload);
-    const validatedResponse = DeskAckSchema.parse(safeResponse);
-    
-    return NextResponse.json(validatedResponse, { status: 200 });
+    console.log('[Desk]', traceId, 'chat-admin', 'conv=', convId, 'action=', action, 'agent=', agentId);
+
+    return NextResponse.json(ack({ messages, suggestions }), { status: 200 });
 
   } catch (error) {
-    log.warn('[chat-admin] Error:', error);
-    // Return safe error response
-    const errorResponse = safeMirrorAck({});
-    return NextResponse.json(errorResponse, { status: 200 });
+    tapPush({ t: nowIso(), route: '/api/chat-admin', traceId, note: 'error', data: { error: String(error) } });
+    console.error('[chat-admin] Error:', error);
+    return NextResponse.json(ack({}), { status: 200 });
   }
 }
 
