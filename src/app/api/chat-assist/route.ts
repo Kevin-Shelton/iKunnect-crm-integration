@@ -5,7 +5,7 @@ import { verifyHmac } from '@/lib/hmac';
 import { log } from '@/lib/logger';
 import { safeMirrorAck, asArray } from '@/lib/safe';
 import { DeskAckSchema } from '@/lib/schemas';
-import type { MirrorPayload, AssistPayload } from '@/lib/types';
+import type { MirrorPayload } from '@/lib/types';
 
 function getSecret(): string {
   const s = process.env.SHARED_HMAC_SECRET;
