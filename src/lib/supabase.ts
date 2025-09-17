@@ -23,7 +23,7 @@ export interface ChatEvent {
     confidence?: number | null;
     rank: number;
   }>;
-  payload: any;
+  payload: Record<string, unknown>;
   created_at?: string;
 }
 
@@ -61,7 +61,7 @@ export async function getChatHistory(conversationId: string, limit = 20) {
 }
 
 // Helper to broadcast event to conversation channel
-export async function broadcastToConversation(conversationId: string, token: string, event: any) {
+export async function broadcastToConversation(conversationId: string, token: string, event: Record<string, unknown>) {
   const channel = `conv:${conversationId}:${token}`;
   
   const broadcastResult = await supabase

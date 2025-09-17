@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Parse JSON safely
-    let payload: any;
+    let payload: MirrorPayload | Record<string, unknown>;
     try { 
       payload = JSON.parse(raw); 
     } catch { 
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate conversationId is present
-    const convId = payload?.conversation?.id;
+    const convId = (payload as Record<string, unknown>)?.conversation?.id as string;
     if (!convId) {
       tapPush({ t: nowIso(), route: '/api/chat-events', traceId, note: 'no_conv_id', data: { payload } });
       return NextResponse.json({ error: 'missing conversation.id' }, { status: 400 });
@@ -57,14 +57,14 @@ export async function POST(req: NextRequest) {
     let eventCount = 0;
     
     // Handle messages array (legacy format)
-    const rawMessages = asArray(payload.messages);
+    const rawMessages = asArray((payload as MirrorPayload).messages);
     if (rawMessages.length > 0) {
       const normalizedMessages = normalizeMessages(rawMessages as GhlMessage[], convId);
       
       for (const msg of normalizedMessages) {
         await insertChatEvent({
           conversation_id: convId,
-          type: msg.actor === 'contact' ? 'inbound' : 'agent_send',
+          type: msg.sender === 'contact' ? 'inbound' : 'agent_send',
           message_id: msg.id,
           text: msg.text,
           payload: msg
@@ -74,14 +74,15 @@ export async function POST(req: NextRequest) {
     }
     
     // Handle direct event format (new format)
-    if (payload.type) {
+    const eventPayload = payload as Record<string, unknown>;
+    if (eventPayload.type) {
       await insertChatEvent({
         conversation_id: convId,
-        type: payload.type,
-        message_id: payload.messageId,
-        text: payload.text,
-        items: payload.items,
-        payload: payload
+        type: eventPayload.type as string,
+        message_id: eventPayload.messageId as string,
+        text: eventPayload.text as string,
+        items: eventPayload.items as unknown[],
+        payload: eventPayload
       });
       eventCount++;
       
@@ -92,7 +93,7 @@ export async function POST(req: NextRequest) {
         .send({
           type: 'broadcast',
           event: 'event',
-          payload: payload
+          payload: eventPayload
         });
     }
 
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
 
     // Return safe response
     return NextResponse.json(ack({ 
-      messageId: payload.messageId,
+      messageId: eventPayload.messageId as string,
       threadId: convId,
       eventsProcessed: eventCount
     }), { status: 200 });

@@ -4,7 +4,6 @@ import { ChatEvent } from './chat-events';
 
 const STORAGE_DIR = path.join(process.cwd(), 'data');
 const EVENTS_FILE = path.join(STORAGE_DIR, 'chat-events.json');
-const CONVERSATIONS_FILE = path.join(STORAGE_DIR, 'conversations.json');
 
 // Ensure storage directory exists
 function ensureStorageDir() {
