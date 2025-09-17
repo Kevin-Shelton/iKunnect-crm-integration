@@ -6,7 +6,7 @@ import { ack, asArray } from '@/lib/safe';
 import { pickTrace, nowIso } from '@/lib/trace';
 import { tapPush } from '@/lib/ring';
 import { insertChatEvent, supabase } from '@/lib/supabase';
-import type { GhlMessage, NormalizedMessage } from '@/lib/types';
+import type { GhlMessage, MirrorPayload } from '@/lib/types';
 
 function getSecret(): string {
   const s = process.env.SHARED_HMAC_SECRET;
