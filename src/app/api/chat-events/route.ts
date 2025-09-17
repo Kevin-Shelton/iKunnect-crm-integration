@@ -5,7 +5,7 @@ import { normalizeMessages } from '@/lib/normalize';
 import { ack, asArray } from '@/lib/safe';
 import { pickTrace, nowIso } from '@/lib/trace';
 import { tapPush } from '@/lib/ring';
-import { upsertMessages } from '@/lib/chatStorage';
+import { insertChatEvent, supabase } from '@/lib/supabase';
 import type { GhlMessage, NormalizedMessage } from '@/lib/types';
 
 function getSecret(): string {
@@ -53,17 +53,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'missing conversation.id' }, { status: 400 });
     }
 
-    // Normalize inbound payloads
-    const rawMessages = asArray(payload.messages);
-    let normalizedMessages: NormalizedMessage[] = [];
+    // Handle different event types
+    let eventCount = 0;
     
+    // Handle messages array (legacy format)
+    const rawMessages = asArray(payload.messages);
     if (rawMessages.length > 0) {
-      normalizedMessages = normalizeMessages(rawMessages as GhlMessage[], convId);
+      const normalizedMessages = normalizeMessages(rawMessages as GhlMessage[], convId);
+      
+      for (const msg of normalizedMessages) {
+        await insertChatEvent({
+          conversation_id: convId,
+          type: msg.actor === 'contact' ? 'inbound' : 'agent_send',
+          message_id: msg.id,
+          text: msg.text,
+          payload: msg
+        });
+        eventCount++;
+      }
     }
-
-    // Store messages using new storage system
-    if (normalizedMessages.length > 0) {
-      upsertMessages(convId, normalizedMessages);
+    
+    // Handle direct event format (new format)
+    if (payload.type) {
+      await insertChatEvent({
+        conversation_id: convId,
+        type: payload.type,
+        message_id: payload.messageId,
+        text: payload.text,
+        items: payload.items,
+        payload: payload
+      });
+      eventCount++;
+      
+      // Broadcast to conversation channel
+      const channel = `conv:${convId}:public`;
+      await supabase
+        .channel(channel)
+        .send({
+          type: 'broadcast',
+          event: 'event',
+          payload: payload
+        });
     }
 
     // Push tap after processing
@@ -71,15 +101,19 @@ export async function POST(req: NextRequest) {
       t: nowIso(),
       route: '/api/chat-events',
       traceId,
-      note: `conv ${convId} msg+${normalizedMessages.length}`,
-      data: { convId, counts: { messages: normalizedMessages.length } }
+      note: `conv ${convId} events+${eventCount}`,
+      data: { convId, counts: { events: eventCount } }
     });
 
     // Console log for debugging
-    console.log('[Desk]', traceId, 'chat-events', 'conv=', convId, 'msg+', normalizedMessages.length);
+    console.log('[Desk]', traceId, 'chat-events', 'conv=', convId, 'events+', eventCount);
 
     // Return safe response
-    return NextResponse.json(ack({ messages: normalizedMessages }), { status: 200 });
+    return NextResponse.json(ack({ 
+      messageId: payload.messageId,
+      threadId: convId,
+      eventsProcessed: eventCount
+    }), { status: 200 });
 
   } catch (error) {
     tapPush({ t: nowIso(), route: '/api/chat-events', traceId, note: 'error', data: { error: String(error) } });

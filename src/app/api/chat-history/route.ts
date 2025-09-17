@@ -1,12 +1,10 @@
 export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyHmac } from '@/lib/hmac';
-import { normalizeMessages } from '@/lib/normalize';
-import { ack, asArray } from '@/lib/safe';
+import { ack } from '@/lib/safe';
 import { pickTrace, nowIso } from '@/lib/trace';
 import { tapPush } from '@/lib/ring';
-import { upsertMessages } from '@/lib/chatStorage';
-import type { GhlMessage, NormalizedMessage } from '@/lib/types';
+import { getChatHistory } from '@/lib/supabase';
 
 function getSecret(): string {
   const s = process.env.SHARED_HMAC_SECRET;
@@ -46,32 +44,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'missing conversation.id' }, { status: 400 });
     }
 
-    // Normalize inbound payloads
-    const rawMessages = asArray(payload.messages);
-    let normalizedMessages: NormalizedMessage[] = [];
+    const pageSize = Math.min(payload.pageSize || 5, 20); // Cap at 20
     
-    if (rawMessages.length > 0) {
-      normalizedMessages = normalizeMessages(rawMessages as GhlMessage[], convId);
-      upsertMessages(convId, normalizedMessages);
-    }
+    // Get chat history from Supabase
+    const events = await getChatHistory(convId, pageSize);
+    
+    // Convert to n8n expected format
+    const messages = events.map(event => ({
+      direction: event.type === 'inbound' ? 'inbound' : 'outbound',
+      text: event.text || '',
+      timestamp: Math.floor(new Date(event.created_at || '').getTime() / 1000)
+    })).filter(msg => msg.text); // Only include messages with text
 
-    // Push tap after processing
     tapPush({
       t: nowIso(),
       route: '/api/chat-history',
       traceId,
-      note: `conv ${convId} history+${normalizedMessages.length}`,
-      data: { convId, counts: { messages: normalizedMessages.length } }
+      note: `conv ${convId} history ${messages.length}`,
+      data: { convId, messageCount: messages.length }
     });
 
-    console.log('[Desk]', traceId, 'chat-history', 'conv=', convId, 'msg+', normalizedMessages.length);
+    console.log('[Desk]', traceId, 'chat-history', 'conv=', convId, 'messages=', messages.length);
 
-    return NextResponse.json(ack({ messages: normalizedMessages }), { status: 200 });
+    return NextResponse.json(ack({ messages }), { status: 200 });
 
   } catch (error) {
     tapPush({ t: nowIso(), route: '/api/chat-history', traceId, note: 'error', data: { error: String(error) } });
     console.error('[chat-history] Error:', error);
-    return NextResponse.json(ack({}), { status: 200 });
+    return NextResponse.json(ack({ messages: [] }), { status: 200 });
   }
 }
 

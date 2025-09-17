@@ -1,30 +1,13 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { MessageCircle, Phone, Mail, MapPin, Clock, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 
 export default function CustomerPage() {
-  useEffect(() => {
-    // Load GoHighLevel chat widget
-    const script = document.createElement('script');
-    script.src = 'https://beta.leadconnectorhq.com/loader.js';
-    script.setAttribute('data-resources-url', 'https://beta.leadconnectorhq.com/chat-widget/loader.js');
-    script.setAttribute('data-widget-id', '687885d4b081f571130f33e8');
-    script.async = true;
-    
-    document.head.appendChild(script);
-
-    // Cleanup function
-    return () => {
-      if (document.head.contains(script)) {
-        document.head.removeChild(script);
-      }
-    };
-  }, []);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -46,10 +29,12 @@ export default function CustomerPage() {
                 <Phone className="w-4 h-4 mr-2" />
                 Call Us
               </Button>
-              <Button size="sm">
-                <MessageCircle className="w-4 h-4 mr-2" />
-                Live Chat
-              </Button>
+              <Link href="/customer/chat">
+                <Button size="sm">
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Live Chat
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -68,10 +53,12 @@ export default function CustomerPage() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="text-lg px-8 py-3">
-                <MessageCircle className="w-5 h-5 mr-2" />
-                Start Live Chat
-              </Button>
+              <Link href="/customer/chat">
+                <Button size="lg" className="text-lg px-8 py-3">
+                  <MessageCircle className="w-5 h-5 mr-2" />
+                  Start Live Chat
+                </Button>
+              </Link>
               <Button variant="outline" size="lg" className="text-lg px-8 py-3">
                 Learn More
               </Button>
@@ -170,33 +157,36 @@ export default function CustomerPage() {
             Ready to Get Started?
           </h2>
           <p className="text-xl text-blue-100 mb-8">
-            Click the chat widget below to start a conversation with our team
+            Experience our new custom chat interface with AI-powered suggestions
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" variant="secondary" className="text-lg px-8 py-3">
-              <MessageCircle className="w-5 h-5 mr-2" />
-              Start Chat Now
-            </Button>
+            <Link href="/customer/chat">
+              <Button size="lg" variant="secondary" className="text-lg px-8 py-3">
+                <MessageCircle className="w-5 h-5 mr-2" />
+                Start Chat Now
+              </Button>
+            </Link>
             <Button size="lg" variant="outline" className="text-lg px-8 py-3 text-white border-white hover:bg-white hover:text-blue-600">
               <Phone className="w-5 h-5 mr-2" />
               Request Callback
             </Button>
           </div>
 
-          {/* Chat Widget Instructions */}
+          {/* Custom Chat Instructions */}
           <div className="mt-12 p-6 bg-blue-700 rounded-lg max-w-2xl mx-auto">
             <h3 className="text-lg font-semibold text-white mb-3">
-              💬 Test the Live Chat Integration
+              💬 New Custom Chat Experience
             </h3>
             <p className="text-blue-100 text-sm leading-relaxed">
-              Look for the chat widget in the bottom-right corner of this page. Click it to start a conversation that will:
+              Our new chat interface features:
             </p>
             <ul className="text-blue-100 text-sm mt-3 space-y-1 text-left">
-              <li>• Send your message through GoHighLevel MCP</li>
-              <li>• Appear in the Agent Chat Desk queue</li>
-              <li>• Allow agents to respond with AI assistance</li>
-              <li>• Demonstrate the complete end-to-end flow</li>
+              <li>• Direct connection to n8n (no GHL delays)</li>
+              <li>• Real-time AI suggestions for faster responses</li>
+              <li>• Multi-language support with automatic detection</li>
+              <li>• Live updates via Supabase Realtime</li>
+              <li>• Optimistic UI for instant message display</li>
             </ul>
           </div>
         </div>
@@ -260,8 +250,6 @@ export default function CustomerPage() {
           </div>
         </div>
       </footer>
-
-      {/* Chat Widget will be injected here by the script */}
     </div>
   );
 }
