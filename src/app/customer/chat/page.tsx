@@ -76,6 +76,16 @@ export default function CustomerChatPage() {
 
   const initializeChat = async () => {
     try {
+      // Check for existing session in localStorage
+      const existingSession = localStorage.getItem('chat-session');
+      if (existingSession) {
+        const parsedSession = JSON.parse(existingSession);
+        setSession(parsedSession);
+        console.log('[Chat] Restored existing session:', parsedSession.conversationId);
+        return;
+      }
+
+      // Create new session only if none exists
       const response = await fetch('/api/livechat/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -84,13 +94,17 @@ export default function CustomerChatPage() {
 
       const data = await response.json();
       if (data.ok) {
-        setSession({
+        const newSession = {
           conversationId: data.conversation.id,
           token: data.conversation.token,
           lang: data.lang,
           channel: data.channel
-        });
-        console.log('[Chat] Session initialized:', data.conversation.id);
+        };
+        
+        setSession(newSession);
+        // Persist session to localStorage
+        localStorage.setItem('chat-session', JSON.stringify(newSession));
+        console.log('[Chat] New session created:', data.conversation.id);
       }
     } catch (error) {
       console.error('[Chat] Failed to initialize:', error);
@@ -240,6 +254,16 @@ export default function CustomerChatPage() {
                 {isConnected ? 'Connected' : 'Connecting...'}
               </span>
             </div>
+            {/* Clear Session Button for Testing */}
+            <button
+              onClick={() => {
+                localStorage.removeItem('chat-session');
+                window.location.reload();
+              }}
+              className="px-3 py-1 text-xs bg-red-100 text-red-600 rounded-md hover:bg-red-200"
+            >
+              New Session
+            </button>
           </div>
           
           {/* Language Selector */}

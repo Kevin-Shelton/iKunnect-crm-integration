@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { SimpleMessages } from './simple-messages';
+import { AgentReply } from './agent-reply';
 import { AiAssistant } from './ai-assistant';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -74,6 +75,14 @@ export function ChatInterface({ conversationId }: ChatInterfaceProps) {
           <SimpleMessages 
             conversationId={conversationId}
             className="flex-1 overflow-y-auto"
+          />
+          {/* Agent Reply Input */}
+          <AgentReply 
+            conversationId={conversationId}
+            onMessageSent={(message) => {
+              console.log('Agent sent message:', message);
+              // Optionally refresh messages or handle real-time updates
+            }}
           />
         </div>
 
