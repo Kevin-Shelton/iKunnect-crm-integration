@@ -50,6 +50,43 @@ export default function CustomerChatPage() {
     setLanguage(savedLang);
   }, []);
 
+  // Poll for new messages when session is active
+  useEffect(() => {
+    if (!session?.conversationId) return;
+
+    const pollForMessages = async () => {
+      try {
+        const response = await fetch(`/api/conversations/${session.conversationId}/messages`);
+        const data = await response.json();
+        
+        if (data.success && data.messages) {
+          const loadedMessages: Message[] = data.messages.map((msg: any) => ({
+            id: msg.id,
+            text: msg.text,
+            type: msg.sender === 'contact' ? 'customer' : 'agent',
+            timestamp: new Date(msg.timestamp || msg.createdAt)
+          }));
+          
+          // Only update if message count changed
+          setMessages(prev => {
+            if (prev.length !== loadedMessages.length) {
+              console.log('[Chat] New messages detected, updating...');
+              return loadedMessages;
+            }
+            return prev;
+          });
+        }
+      } catch (error) {
+        console.error('[Chat] Failed to poll for messages:', error);
+      }
+    };
+
+    // Poll every 3 seconds for new messages
+    const interval = setInterval(pollForMessages, 3000);
+    
+    return () => clearInterval(interval);
+  }, [session?.conversationId]);
+
   const initializeChat = async () => {
     try {
       // Check for existing session in localStorage
@@ -58,6 +95,9 @@ export default function CustomerChatPage() {
         const parsedSession = JSON.parse(existingSession);
         setSession(parsedSession);
         console.log('[Chat] Restored existing session:', parsedSession.conversationId);
+        
+        // Load existing messages for this conversation
+        await loadConversationHistory(parsedSession.conversationId);
         return;
       }
 
@@ -84,6 +124,28 @@ export default function CustomerChatPage() {
       }
     } catch (error) {
       console.error('[Chat] Failed to initialize:', error);
+    }
+  };
+
+  const loadConversationHistory = async (conversationId: string) => {
+    try {
+      console.log('[Chat] Loading conversation history for:', conversationId);
+      const response = await fetch(`/api/conversations/${conversationId}/messages`);
+      const data = await response.json();
+      
+      if (data.success && data.messages) {
+        const loadedMessages: Message[] = data.messages.map((msg: any) => ({
+          id: msg.id,
+          text: msg.text,
+          type: msg.sender === 'contact' ? 'customer' : 'agent',
+          timestamp: new Date(msg.timestamp || msg.createdAt)
+        }));
+        
+        setMessages(loadedMessages);
+        console.log('[Chat] Loaded', loadedMessages.length, 'messages');
+      }
+    } catch (error) {
+      console.error('[Chat] Failed to load conversation history:', error);
     }
   };
 
