@@ -7,11 +7,19 @@ import type { NormalizedMessage } from '@/lib/types';
 const N8N_WEBHOOK_URL = 'https://invictusbpo.app.n8n.cloud/webhook/ghl-chat-inbound';
 const SHARED_HMAC_SECRET = process.env.SHARED_HMAC_SECRET;
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const body = await request.json();
     
-    // Validate required fields
+    console.log('[LiveChat Send] Received body:', JSON.stringify(body, null, 2));
+    
+    if (!body.message?.text?.trim()) {
+      return NextResponse.json({
+        ok: false,
+        error: 'message.text is required'
+      }, { status: 400 });
+    }
+    
     if (!body.conversation?.id) {
       return NextResponse.json({
         ok: false,
