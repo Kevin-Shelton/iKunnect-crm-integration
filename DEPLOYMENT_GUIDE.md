@@ -183,3 +183,13 @@ For technical issues or questions about this integration:
 **Version**: 1.0.0
 **Status**: Production Ready
 
+
+
+
+## AI Suggestions Setup
+
+1.  Create a new OpenAI API key.
+2.  Add the API key to the `OPENAI_API_KEY` environment variable in your Vercel project settings.
+3.  The `/api/ai-suggestions` endpoint will now be active and will generate suggestions when called from the customer chat page.
+
+

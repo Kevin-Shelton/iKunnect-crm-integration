@@ -181,3 +181,10 @@ The system is now **completely implemented** with:
 
 The GoHighLevel Agent Desk integration is **production-ready** and provides a robust, traceable, and maintainable solution for customer conversation management.
 
+
+
+
+## AI Suggestions Implementation
+
+An AI suggestions feature has been implemented using OpenAI. When a customer sends a message, the system automatically generates helpful response suggestions for the agent. This is achieved through a new API endpoint `/api/ai-suggestions` that is called from the customer chat page. The suggestions are then displayed in the chat interface for the agent to use.
+

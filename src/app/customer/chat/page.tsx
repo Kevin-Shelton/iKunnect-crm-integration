@@ -168,12 +168,38 @@ export default function CustomerChatPage() {
         console.error('[Chat] Send failed:', data.error);
         // Remove optimistic message on failure
         setMessages(prev => prev.filter(msg => msg.id !== messageId));
+      } else {
+        // Generate AI suggestions after successful message send
+        generateAISuggestions();
       }
     } catch (error) {
       console.error('[Chat] Send error:', error);
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const generateAISuggestions = async () => {
+    if (!session) return;
+
+    try {
+      const response = await fetch('/api/ai-suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: session.conversationId,
+          messages: messages.slice(-5) // Send last 5 messages for context
+        })
+      });
+
+      const data = await response.json();
+      if (data.ok && data.suggestions) {
+        setSuggestions(data.suggestions);
+        console.log('[Chat] AI suggestions generated:', data.suggestions.length);
+      }
+    } catch (error) {
+      console.error('[Chat] AI suggestions error:', error);
     }
   };
 
