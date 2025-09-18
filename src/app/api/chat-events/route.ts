@@ -31,7 +31,26 @@ export async function POST(request: NextRequest) {
     // Extract conversation ID with proper type handling
     const payloadObj = payload as Record<string, unknown>;
     const conversation = payloadObj?.conversation as Record<string, unknown> | undefined;
-    const convId = conversation?.id as string;
+    let convId = conversation?.id as string;
+    
+    // If conversation ID is missing or "unknown", generate one from contact info
+    if (!convId || convId === 'unknown') {
+      const contact = payloadObj?.contact as Record<string, unknown> | undefined;
+      const contactId = contact?.id as string;
+      const messageId = payloadObj?.messageId as string;
+      
+      if (contactId && contactId !== 'unknown') {
+        convId = `conv_${contactId}`;
+      } else if (messageId) {
+        // Extract conversation ID from message ID pattern
+        const match = messageId.match(/msg_(\d+)/);
+        convId = match ? `conv_${match[1]}` : `conv_${Date.now()}`;
+      } else {
+        convId = `conv_${Date.now()}`;
+      }
+      
+      console.log('[Chat Events] Generated conversation ID:', convId, 'from:', { contactId, messageId });
+    }
     
     if (!convId) {
       tapPush({ t: nowIso(), route: '/api/chat-events', traceId, note: 'no_conv_id', data: { payload } });
@@ -77,12 +96,27 @@ export async function POST(request: NextRequest) {
       const validType: ValidEventType = validEventTypes.includes(eventType as ValidEventType) 
         ? (eventType as ValidEventType)
         : 'inbound';
+      
+      // Extract text from multiple possible fields
+      let messageText = (payloadObj.text as string) || '';
+      if (!messageText && payloadObj.messageText) {
+        messageText = payloadObj.messageText as string;
+      }
+      if (!messageText && payloadObj.body) {
+        messageText = payloadObj.body as string;
+      }
+      
+      console.log('[Chat Events] Extracted text:', messageText, 'from payload fields:', {
+        text: payloadObj.text,
+        messageText: payloadObj.messageText,
+        body: payloadObj.body
+      });
         
       await insertChatEvent({
         conversation_id: convId,
         type: validType,
         message_id: (payloadObj.messageId as string) || `evt_${Date.now()}`,
-        text: (payloadObj.text as string) || '',
+        text: messageText,
         payload: payloadObj
       });
       eventCount++;
