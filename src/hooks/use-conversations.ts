@@ -34,7 +34,7 @@ export function useConversations(): UseConversationsReturn {
       setIsLoading(true);
       setError(null);
       
-      const response = await fetch('/api/conversations');
+      const response = await fetch('/api/chat/conversations');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

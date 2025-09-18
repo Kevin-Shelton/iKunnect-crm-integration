@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { RealTimeMessages } from './real-time-messages';
+import { SimpleMessages } from './simple-messages';
 import { AiAssistant } from './ai-assistant';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -69,9 +69,9 @@ export function ChatInterface({ conversationId }: ChatInterfaceProps) {
 
       {/* Main content area */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Real-time messages */}
+        {/* Messages */}
         <div className="flex-1 flex flex-col">
-          <RealTimeMessages 
+          <SimpleMessages 
             conversationId={conversationId}
             className="flex-1 overflow-y-auto"
           />

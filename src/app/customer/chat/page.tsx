@@ -152,23 +152,24 @@ export default function CustomerChatPage() {
     setSuggestions([]); // Clear old suggestions
 
     try {
-      const response = await fetch('/api/livechat/send', {
+      const response = await fetch('/api/chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          conversation: { id: session.conversationId },
-          message: { id: messageId, text: text.trim() },
-          lang: language,
-          channel: 'webchat'
+          conversationId: session.conversationId,
+          messageId: messageId,
+          text: text.trim(),
+          sender: 'customer'
         })
       });
 
       const data = await response.json();
-      if (!data.ok) {
+      if (!data.success) {
         console.error('[Chat] Send failed:', data.error);
         // Remove optimistic message on failure
         setMessages(prev => prev.filter(msg => msg.id !== messageId));
       } else {
+        console.log('[Chat] Message sent successfully:', data.message);
         // Generate AI suggestions after successful message send
         generateAISuggestions();
       }
