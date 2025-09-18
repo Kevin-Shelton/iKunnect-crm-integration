@@ -89,11 +89,14 @@ export function Header({
       <div className="flex items-center justify-between">
         {/* Left Section - Logo and Title */}
         <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <MessageSquare className="h-8 w-8 text-blue-600" />
-            <h1 className="text-xl font-semibold text-gray-900">
-              iKunnect Agent Chat Desk
-            </h1>
+          <div className="flex items-center space-x-3">
+          <MessageSquare className="h-6 w-6 text-blue-600" />
+          <h1 className="text-xl font-semibold text-gray-900">
+            iKunnect Agent Chat Desk
+          </h1>
+          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            v2.1 - FIXED
+          </Badge>
           </div>
           
           {/* Queue Stats */}
