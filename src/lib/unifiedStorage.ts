@@ -1,54 +1,60 @@
-// Unified storage system with Supabase persistence and in-memory fallback
-// Works with both the conversations/messages schema and chat_events table
+export const runtime = 'nodejs';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import type { NormalizedMessage } from './types';
 
+// Storage interfaces
 interface StoredMessage {
   id: string;
   conversation_id: string;
   text: string;
-  sender: 'customer' | 'agent';
+  sender: string;
   timestamp: string;
-  created_at?: string;
 }
 
-interface StoredConversation {
+interface ConversationWithMessages {
   id: string;
   customer_name: string;
+  messages: StoredMessage[];
+  last_activity: string;
   status: 'waiting' | 'assigned' | 'closed';
   assigned_agent?: string;
-  last_activity: string;
-  created_at?: string;
-  updated_at?: string;
 }
 
-interface ConversationWithMessages extends StoredConversation {
-  messages: StoredMessage[];
-}
+// Supabase configuration
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_TOKEN;
 
-// Supabase client setup
 let supabase: any = null;
 let useSupabase = false;
 
+// Initialize Supabase if credentials are available
 try {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_TOKEN;
-  
-  if (supabaseUrl && supabaseKey && 
-      supabaseUrl !== 'https://your-project.supabase.co' && 
-      supabaseKey !== 'your-service-role-key') {
-    supabase = createClient(supabaseUrl, supabaseKey);
+  if (supabaseUrl && supabaseServiceKey) {
+    supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
     useSupabase = true;
-    console.log('[UnifiedStorage] Using Supabase for persistent storage');
+    console.log('[UnifiedStorage] Supabase initialized successfully');
   } else {
-    console.log('[UnifiedStorage] Supabase not configured, using in-memory storage');
+    console.log('[UnifiedStorage] Supabase credentials not found, using in-memory storage only');
   }
 } catch (error) {
   console.log('[UnifiedStorage] Supabase initialization failed, using in-memory storage:', error);
 }
 
-// In-memory fallback storage
-const memoryConversations = new Map<string, ConversationWithMessages>();
+// Import singleton memory storage
+import { 
+  getConversationFromMemory, 
+  setConversationInMemory, 
+  getAllConversationsFromMemory,
+  getMemoryStorageStats,
+  type ConversationWithMessages,
+  type StoredMessage as MemoryStoredMessage
+} from './memoryStorageSingleton';
 
 // Convert NormalizedMessage to StoredMessage
 function normalizeToStored(msg: NormalizedMessage): StoredMessage {
@@ -77,16 +83,15 @@ function storedToNormalized(msg: StoredMessage): NormalizedMessage {
       type: 29, // TYPE_LIVE_CHAT
       body: msg.text,
       conversationId: msg.conversation_id,
-      dateAdded: msg.timestamp,
-      source: 'webchat'
+      dateAdded: msg.timestamp
     }
   };
 }
 
 export async function addMessage(conversationId: string, message: NormalizedMessage): Promise<void> {
   const storedMessage = normalizeToStored(message);
-  const timestamp = new Date().toISOString();
   
+  // Try Supabase first if available
   try {
     if (useSupabase && supabase) {
       await storeInSupabase(conversationId, storedMessage, message);
@@ -154,22 +159,16 @@ async function storeInSupabase(conversationId: string, message: StoredMessage, o
         onConflict: 'id'
       });
       
-    // Update conversation last activity
-    await supabase
-      .from('conversations')
-      .update({ 
-        last_activity: message.timestamp
-      })
-      .eq('id', conversationId);
-  } catch (tableError) {
-    // Tables might not exist, that's okay - chat_events is the primary storage
+  } catch (error) {
     console.log('[UnifiedStorage] conversations/messages tables not available, using chat_events only');
   }
 }
 
 function storeInMemory(conversationId: string, message: StoredMessage): void {
-  let conversation = memoryConversations.get(conversationId);
+  console.log(`[UnifiedStorage] Storing message in memory for conversation: ${conversationId}`);
+  let conversation = getConversationFromMemory(conversationId);
   if (!conversation) {
+    console.log(`[UnifiedStorage] Creating new conversation in memory: ${conversationId}`);
     conversation = {
       id: conversationId,
       customer_name: `Customer ${conversationId.slice(-4)}`,
@@ -177,14 +176,16 @@ function storeInMemory(conversationId: string, message: StoredMessage): void {
       last_activity: message.timestamp,
       status: 'waiting'
     };
-    memoryConversations.set(conversationId, conversation);
+    setConversationInMemory(conversationId, conversation);
   }
   
   // Check if message already exists to avoid duplicates
   const existingIndex = conversation.messages.findIndex(m => m.id === message.id);
   if (existingIndex >= 0) {
+    console.log(`[UnifiedStorage] Updating existing message: ${message.id}`);
     conversation.messages[existingIndex] = message;
   } else {
+    console.log(`[UnifiedStorage] Adding new message: ${message.id}`);
     conversation.messages.push(message);
   }
   
@@ -194,6 +195,11 @@ function storeInMemory(conversationId: string, message: StoredMessage): void {
   );
   
   conversation.last_activity = message.timestamp;
+  
+  // Update the conversation in memory
+  setConversationInMemory(conversationId, conversation);
+  
+  console.log(`[UnifiedStorage] Memory storage updated. Conversation ${conversationId} now has ${conversation.messages.length} messages`);
 }
 
 export async function getConversations(): Promise<Array<{
@@ -204,14 +210,27 @@ export async function getConversations(): Promise<Array<{
   messageCount: number;
   assignedAgent?: string;
 }>> {
+  console.log('[UnifiedStorage] getConversations called, useSupabase:', useSupabase);
+  
   try {
     if (useSupabase && supabase) {
-      return await getConversationsFromSupabase();
+      const supabaseConversations = await getConversationsFromSupabase();
+      console.log('[UnifiedStorage] Supabase returned conversations:', supabaseConversations.length);
+      
+      // If Supabase returns no conversations, check memory as fallback
+      if (supabaseConversations.length === 0) {
+        const memoryConversations = getConversationsFromMemory();
+        console.log('[UnifiedStorage] Memory fallback returned conversations:', memoryConversations.length);
+        return memoryConversations;
+      }
+      
+      return supabaseConversations;
     }
   } catch (error) {
     console.error('[UnifiedStorage] Supabase fetch failed, using memory fallback:', error);
   }
   
+  console.log('[UnifiedStorage] Using memory storage only');
   return getConversationsFromMemory();
 }
 
@@ -304,7 +323,7 @@ function getConversationsFromMemory(): Array<{
   messageCount: number;
   assignedAgent?: string;
 }> {
-  return Array.from(memoryConversations.values())
+  return getAllConversationsFromMemory()
     .sort((a, b) => new Date(b.last_activity).getTime() - new Date(a.last_activity).getTime())
     .map(conv => ({
       id: conv.id,
@@ -321,14 +340,28 @@ export async function getConversationMessages(conversationId: string, limit = 25
   contact: any;
   total: number;
 }> {
+  console.log(`[UnifiedStorage] getConversationMessages called for ${conversationId}, useSupabase:`, useSupabase);
+  
   try {
     if (useSupabase && supabase) {
-      return await getMessagesFromSupabase(conversationId, limit);
+      const supabaseMessages = await getMessagesFromSupabase(conversationId, limit);
+      console.log(`[UnifiedStorage] Supabase returned ${supabaseMessages.messages.length} messages for ${conversationId}`);
+      
+      // If Supabase returns no messages, check memory as fallback
+      if (supabaseMessages.messages.length === 0) {
+        const memoryMessages = getMessagesFromMemory(conversationId, limit);
+        console.log(`[UnifiedStorage] Memory fallback returned ${memoryMessages.messages.length} messages for ${conversationId}`);
+        return memoryMessages;
+      }
+      
+      return supabaseMessages;
     }
   } catch (error) {
     console.error('[UnifiedStorage] Supabase fetch failed, using memory fallback:', error);
+    return getMessagesFromMemory(conversationId, limit);
   }
   
+  console.log(`[UnifiedStorage] Using memory storage only for ${conversationId}`);
   return getMessagesFromMemory(conversationId, limit);
 }
 
@@ -388,24 +421,16 @@ async function getMessagesFromSupabase(conversationId: string, limit: number): P
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
     .limit(limit);
-    
-  if (!chatEvents || chatEvents.length === 0) {
-    return {
-      messages: [],
-      contact: null,
-      total: 0
-    };
-  }
-  
+
   const messages = chatEvents
-    .filter((event: any) => event.type === 'inbound' || event.type === 'agent_send')
+    ?.filter((event: any) => event.type === 'inbound' || event.type === 'agent_send')
     .map((event: any) => storedToNormalized({
       id: event.message_id || event.id,
       conversation_id: conversationId,
       text: event.text || '',
       sender: event.type === 'inbound' ? 'customer' : 'agent',
       timestamp: event.created_at
-    }));
+    })) || [];
   
   const contact = {
     id: conversationId,
@@ -423,7 +448,7 @@ function getMessagesFromMemory(conversationId: string, limit: number): {
   contact: any;
   total: number;
 } {
-  const conversation = memoryConversations.get(conversationId);
+  const conversation = getConversationFromMemory(conversationId);
   
   if (!conversation) {
     return {
@@ -449,6 +474,30 @@ function getMessagesFromMemory(conversationId: string, limit: number): {
     messages,
     contact,
     total: messages.length
+  };
+}
+
+export async function getConversation(conversationId: string): Promise<{
+  id: string;
+  customerName: string;
+  status: string;
+  lastActivity: string;
+  messages: NormalizedMessage[];
+  contact?: any;
+} | null> {
+  const { messages, contact } = await getConversationMessages(conversationId);
+  
+  if (messages.length === 0) {
+    return null;
+  }
+  
+  return {
+    id: conversationId,
+    customerName: contact?.name || `Customer ${conversationId.slice(-4)}`,
+    status: 'waiting',
+    lastActivity: messages[messages.length - 1]?.createdAt || new Date().toISOString(),
+    messages,
+    contact
   };
 }
 
@@ -479,68 +528,49 @@ export async function updateConversationStatus(
     console.error('[UnifiedStorage] Supabase update failed, using memory fallback:', error);
   }
   
-  // Update memory
-  const conversation = memoryConversations.get(conversationId);
+  // Update memory storage
+  const conversation = getConversationFromMemory(conversationId);
   if (conversation) {
     conversation.status = status;
-    if (agentId) {
-      conversation.assigned_agent = agentId;
-    }
+    conversation.assigned_agent = agentId;
     conversation.last_activity = timestamp;
+    setConversationInMemory(conversationId, conversation);
   }
   
   console.log(`[UnifiedStorage] Updated conversation ${conversationId} status to ${status}`);
 }
 
 export function getStorageInfo() {
+  const stats = getMemoryStorageStats();
   return {
-    type: useSupabase ? 'supabase+memory' : 'memory-only',
-    supabaseConfigured: useSupabase,
-    memoryConversations: memoryConversations.size
+    useSupabase,
+    supabaseConfigured: !!(supabaseUrl && supabaseServiceKey),
+    memoryConversations: stats.totalConversations
   };
 }
 
-// Legacy compatibility functions for existing code
-export function upsertMessages(conversationId: string, messages: NormalizedMessage[]) {
-  messages.forEach(message => {
-    addMessage(conversationId, message).catch(error => {
-      console.error('[UnifiedStorage] Failed to add message:', error);
-    });
-  });
-}
-
-export function getConversation(id: string) {
-  const conversation = memoryConversations.get(id);
-  if (!conversation) {
-    return { id, messages: [], suggestions: [], updatedAt: 0 };
-  }
+// Export memory storage for debugging
+export function getMemoryStorageForDebug() {
+  const stats = getMemoryStorageStats();
+  const conversations = getAllConversationsFromMemory();
   
   return {
-    id: conversation.id,
-    messages: conversation.messages.map(msg => storedToNormalized(msg)),
-    suggestions: [], // TODO: Implement suggestions storage
-    updatedAt: new Date(conversation.last_activity).getTime()
+    totalConversations: stats.totalConversations,
+    conversationIds: stats.conversationIds,
+    totalMessages: stats.totalMessages,
+    conversations: conversations.map(conv => ({
+      id: conv.id,
+      customerName: conv.customer_name,
+      messageCount: conv.messages.length,
+      lastActivity: conv.last_activity,
+      status: conv.status,
+      assignedAgent: conv.assigned_agent,
+      messages: conv.messages.map(msg => ({
+        id: msg.id,
+        text: msg.text,
+        sender: msg.sender,
+        timestamp: msg.timestamp
+      }))
+    }))
   };
-}
-
-export function listConversations() {
-  return Array.from(memoryConversations.values())
-    .sort((a, b) => new Date(b.last_activity).getTime() - new Date(a.last_activity).getTime())
-    .map(c => ({
-      id: c.id,
-      updatedAt: new Date(c.last_activity).getTime(),
-      messageCount: c.messages.length,
-      suggestionCount: 0, // TODO: Implement suggestions
-      lastText: c.messages.at(-1)?.text ?? ''
-    }));
-}
-
-export function addSuggestions(conversationId: string, suggestions: string[]) {
-  // TODO: Implement suggestions storage in unified system
-  console.log(`[UnifiedStorage] Suggestions not yet implemented for conversation ${conversationId}:`, suggestions);
-}
-
-export function resetConversations() {
-  memoryConversations.clear();
-  console.log('[UnifiedStorage] Cleared memory conversations');
 }

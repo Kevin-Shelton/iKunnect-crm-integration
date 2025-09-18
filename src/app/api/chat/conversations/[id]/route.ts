@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConversation } from '@/lib/productionStorage';
+import { getConversation } from '@/lib/unifiedStorage';
 
 export async function GET(
   request: NextRequest,
@@ -8,12 +8,12 @@ export async function GET(
   try {
     const { id } = await params;
     
-    console.log(`[Chat Messages] Fetching messages for conversation: ${id}`);
+    console.log(`[Chat Messages] Fetching messages for conversation: ${id} from unified storage`);
     
     const conversation = await getConversation(id);
     
     if (!conversation) {
-      console.log(`[Chat Messages] Conversation ${id} not found`);
+      console.log(`[Chat Messages] Conversation ${id} not found in unified storage`);
       return NextResponse.json({
         success: true,
         messages: [],
@@ -26,21 +26,21 @@ export async function GET(
     const messages = conversation.messages.map(msg => ({
       id: msg.id,
       text: msg.text,
-      sender: msg.sender === 'customer' ? 'contact' : 'agent',
+      sender: msg.sender,
       timestamp: msg.timestamp,
-      type: msg.sender === 'customer' ? 'inbound' : 'outbound',
-      contactId: conversation.id
+      type: msg.sender === 'contact' ? 'inbound' : 'outbound',
+      contactId: conversation.contact?.id || conversation.id
     }));
     
     const contact = {
-      id: conversation.id,
-      name: conversation.customerName,
-      email: '',
-      phone: '',
-      locationId: ''
+      id: conversation.contact?.id || conversation.id,
+      name: conversation.contact?.name || conversation.customerName || `Customer ${conversation.id}`,
+      email: conversation.contact?.email || '',
+      phone: conversation.contact?.phone || '',
+      locationId: conversation.contact?.locationId || ''
     };
     
-    console.log(`[Chat Messages] Returning ${messages.length} messages for conversation ${id}`);
+    console.log(`[Chat Messages] Returning ${messages.length} messages for conversation ${id} from unified storage`);
     
     return NextResponse.json({
       success: true,
@@ -60,4 +60,3 @@ export async function GET(
     }, { status: 500 });
   }
 }
-

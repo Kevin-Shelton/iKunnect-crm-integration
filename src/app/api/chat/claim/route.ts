@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConversation, updateConversationStatus } from '@/lib/productionStorage';
+import { getConversation, updateConversationStatus } from '@/lib/unifiedStorage';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,9 +12,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the conversation
+    console.log(`[Claim] Attempting to claim conversation ${conversationId} for agent ${agentId}`);
+
+    // Get the conversation from unified storage
     const conversation = await getConversation(conversationId);
     if (!conversation) {
+      console.log(`[Claim] Conversation ${conversationId} not found in unified storage`);
       return NextResponse.json(
         { success: false, error: 'Conversation not found' },
         { status: 404 }
@@ -24,7 +27,7 @@ export async function POST(request: NextRequest) {
     // Update conversation status to assigned
     const updatedConversation = await updateConversationStatus(conversationId, 'assigned', agentId);
 
-    console.log(`[Claim] Conversation ${conversationId} claimed by ${agentId}`);
+    console.log(`[Claim] Conversation ${conversationId} claimed by ${agentId} via unified storage`);
 
     return NextResponse.json({
       success: true,
@@ -40,4 +43,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
