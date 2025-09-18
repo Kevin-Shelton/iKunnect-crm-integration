@@ -1,8 +1,7 @@
 export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { upsertMessages } from '@/lib/chatStorage';
-import { supabaseService } from '@/lib/supabase';
+import { addMessage } from '@/lib/unifiedStorage';
 import type { NormalizedMessage } from '@/lib/types';
 
 const N8N_WEBHOOK_URL = 'https://invictusbpo.app.n8n.cloud/webhook/ghl-chat-inbound';
@@ -55,7 +54,7 @@ export async function POST(request: Request) {
         .digest('hex');
     }
 
-    // Store message in local storage
+    // Store message using unified storage
     const normalizedMessage: NormalizedMessage = {
       id: payload.messageId,
       conversationId: payload.conversation.id,
@@ -77,54 +76,38 @@ export async function POST(request: Request) {
       }
     };
     
-    upsertMessages(payload.conversation.id, [normalizedMessage]);
+    // Store in unified storage (handles both Supabase and memory)
+    await addMessage(payload.conversation.id, normalizedMessage);
     
-    // Also store in Supabase for conversations API
-    if (supabaseService) {
-      try {
-        await supabaseService
-          .from('chat_events')
-          .insert({
-            conversation_id: payload.conversation.id,
-            message_id: payload.messageId,
-            type: 'inbound',
-            text: payload.text,
-            created_at: payload.timestamp,
-            raw_payload: payload
-          });
-        
-        console.log('[LiveChat Send] Message stored in Supabase');
-      } catch (supabaseError) {
-        console.error('[LiveChat Send] Supabase storage failed:', supabaseError);
-        // Continue anyway - in-memory storage is working
-      }
-    }
-    
-    console.log('[LiveChat Send] Message stored locally:', {
+    console.log('[LiveChat Send] Message stored:', {
       conversationId: payload.conversation.id,
       messageId: payload.messageId,
       text: payload.text
     });
     
     // Forward to n8n webhook
-    const response = await fetch(N8N_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(signature && { 'X-Signature': `sha256=${signature}` })
-      },
-      body: payloadString
-    });
+    try {
+      const response = await fetch(N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(signature && { 'X-Signature': `sha256=${signature}` })
+        },
+        body: payloadString
+      });
+      
+      console.log('[LiveChat Send] n8n webhook response:', {
+        conversationId: payload.conversation.id,
+        messageId: payload.messageId,
+        status: response.status,
+        ok: response.ok
+      });
+    } catch (n8nError) {
+      console.error('[LiveChat Send] n8n webhook failed:', n8nError);
+      // Continue anyway - message is stored
+    }
     
-    // Log the attempt
-    console.log('[LiveChat Send]', {
-      conversationId: payload.conversation.id,
-      messageId: payload.messageId,
-      n8nStatus: response.status,
-      timestamp: payload.timestamp
-    });
-    
-    // Return success immediately (don't wait for n8n processing)
+    // Return success immediately
     return NextResponse.json({
       ok: true,
       messageId: payload.messageId,
@@ -139,4 +122,3 @@ export async function POST(request: Request) {
     }, { status: 500 });
   }
 }
-

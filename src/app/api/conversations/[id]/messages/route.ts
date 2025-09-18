@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConversation } from '@/lib/chatStorage';
+import { getConversationMessages } from '@/lib/unifiedStorage';
 
 export async function GET(
   request: NextRequest,
@@ -10,22 +10,30 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get('limit') || '25');
 
-    // Get conversation from in-memory storage
-    const conversation = getConversation(conversationId);
+    console.log('[Messages API] Fetching messages for conversation:', conversationId, { limit });
+
+    // Get conversation messages from unified storage
+    const result = await getConversationMessages(conversationId, limit);
     
-    if (!conversation || !conversation.messages) {
-      console.log('[Messages API] No conversation found for ID:', conversationId);
+    if (!result.messages || result.messages.length === 0) {
+      console.log('[Messages API] No messages found for conversation:', conversationId);
       return NextResponse.json({
         success: true,
         messages: [],
-        contact: null,
+        contact: result.contact || {
+          id: conversationId,
+          name: `Customer ${conversationId.slice(-4)}`,
+          email: '',
+          phone: '',
+          locationId: ''
+        },
         total: 0,
         timestamp: new Date().toISOString()
       });
     }
 
-    // Transform normalized messages to API format
-    const messages = conversation.messages.slice(-limit).map((msg) => ({
+    // Transform normalized messages to API format expected by the frontend
+    const messages = result.messages.map((msg) => ({
       id: msg.id,
       text: msg.text || '',
       sender: msg.sender || 'contact',
@@ -34,30 +42,25 @@ export async function GET(
       contactId: msg.conversationId || null
     }));
 
-    // Extract contact info from the first message
-    let contact = null;
-    if (messages.length > 0) {
-      const firstMessage = conversation.messages[0];
-      contact = {
-        id: firstMessage.conversationId || conversationId,
-        name: `Customer ${conversationId.slice(-4)}`,
-        email: '',
-        phone: '',
-        locationId: ''
-      };
-    }
-
     console.log('[Messages API] Returning messages for conversation:', conversationId, {
       messageCount: messages.length,
-      hasContact: !!contact,
-      totalInStorage: conversation.messages.length
+      hasContact: !!result.contact,
+      total: result.total,
+      firstMessage: messages[0]?.text?.substring(0, 50),
+      lastMessage: messages[messages.length - 1]?.text?.substring(0, 50)
     });
 
     return NextResponse.json({
       success: true,
       messages: messages,
-      contact,
-      total: messages.length,
+      contact: result.contact || {
+        id: conversationId,
+        name: `Customer ${conversationId.slice(-4)}`,
+        email: '',
+        phone: '',
+        locationId: ''
+      },
+      total: result.total,
       timestamp: new Date().toISOString()
     });
 
@@ -67,10 +70,10 @@ export async function GET(
       { 
         error: 'Internal server error', 
         message: error instanceof Error ? error.message : 'Unknown error',
+        success: false,
         timestamp: new Date().toISOString()
       },
       { status: 500 }
     );
   }
 }
-
