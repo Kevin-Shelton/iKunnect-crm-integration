@@ -54,7 +54,7 @@ const memoryConversations = new Map<string, ConversationWithMessages>();
 function normalizeToStored(msg: NormalizedMessage): StoredMessage {
   return {
     id: msg.id,
-    conversation_id: msg.conversationId,
+    conversation_id: msg.conversationId || '',
     text: msg.text || '',
     sender: msg.direction === 'inbound' ? 'customer' : 'agent',
     timestamp: msg.createdAt || new Date().toISOString()
@@ -67,7 +67,7 @@ function storedToNormalized(msg: StoredMessage): NormalizedMessage {
     id: msg.id,
     conversationId: msg.conversation_id,
     direction: msg.sender === 'customer' ? 'inbound' : 'outbound',
-    sender: msg.sender === 'customer' ? 'contact' : 'agent',
+    sender: msg.sender === 'customer' ? 'contact' : 'human_agent',
     category: 'chat',
     text: msg.text,
     createdAt: msg.timestamp,

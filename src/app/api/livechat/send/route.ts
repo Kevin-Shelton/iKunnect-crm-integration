@@ -1,5 +1,5 @@
 export const runtime = 'nodejs';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { addMessage } from '@/lib/unifiedStorage';
 import type { NormalizedMessage } from '@/lib/types';

@@ -1,5 +1,6 @@
 export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 
 // Use the existing n8n webhook URL that's already configured
 const N8N_WEBHOOK_URL = 'https://invictusbpo.app.n8n.cloud/webhook/ghl-chat-inbound';
@@ -58,7 +59,6 @@ export async function POST(request: NextRequest) {
     // Generate HMAC signature if secret is available
     let signature = '';
     if (SHARED_HMAC_SECRET) {
-      const crypto = require('crypto');
       const payloadString = JSON.stringify(n8nPayload);
       signature = crypto
         .createHmac('sha256', SHARED_HMAC_SECRET)
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
         }));
 
         // If we got valid suggestions, return them
-        if (formattedSuggestions.length > 0 && formattedSuggestions.some(s => s.text.trim())) {
+        if (formattedSuggestions.length > 0 && formattedSuggestions.some((s: any) => s.text.trim())) {
           return NextResponse.json({
             ok: true,
             suggestions: formattedSuggestions,
