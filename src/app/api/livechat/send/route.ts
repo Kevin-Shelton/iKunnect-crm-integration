@@ -27,13 +27,6 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
     
-    if (!body.message?.text?.trim()) {
-      return NextResponse.json({
-        ok: false,
-        error: 'message.text is required'
-      }, { status: 400 });
-    }
-    
     // Normalize payload for n8n
     const payload = {
       type: 'inbound',
