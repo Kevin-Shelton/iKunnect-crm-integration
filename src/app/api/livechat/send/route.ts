@@ -2,6 +2,7 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { upsertMessages } from '@/lib/chatStorage';
+import { supabaseService } from '@/lib/supabase';
 import type { NormalizedMessage } from '@/lib/types';
 
 const N8N_WEBHOOK_URL = 'https://invictusbpo.app.n8n.cloud/webhook/ghl-chat-inbound';
@@ -77,6 +78,27 @@ export async function POST(request: Request) {
     };
     
     upsertMessages(payload.conversation.id, [normalizedMessage]);
+    
+    // Also store in Supabase for conversations API
+    if (supabaseService) {
+      try {
+        await supabaseService
+          .from('chat_events')
+          .insert({
+            conversation_id: payload.conversation.id,
+            message_id: payload.messageId,
+            type: 'inbound',
+            text: payload.text,
+            created_at: payload.timestamp,
+            raw_payload: payload
+          });
+        
+        console.log('[LiveChat Send] Message stored in Supabase');
+      } catch (supabaseError) {
+        console.error('[LiveChat Send] Supabase storage failed:', supabaseError);
+        // Continue anyway - in-memory storage is working
+      }
+    }
     
     console.log('[LiveChat Send] Message stored locally:', {
       conversationId: payload.conversation.id,
