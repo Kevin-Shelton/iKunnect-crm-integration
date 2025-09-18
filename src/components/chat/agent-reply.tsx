@@ -8,9 +8,10 @@ import { Send } from 'lucide-react';
 interface AgentReplyProps {
   conversationId: string;
   onMessageSent?: (message: string) => void;
+  onRefreshNeeded?: () => void;
 }
 
-export function AgentReply({ conversationId, onMessageSent }: AgentReplyProps) {
+export function AgentReply({ conversationId, onMessageSent, onRefreshNeeded }: AgentReplyProps) {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -35,6 +36,7 @@ export function AgentReply({ conversationId, onMessageSent }: AgentReplyProps) {
         console.log('[Agent] Message sent successfully:', data.message);
         setMessage('');
         onMessageSent?.(message.trim());
+        onRefreshNeeded?.(); // Trigger refresh
       } else {
         console.error('[Agent] Send failed:', data.error);
       }

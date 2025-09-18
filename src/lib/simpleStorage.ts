@@ -13,7 +13,7 @@ interface Conversation {
   customerName: string;
   messages: Message[];
   lastActivity: string;
-  status: 'waiting' | 'active' | 'closed';
+  status: 'waiting' | 'assigned' | 'closed';
 }
 
 // Global storage
@@ -84,7 +84,7 @@ export function debugStorage() {
 // Update conversation status
 export function updateConversationStatus(
   conversationId: string, 
-  status: 'waiting' | 'active' | 'closed',
+  status: 'waiting' | 'assigned' | 'closed',
   agentId?: string
 ): Conversation | null {
   const conversation = conversations.get(conversationId);

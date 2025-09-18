@@ -29,7 +29,27 @@ export async function GET(request: NextRequest) {
         }))
       }));
     
-    const assigned = conversations.filter(conv => conv.status === 'active');
+    const assigned = conversations
+      .filter(conv => conv.status === 'assigned')
+      .map(conv => ({
+        id: conv.id,
+        contactId: `contact_${conv.id}`,
+        contactName: conv.customerName,
+        lastMessage: conv.messages[conv.messages.length - 1]?.text || '',
+        timestamp: conv.lastActivity,
+        unreadCount: conv.messages.filter(m => m.sender === 'customer').length,
+        status: conv.status,
+        priority: 'normal',
+        tags: [],
+        assignedTo: (conv as any).assignedAgent || 'Agent',
+        messages: conv.messages.map(msg => ({
+          id: msg.id,
+          text: msg.text,
+          sender: msg.sender === 'customer' ? 'contact' : 'agent',
+          timestamp: msg.timestamp,
+          type: msg.sender === 'customer' ? 'inbound' : 'outbound'
+        }))
+      }));
     const all = [...waiting, ...assigned];
     
     console.log('[Chat Conversations] Returning:', {

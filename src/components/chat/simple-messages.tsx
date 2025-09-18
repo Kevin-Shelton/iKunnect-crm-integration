@@ -7,16 +7,17 @@ import { formatDistanceToNow } from 'date-fns';
 interface Message {
   id: string;
   text: string;
-  sender: 'contact' | 'agent';
+  sender: 'customer' | 'agent';
   timestamp: string;
 }
 
 interface SimpleMessagesProps {
   conversationId: string;
   className?: string;
+  onNewMessage?: (message: Message) => void;
 }
 
-export function SimpleMessages({ conversationId, className = '' }: SimpleMessagesProps) {
+export function SimpleMessages({ conversationId, className = '', onNewMessage }: SimpleMessagesProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +44,16 @@ export function SimpleMessages({ conversationId, className = '' }: SimpleMessage
         }
         
         console.log(`[SimpleMessages] Loaded ${data.messages.length} messages`);
-        setMessages(data.messages || []);
+        const newMessages = data.messages || [];
+        setMessages(newMessages);
+        
+        // Trigger notification for new messages
+        if (newMessages.length > messages.length && onNewMessage) {
+          const latestMessage = newMessages[newMessages.length - 1];
+          if (latestMessage.sender === 'customer') {
+            onNewMessage(latestMessage);
+          }
+        }
         
       } catch (err) {
         console.error('[SimpleMessages] Error loading messages:', err);
@@ -54,7 +64,11 @@ export function SimpleMessages({ conversationId, className = '' }: SimpleMessage
     };
 
     loadMessages();
-  }, [conversationId]);
+    
+    // Auto-refresh every 2 seconds
+    const interval = setInterval(loadMessages, 2000);
+    return () => clearInterval(interval);
+  }, [conversationId, messages.length, onNewMessage]);
 
   if (isLoading) {
     return (
