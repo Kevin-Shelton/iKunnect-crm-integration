@@ -10,7 +10,7 @@ import type { GhlMessage, MirrorPayload } from '@/lib/types';
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
-  const traceId = pickTrace(request);
+  const traceId = pickTrace(request.headers);
   
   try {
     const body = await request.text();
