@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
-import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface Message {
   id: string;
@@ -31,37 +29,15 @@ export default function CustomerChatPage() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [language, setLanguage] = useState('en');
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(true); // Always connected in clean architecture
   const [isLoading, setIsLoading] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const channelRef = useRef<RealtimeChannel | null>(null);
 
   // Initialize chat session
   useEffect(() => {
     initializeChat();
   }, []);
-
-  // Set up Supabase Realtime subscription
-  useEffect(() => {
-    if (!session || !supabase) return;
-
-    const channel = supabase
-      .channel(session.channel)
-      .on('broadcast', { event: 'event' }, (payload) => {
-        handleRealtimeEvent(payload.payload);
-      })
-      .subscribe((status) => {
-        setIsConnected(status === 'SUBSCRIBED');
-        console.log('[Chat] Realtime status:', status);
-      });
-
-    channelRef.current = channel;
-
-    return () => {
-      channel.unsubscribe();
-    };
-  }, [session]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -108,39 +84,6 @@ export default function CustomerChatPage() {
       }
     } catch (error) {
       console.error('[Chat] Failed to initialize:', error);
-    }
-  };
-
-  const handleRealtimeEvent = (event: any) => {
-    console.log('[Chat] Received event:', event);
-
-    switch (event.type) {
-      case 'inbound':
-        // Echo of our own message
-        setMessages(prev => prev.map(msg => 
-          msg.id === event.messageId 
-            ? { ...msg, type: 'customer' as const }
-            : msg
-        ));
-        break;
-
-      case 'agent_send':
-        addMessage({
-          id: event.messageId || `agent_${Date.now()}`,
-          text: event.text,
-          type: 'agent',
-          timestamp: new Date()
-        });
-        break;
-
-      case 'suggestions':
-        if (event.items && Array.isArray(event.items)) {
-          setSuggestions(event.items.sort((a: Suggestion, b: Suggestion) => a.rank - b.rank));
-        }
-        break;
-
-      default:
-        console.log('[Chat] Unknown event type:', event.type);
     }
   };
 
