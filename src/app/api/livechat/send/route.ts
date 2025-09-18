@@ -1,6 +1,8 @@
 export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { upsertMessages } from '@/lib/chatStorage';
+import type { NormalizedMessage } from '@/lib/types';
 
 const N8N_WEBHOOK_URL = 'https://invictusbpo.app.n8n.cloud/webhook/ghl-chat-inbound';
 const SHARED_HMAC_SECRET = process.env.SHARED_HMAC_SECRET;
@@ -50,6 +52,36 @@ export async function POST(request: NextRequest) {
         .update(payloadString, 'utf8')
         .digest('hex');
     }
+
+    // Store message in local storage
+    const normalizedMessage: NormalizedMessage = {
+      id: payload.messageId,
+      conversationId: payload.conversation.id,
+      direction: 'inbound',
+      sender: 'contact',
+      category: 'chat',
+      text: payload.text,
+      createdAt: payload.timestamp,
+      raw: {
+        id: payload.messageId,
+        direction: 'inbound',
+        type: 29, // TYPE_LIVE_CHAT
+        body: payload.text,
+        conversationId: payload.conversation.id,
+        dateAdded: payload.timestamp,
+        locationId: payload.locationId,
+        contactId: payload.contact?.id || null,
+        source: 'webchat'
+      }
+    };
+    
+    upsertMessages(payload.conversation.id, [normalizedMessage]);
+    
+    console.log('[LiveChat Send] Message stored locally:', {
+      conversationId: payload.conversation.id,
+      messageId: payload.messageId,
+      text: payload.text
+    });
     
     // Forward to n8n webhook
     const response = await fetch(N8N_WEBHOOK_URL, {
