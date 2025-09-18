@@ -47,7 +47,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate conversationId is present
-    const convId = (payload as Record<string, unknown>)?.conversation?.id as string;
+    const payloadObj = payload as Record<string, unknown>;
+    const conversation = payloadObj?.conversation as Record<string, unknown> | undefined;
+    const convId = conversation?.id as string;
     if (!convId) {
       tapPush({ t: nowIso(), route: '/api/chat-events', traceId, note: 'no_conv_id', data: { payload } });
       return NextResponse.json({ error: 'missing conversation.id' }, { status: 400 });
@@ -74,15 +76,14 @@ export async function POST(req: NextRequest) {
     }
     
     // Handle direct event format (new format)
-    const eventPayload = payload as Record<string, unknown>;
-    if (eventPayload.type) {
+    if (payloadObj.type) {
       await insertChatEvent({
         conversation_id: convId,
-        type: eventPayload.type as string,
-        message_id: eventPayload.messageId as string,
-        text: eventPayload.text as string,
-        items: eventPayload.items as unknown[],
-        payload: eventPayload
+        type: payloadObj.type as string,
+        message_id: payloadObj.messageId as string,
+        text: payloadObj.text as string,
+        items: payloadObj.items as unknown[],
+        payload: payloadObj
       });
       eventCount++;
       
@@ -93,7 +94,7 @@ export async function POST(req: NextRequest) {
         .send({
           type: 'broadcast',
           event: 'event',
-          payload: eventPayload
+          payload: payloadObj
         });
     }
 
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
 
     // Return safe response
     return NextResponse.json(ack({ 
-      messageId: eventPayload.messageId as string,
+      messageId: payloadObj.messageId as string,
       threadId: convId,
       eventsProcessed: eventCount
     }), { status: 200 });
