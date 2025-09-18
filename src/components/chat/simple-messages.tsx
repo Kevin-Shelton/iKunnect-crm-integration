@@ -36,7 +36,7 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage }:
         
         console.log(`[SimpleMessages] Loading messages for conversation: ${conversationId}`);
         
-        const response = await fetch(`/api/chat/conversations/${conversationId}`);
+        const response = await fetch(`/api/conversations/${conversationId}/messages`);
         const data = await response.json();
         
         if (!data.success) {
@@ -44,14 +44,21 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage }:
         }
         
         console.log(`[SimpleMessages] Loaded ${data.messages.length} messages`);
-        const newMessages = data.messages || [];
-        setMessages(newMessages);
+        const newMessages = (data.messages || []).map((msg: any) => ({
+          ...msg,
+          sender: msg.sender === 'contact' ? 'customer' : msg.sender === 'human_agent' ? 'agent' : msg.sender
+        }));
         
-        // Trigger notification for new messages
-        if (newMessages.length > messages.length && onNewMessage) {
-          const latestMessage = newMessages[newMessages.length - 1];
-          if (latestMessage.sender === 'customer') {
-            onNewMessage(latestMessage);
+        // Only update if messages actually changed
+        if (JSON.stringify(newMessages) !== JSON.stringify(messages)) {
+          setMessages(newMessages);
+          
+          // Trigger notification for new messages
+          if (newMessages.length > messages.length && onNewMessage) {
+            const latestMessage = newMessages[newMessages.length - 1];
+            if (latestMessage.sender === 'customer') {
+              onNewMessage(latestMessage);
+            }
           }
         }
         
@@ -65,10 +72,10 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage }:
 
     loadMessages();
     
-    // Auto-refresh every 2 seconds
-    const interval = setInterval(loadMessages, 2000);
+    // Reduce refresh frequency to every 10 seconds to prevent blinking
+    const interval = setInterval(loadMessages, 10000);
     return () => clearInterval(interval);
-  }, [conversationId, messages.length, onNewMessage]);
+  }, [conversationId]); // Remove messages.length and onNewMessage from dependencies
 
   if (isLoading) {
     return (
