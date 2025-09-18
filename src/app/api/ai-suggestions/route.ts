@@ -7,6 +7,8 @@ const openai = new OpenAI({
 });
 
 export async function POST(request: NextRequest) {
+  let conversationId = 'unknown';
+  
   try {
     const body = await request.json();
     
@@ -17,6 +19,8 @@ export async function POST(request: NextRequest) {
         error: 'conversationId is required'
       }, { status: 400 });
     }
+    
+    conversationId = body.conversationId;
     
     if (!body.messages || !Array.isArray(body.messages)) {
       return NextResponse.json({
@@ -145,7 +149,7 @@ Format your response as a JSON array of objects with "text", "reason", and "conf
     return NextResponse.json({
       ok: true,
       suggestions: fallbackSuggestions,
-      conversationId: body.conversationId,
+      conversationId: conversationId,
       fallback: true,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
