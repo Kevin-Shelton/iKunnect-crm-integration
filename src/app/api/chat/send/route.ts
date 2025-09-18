@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { addMessage } from '@/lib/productionStorage';
+import { addMessage } from '@/lib/unifiedStorage';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,21 +24,35 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // Create message
-    const message = await addMessage(body.conversationId, {
+    // Create message using unified storage
+    const messageData = {
       id: body.messageId || `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       text: body.text.trim(),
-      sender: body.sender || 'customer'
+      sender: body.sender === 'agent' ? 'human_agent' : 'contact',
+      conversationId: body.conversationId,
+      createdAt: new Date().toISOString(),
+      direction: body.sender === 'agent' ? 'outbound' : 'inbound'
+    };
+    
+    console.log('[Chat Send] Adding message to unified storage:', {
+      conversationId: body.conversationId,
+      messageId: messageData.id,
+      sender: messageData.sender,
+      text: messageData.text.substring(0, 50) + '...'
     });
     
-    console.log('[Chat Send] Message stored successfully:', {
-      conversationId: body.conversationId,
-      messageId: message.id,
-      text: message.text
+    // Add message to unified storage
+    await addMessage(body.conversationId, messageData, {
+      id: body.conversationId,
+      name: body.contactName || `Customer ${body.conversationId.slice(-4)}`,
+      email: body.contactEmail || '',
+      phone: body.contactPhone || ''
     });
+    
+    console.log('[Chat Send] Message stored successfully in unified storage');
     
     // If this is a customer message, trigger existing n8n AI suggestions workflow
-    if (message.sender === 'customer') {
+    if (messageData.sender === 'contact') {
       const n8nWebhookUrl = process.env.N8N_INBOUND_WEBHOOK_URL;
       
       if (n8nWebhookUrl && n8nWebhookUrl !== 'your-n8n-webhook-url') {
@@ -49,8 +63,8 @@ export async function POST(request: NextRequest) {
               id: body.conversationId 
             },
             message: { 
-              id: message.id, 
-              text: message.text 
+              id: messageData.id, 
+              text: messageData.text 
             },
             contact: {
               name: body.contactName || `Customer ${body.conversationId.slice(-4)}`,
@@ -59,7 +73,7 @@ export async function POST(request: NextRequest) {
             },
             locationId: body.locationId || 'DKs2AdSvw0MGWJYyXwk1',
             channel: body.channel || 'webchat',
-            timestamp: message.timestamp
+            timestamp: messageData.createdAt
           };
           
           // Send to n8n workflow (fire and forget)
@@ -82,9 +96,20 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // For agent messages, we might want to send to customer via webhook or API
+    if (messageData.sender === 'human_agent') {
+      console.log('[Chat Send] Agent message stored, should be sent to customer via webhook/API');
+      // TODO: Implement customer notification system here
+    }
+    
     return NextResponse.json({
       success: true,
-      message: message
+      message: {
+        id: messageData.id,
+        text: messageData.text,
+        sender: messageData.sender,
+        timestamp: messageData.createdAt
+      }
     });
     
   } catch (error) {
@@ -96,4 +121,3 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
-
