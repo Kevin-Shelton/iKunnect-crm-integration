@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
             type: msg.sender === 'contact' ? 'inbound' : 'agent_send',
             message_id: msg.id,
             text: msg.text,
-            payload: msg as Record<string, unknown>
+            payload: msg as unknown as Record<string, unknown>
           });
           eventCount++;
         }
