@@ -1,55 +1,38 @@
-export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyHmac } from '@/lib/hmac';
-import { normalizeMessages } from '@/lib/normalize';
+import { verifyHmacSignature } from '@/lib/hmac';
 import { ack } from '@/lib/safe';
-import { pickTrace, nowIso } from '@/lib/trace';
+import { normalizeMessages } from '@/lib/normalize';
+import { nowIso, pickTrace } from '@/lib/trace';
 import { tapPush } from '@/lib/ring';
-import { insertChatEvent, supabase } from '@/lib/supabase';
+import { insertChatEvent } from '@/lib/supabase';
 import type { GhlMessage, MirrorPayload } from '@/lib/types';
 
-function getSecret(): string {
-  const s = process.env.SHARED_HMAC_SECRET;
-  if (!s) {
-    console.warn('SHARED_HMAC_SECRET missing, using fallback');
-    return 'your_shared_hmac_secret_here_change_this_in_production';
-  }
-  return s;
-}
+export const runtime = 'nodejs';
 
-export async function POST(req: NextRequest) {
-  const traceId = pickTrace(req.headers);
+export async function POST(request: NextRequest) {
+  const traceId = pickTrace(request);
   
   try {
-    // Environment check
-    if (!process.env.SHARED_HMAC_SECRET) {
-      tapPush({ t: nowIso(), route: '/api/chat-events', traceId, note: 'env_missing', data: { error: 'SHARED_HMAC_SECRET missing' } });
-      return NextResponse.json({ error: 'SHARED_HMAC_SECRET missing' }, { status: 400 });
-    }
-
-    const raw = await req.text();
-    const ok = verifyHmac(raw, req.headers.get('x-signature'), getSecret());
-    if (!ok) {
-      if (process.env.REJECT_UNSIGNED === 'true') {
-        tapPush({ t: nowIso(), route: '/api/chat-events', traceId, note: 'hmac_fail', data: { error: 'invalid signature' } });
+    const body = await request.text();
+    const payload = JSON.parse(body);
+    
+    // HMAC verification
+    const signature = request.headers.get('x-signature');
+    if (process.env.REJECT_UNSIGNED === 'true' && signature) {
+      const isValid = verifyHmacSignature(body, signature);
+      if (!isValid) {
+        tapPush({ t: nowIso(), route: '/api/chat-events', traceId, note: 'hmac_fail', data: { signature } });
         return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
       }
-      console.warn('[WARN] unsigned/invalid signature');
     }
 
-    // Parse JSON safely
-    let payload: MirrorPayload | Record<string, unknown>;
-    try { 
-      payload = JSON.parse(raw); 
-    } catch { 
-      tapPush({ t: nowIso(), route: '/api/chat-events', traceId, note: 'json_fail', data: { error: 'invalid json' } });
-      return NextResponse.json({ error: 'invalid json' }, { status: 400 }); 
-    }
+    tapPush({ t: nowIso(), route: '/api/chat-events', traceId, note: 'received', data: { payload } });
 
-    // Validate conversationId is present
+    // Extract conversation ID with proper type handling
     const payloadObj = payload as Record<string, unknown>;
     const conversation = payloadObj?.conversation as Record<string, unknown> | undefined;
     const convId = conversation?.id as string;
+    
     if (!convId) {
       tapPush({ t: nowIso(), route: '/api/chat-events', traceId, note: 'no_conv_id', data: { payload } });
       return NextResponse.json({ error: 'missing conversation.id' }, { status: 400 });
@@ -86,50 +69,51 @@ export async function POST(req: NextRequest) {
     
     // Handle direct event format (new format)
     if (payloadObj.type) {
+      const eventType = payloadObj.type as string;
+      // Map event types to valid chat event types with proper type checking
+      const validEventTypes = ['inbound', 'agent_send', 'suggestions', 'admin'] as const;
+      type ValidEventType = typeof validEventTypes[number];
+      
+      const validType: ValidEventType = validEventTypes.includes(eventType as ValidEventType) 
+        ? (eventType as ValidEventType)
+        : 'inbound';
+        
       await insertChatEvent({
         conversation_id: convId,
-        type: payloadObj.type as string,
-        message_id: payloadObj.messageId as string,
-        text: payloadObj.text as string,
-        items: payloadObj.items as unknown[],
+        type: validType,
+        message_id: (payloadObj.messageId as string) || `evt_${Date.now()}`,
+        text: (payloadObj.text as string) || '',
         payload: payloadObj
       });
       eventCount++;
-      
-      // Broadcast to conversation channel
-      const channel = `conv:${convId}:public`;
-      await supabase
-        .channel(channel)
-        .send({
-          type: 'broadcast',
-          event: 'event',
-          payload: payloadObj
-        });
     }
 
-    // Push tap after processing
-    tapPush({
-      t: nowIso(),
-      route: '/api/chat-events',
-      traceId,
-      note: `conv ${convId} events+${eventCount}`,
-      data: { convId, counts: { events: eventCount } }
+    tapPush({ 
+      t: nowIso(), 
+      route: '/api/chat-events', 
+      traceId, 
+      note: `conv ${convId} msg+${eventCount}`, 
+      data: { convId, counts: { messages: eventCount } } 
     });
 
-    // Console log for debugging
-    console.log('[Desk]', traceId, 'chat-events', 'conv=', convId, 'events+', eventCount);
-
-    // Return safe response
     return NextResponse.json(ack({ 
-      messageId: payloadObj.messageId as string,
-      threadId: convId,
-      eventsProcessed: eventCount
-    }), { status: 200 });
+      received: eventCount,
+      conversationId: convId,
+      traceId 
+    }));
 
   } catch (error) {
     tapPush({ t: nowIso(), route: '/api/chat-events', traceId, note: 'error', data: { error: String(error) } });
-    console.error('[chat-events] Error:', error);
-    return NextResponse.json(ack({}), { status: 200 });
+    return NextResponse.json({ error: 'processing failed' }, { status: 500 });
   }
+}
+
+export async function GET() {
+  return NextResponse.json({ 
+    status: 'ready',
+    endpoint: '/api/chat-events',
+    methods: ['POST'],
+    timestamp: nowIso()
+  });
 }
 
