@@ -1,33 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getConversations, getConversationMessages } from '@/lib/unifiedStorage';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     console.log('[Chat Conversations] Fetching conversations from unified storage');
     
     const conversations = await getConversations();
     console.log('[Chat Conversations] Got conversations:', conversations.length);
     
-    // For each conversation, we need to get the messages to build the full structure
+    // Get messages for each conversation to provide full context
     const conversationsWithMessages = await Promise.all(
       conversations.map(async (conv) => {
-        try {
-          const { messages } = await getConversationMessages(conv.id, 5); // Get last 5 messages for preview
-          return {
-            ...conv,
-            messages: messages || []
-          };
-        } catch (error) {
-          console.error(`[Chat Conversations] Error getting messages for ${conv.id}:`, error);
-          return {
-            ...conv,
-            messages: []
-          };
-        }
+        const { messages } = await getConversationMessages(conv.id, 10);
+        return {
+          ...conv,
+          messages
+        };
       })
     );
     
-    // Transform to Agent Desk format
     const waiting = conversationsWithMessages
       .filter(conv => conv.status === 'waiting')
       .map(conv => ({
@@ -44,7 +35,7 @@ export async function GET(request: NextRequest) {
           id: msg.id,
           text: msg.text,
           sender: msg.sender,
-          timestamp: msg.timestamp || msg.createdAt,
+          timestamp: msg.createdAt,
           type: msg.sender === 'contact' ? 'inbound' : 'outbound'
         }))
       }));
@@ -66,7 +57,7 @@ export async function GET(request: NextRequest) {
           id: msg.id,
           text: msg.text,
           sender: msg.sender,
-          timestamp: msg.timestamp || msg.createdAt,
+          timestamp: msg.createdAt,
           type: msg.sender === 'contact' ? 'inbound' : 'outbound'
         }))
       }));
@@ -79,20 +70,17 @@ export async function GET(request: NextRequest) {
       total: all.length,
       conversations: conversations.map(c => ({ id: c.id, messageCount: c.messageCount, status: c.status }))
     });
-    
+
     return NextResponse.json({
       waiting,
       assigned,
       all
     });
-    
   } catch (error) {
     console.error('[Chat Conversations] Error:', error);
-    return NextResponse.json({
-      waiting: [],
-      assigned: [],
-      all: [],
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch conversations' },
+      { status: 500 }
+    );
   }
 }

@@ -1,5 +1,4 @@
 export const runtime = 'nodejs';
-import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import type { NormalizedMessage } from './types';
 
@@ -12,14 +11,7 @@ interface StoredMessage {
   timestamp: string;
 }
 
-interface ConversationWithMessages {
-  id: string;
-  customer_name: string;
-  messages: StoredMessage[];
-  last_activity: string;
-  status: 'waiting' | 'assigned' | 'closed';
-  assigned_agent?: string;
-}
+// ConversationWithMessages interface is imported from memoryStorageSingleton
 
 // Supabase configuration
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -52,8 +44,7 @@ import {
   setConversationInMemory, 
   getAllConversationsFromMemory,
   getMemoryStorageStats,
-  type ConversationWithMessages,
-  type StoredMessage as MemoryStoredMessage
+  type ConversationWithMessages
 } from './memoryStorageSingleton';
 
 // Convert NormalizedMessage to StoredMessage

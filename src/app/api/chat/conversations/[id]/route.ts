@@ -27,7 +27,7 @@ export async function GET(
       id: msg.id,
       text: msg.text,
       sender: msg.sender,
-      timestamp: msg.timestamp,
+      timestamp: msg.createdAt,
       type: msg.sender === 'contact' ? 'inbound' : 'outbound',
       contactId: conversation.contact?.id || conversation.id
     }));

@@ -67,4 +67,4 @@ export function clearMemoryStorage(): void {
   console.log('[MemoryStorage] Memory storage cleared');
 }
 
-export { ConversationWithMessages, StoredMessage };
+export type { ConversationWithMessages, StoredMessage };
