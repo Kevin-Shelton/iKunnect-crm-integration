@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyHmacSignature } from '@/lib/hmac';
+import { verifyHmac } from '@/lib/hmac';
 import { ack } from '@/lib/safe';
 import { normalizeMessages } from '@/lib/normalize';
 import { nowIso, pickTrace } from '@/lib/trace';
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     // HMAC verification
     const signature = request.headers.get('x-signature');
     if (process.env.REJECT_UNSIGNED === 'true' && signature) {
-      const isValid = verifyHmacSignature(body, signature);
+      const isValid = verifyHmac(body, signature, process.env.SHARED_HMAC_SECRET || '');
       if (!isValid) {
         tapPush({ t: nowIso(), route: '/api/chat-events', traceId, note: 'hmac_fail', data: { signature } });
         return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
