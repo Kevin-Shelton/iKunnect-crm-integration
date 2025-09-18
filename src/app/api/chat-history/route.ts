@@ -38,13 +38,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'invalid json' }, { status: 400 }); 
     }
 
-    const convId = payload?.conversation?.id as string;
+    const payloadObj = payload as Record<string, unknown>;
+    const conversation = payloadObj?.conversation as Record<string, unknown> | undefined;
+    const convId = conversation?.id as string;
     if (!convId) {
       tapPush({ t: nowIso(), route: '/api/chat-history', traceId, note: 'no_conv_id', data: { payload } });
       return NextResponse.json({ error: 'missing conversation.id' }, { status: 400 });
     }
 
-    const pageSize = Math.min((payload.pageSize as number) || 5, 20); // Cap at 20
+    const pageSize = Math.min((payloadObj.pageSize as number) || 5, 20); // Cap at 20
     
     // Get chat history from Supabase
     const events = await getChatHistory(convId, pageSize);
