@@ -59,19 +59,27 @@ export async function POST(req: NextRequest) {
     let eventCount = 0;
     
     // Handle messages array (legacy format)
-    const rawMessages = asArray((payload as MirrorPayload).messages);
+    const mirrorPayload = payload as MirrorPayload;
+    const rawMessages = asArray(mirrorPayload.messages);
     if (rawMessages.length > 0) {
-      const normalizedMessages = normalizeMessages(rawMessages as GhlMessage[], convId);
+      // Filter to only GhlMessage objects (those with 'type' property)
+      const ghlMessages = rawMessages.filter((msg): msg is GhlMessage => 
+        typeof msg === 'object' && msg !== null && 'type' in msg
+      );
       
-      for (const msg of normalizedMessages) {
-        await insertChatEvent({
-          conversation_id: convId,
-          type: msg.sender === 'contact' ? 'inbound' : 'agent_send',
-          message_id: msg.id,
-          text: msg.text,
-          payload: msg
-        });
-        eventCount++;
+      if (ghlMessages.length > 0) {
+        const normalizedMessages = normalizeMessages(ghlMessages, convId);
+        
+        for (const msg of normalizedMessages) {
+          await insertChatEvent({
+            conversation_id: convId,
+            type: msg.sender === 'contact' ? 'inbound' : 'agent_send',
+            message_id: msg.id,
+            text: msg.text,
+            payload: msg
+          });
+          eventCount++;
+        }
       }
     }
     
