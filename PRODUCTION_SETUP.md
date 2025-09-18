@@ -25,13 +25,13 @@ The chat integration system now supports **dual storage**:
 Add these environment variables in your Vercel dashboard:
 
 ```bash
-# Supabase Configuration
+# Supabase Configuration (already configured)
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_TOKEN=your-anon-key-here
 SUPABASE_SERVICE_ROLE_TOKEN=your-service-role-key-here
 
-# OpenAI Configuration (for AI suggestions)
-OPENAI_API_KEY=your-openai-api-key-here
+# n8n Integration (for AI suggestions)
+N8N_AI_SUGGESTIONS_WEBHOOK_URL=https://your-n8n-instance.com/webhook/ai-suggestions
 
 # HMAC Secret (for webhook verification)
 SHARED_HMAC_SECRET=your-hmac-secret-here
@@ -44,10 +44,13 @@ REJECT_UNSIGNED=false
 Update your `.env.local` file with real values:
 
 ```bash
-# Replace placeholder values with real Supabase credentials
+# Replace placeholder values with real Supabase credentials (already configured)
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 SUPABASE_SERVICE_ROLE_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+# Add n8n webhook URL for AI suggestions
+N8N_AI_SUGGESTIONS_WEBHOOK_URL=https://your-n8n-instance.com/webhook/ai-suggestions
 ```
 
 ## Storage Behavior

@@ -1,11 +1,5 @@
 export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
-
-// Initialize OpenAI client only when API key is available
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-}) : null;
 
 export async function POST(request: NextRequest) {
   let conversationId = 'unknown';
@@ -30,102 +24,65 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // Check if OpenAI is configured
-    if (!process.env.OPENAI_API_KEY || !openai) {
-      return NextResponse.json({
-        ok: false,
-        error: 'OpenAI API key not configured'
-      }, { status: 500 });
-    }
-    
-    // Build conversation context
+    // Build conversation context for n8n
     const conversationContext = body.messages
       .slice(-5) // Last 5 messages for context
       .map((msg: any) => `${msg.sender}: ${msg.text}`)
       .join('\n');
     
-    const prompt = `You are an AI assistant helping a customer service agent respond to customer inquiries. Based on the conversation below, suggest 3 helpful, professional responses that the agent could use.
-
-Conversation:
-${conversationContext}
-
-Please provide 3 different response suggestions that are:
-1. Professional and helpful
-2. Appropriate for customer service
-3. Varied in tone (empathetic, solution-focused, informative)
-
-Format your response as a JSON array of objects with "text", "reason", and "confidence" fields.`;
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful customer service AI assistant. Respond only with valid JSON."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      max_tokens: 500,
-      temperature: 0.7,
-    });
-
-    const responseText = completion.choices[0]?.message?.content;
-    if (!responseText) {
-      throw new Error('No response from OpenAI');
-    }
-
-    // Parse the AI response
-    let suggestions;
-    try {
-      suggestions = JSON.parse(responseText);
-    } catch (parseError) {
-      // Fallback if JSON parsing fails
-      suggestions = [
-        {
-          text: "Thank you for reaching out. I understand your concern and I'm here to help you resolve this issue.",
-          reason: "Empathetic acknowledgment",
-          confidence: 0.8
-        },
-        {
-          text: "Let me look into this for you right away. Can you provide me with a few more details about what you're experiencing?",
-          reason: "Solution-focused approach",
-          confidence: 0.9
-        },
-        {
-          text: "I appreciate your patience. Based on what you've described, here are a few options we can explore to address your concern.",
-          reason: "Informative and structured",
-          confidence: 0.85
-        }
-      ];
-    }
-
-    // Ensure suggestions have the required format
-    const formattedSuggestions = suggestions.map((suggestion: any, index: number) => ({
-      text: suggestion.text || suggestion.response || '',
-      reason: suggestion.reason || 'AI-generated suggestion',
-      confidence: suggestion.confidence || 0.8,
-      rank: index + 1
-    }));
-
-    console.log('[AI Suggestions]', {
-      conversationId: body.conversationId,
-      suggestionsCount: formattedSuggestions.length,
-      timestamp: new Date().toISOString()
-    });
-
-    return NextResponse.json({
-      ok: true,
-      suggestions: formattedSuggestions,
-      conversationId: body.conversationId
-    });
-
-  } catch (error) {
-    console.error('[AI Suggestions Error]', error);
+    // Send request to n8n workflow for AI suggestions
+    const n8nWebhookUrl = process.env.N8N_AI_SUGGESTIONS_WEBHOOK_URL;
     
-    // Return fallback suggestions if OpenAI fails
+    if (n8nWebhookUrl && n8nWebhookUrl !== 'your-n8n-webhook-url') {
+      try {
+        const n8nResponse = await fetch(n8nWebhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            conversationId: body.conversationId,
+            messages: body.messages,
+            context: conversationContext,
+            requestType: 'ai-suggestions'
+          })
+        });
+
+        if (n8nResponse.ok) {
+          const n8nData = await n8nResponse.json();
+          
+          // Format n8n response to match expected structure
+          const suggestions = n8nData.suggestions || n8nData.items || [];
+          const formattedSuggestions = suggestions.map((suggestion: any, index: number) => ({
+            text: suggestion.text || suggestion.response || suggestion.suggestion || '',
+            reason: suggestion.reason || suggestion.type || 'AI-generated suggestion',
+            confidence: suggestion.confidence || 0.8,
+            rank: index + 1
+          }));
+
+          console.log('[AI Suggestions] n8n response received:', {
+            conversationId: body.conversationId,
+            suggestionsCount: formattedSuggestions.length,
+            timestamp: new Date().toISOString()
+          });
+
+          return NextResponse.json({
+            ok: true,
+            suggestions: formattedSuggestions,
+            conversationId: body.conversationId,
+            source: 'n8n'
+          });
+        } else {
+          console.warn('[AI Suggestions] n8n webhook failed:', n8nResponse.status);
+        }
+      } catch (n8nError) {
+        console.error('[AI Suggestions] n8n request failed:', n8nError);
+      }
+    } else {
+      console.log('[AI Suggestions] n8n webhook not configured, using fallback');
+    }
+
+    // Fallback suggestions if n8n is not available or fails
     const fallbackSuggestions = [
       {
         text: "Thank you for contacting us. I'm here to help you with your inquiry.",
@@ -135,7 +92,7 @@ Format your response as a JSON array of objects with "text", "reason", and "conf
       },
       {
         text: "I understand your concern. Let me assist you in finding the best solution.",
-        reason: "Empathetic response",
+        reason: "Empathetic response", 
         confidence: 0.7,
         rank: 2
       },
@@ -147,11 +104,45 @@ Format your response as a JSON array of objects with "text", "reason", and "conf
       }
     ];
 
+    console.log('[AI Suggestions] Using fallback suggestions for conversation:', conversationId);
+
     return NextResponse.json({
       ok: true,
       suggestions: fallbackSuggestions,
       conversationId: conversationId,
-      fallback: true,
+      source: 'fallback'
+    });
+
+  } catch (error) {
+    console.error('[AI Suggestions Error]', error);
+    
+    // Return basic fallback suggestions on any error
+    const errorFallbackSuggestions = [
+      {
+        text: "Thank you for reaching out. How can I assist you today?",
+        reason: "Basic greeting",
+        confidence: 0.6,
+        rank: 1
+      },
+      {
+        text: "I'm here to help. What can I do for you?",
+        reason: "Simple offer to help",
+        confidence: 0.6,
+        rank: 2
+      },
+      {
+        text: "Let me know how I can assist you with your request.",
+        reason: "Open-ended assistance",
+        confidence: 0.6,
+        rank: 3
+      }
+    ];
+
+    return NextResponse.json({
+      ok: true,
+      suggestions: errorFallbackSuggestions,
+      conversationId: conversationId,
+      source: 'error-fallback',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
@@ -162,7 +153,8 @@ export async function GET() {
     status: 'ready',
     endpoint: '/api/ai-suggestions',
     methods: ['POST'],
-    configured: !!process.env.OPENAI_API_KEY,
+    n8nConfigured: !!(process.env.N8N_AI_SUGGESTIONS_WEBHOOK_URL && 
+                      process.env.N8N_AI_SUGGESTIONS_WEBHOOK_URL !== 'your-n8n-webhook-url'),
     timestamp: new Date().toISOString()
   });
 }
