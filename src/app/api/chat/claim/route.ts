@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConversation, updateConversationStatus } from '@/lib/simpleStorage';
+import { getConversation, updateConversationStatus } from '@/lib/productionStorage';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the conversation
-    const conversation = getConversation(conversationId);
+    const conversation = await getConversation(conversationId);
     if (!conversation) {
       return NextResponse.json(
         { success: false, error: 'Conversation not found' },
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update conversation status to assigned
-    const updatedConversation = updateConversationStatus(conversationId, 'assigned', agentId);
+    const updatedConversation = await updateConversationStatus(conversationId, 'assigned', agentId);
 
     console.log(`[Claim] Conversation ${conversationId} claimed by ${agentId}`);
 

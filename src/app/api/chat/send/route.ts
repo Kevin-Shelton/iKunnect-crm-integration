@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { addMessage } from '@/lib/simpleStorage';
+import { addMessage } from '@/lib/productionStorage';
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Create message
-    const message = addMessage(body.conversationId, {
+    const message = await addMessage(body.conversationId, {
       id: body.messageId || `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       text: body.text.trim(),
       sender: body.sender || 'customer'

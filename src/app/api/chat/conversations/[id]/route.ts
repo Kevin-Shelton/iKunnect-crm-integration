@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConversation } from '@/lib/simpleStorage';
+import { getConversation } from '@/lib/productionStorage';
 
 export async function GET(
   request: NextRequest,
@@ -10,7 +10,7 @@ export async function GET(
     
     console.log(`[Chat Messages] Fetching messages for conversation: ${id}`);
     
-    const conversation = getConversation(id);
+    const conversation = await getConversation(id);
     
     if (!conversation) {
       console.log(`[Chat Messages] Conversation ${id} not found`);

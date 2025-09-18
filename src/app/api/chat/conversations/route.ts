@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConversations } from '@/lib/simpleStorage';
+import { getConversations } from '@/lib/productionStorage';
 
 export async function GET(request: NextRequest) {
   try {
     console.log('[Chat Conversations] Fetching conversations');
     
-    const conversations = getConversations();
+    const conversations = await getConversations();
     
     // Transform to Agent Desk format
     const waiting = conversations
