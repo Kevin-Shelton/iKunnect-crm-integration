@@ -1,62 +1,52 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+// Simple, direct approach - query Supabase chat_events table directly
 export async function GET() {
   try {
-    console.log('[Conversations] Starting conversation fetch...');
-    
-    // Initialize Supabase client directly (no complex unified storage)
+    // Initialize Supabase client
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_TOKEN;
     
-    console.log('[Conversations] Environment check:', {
-      hasUrl: !!supabaseUrl,
-      hasServiceKey: !!supabaseServiceKey,
-      nodeEnv: process.env.NODE_ENV
-    });
-    
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.log('[Conversations] Missing Supabase configuration, returning empty data');
-      return NextResponse.json({
-        waiting: [],
-        assigned: [],
-        all: [],
-        error: 'Missing Supabase configuration'
-      });
+      return NextResponse.json({ 
+        error: 'Missing Supabase configuration',
+        debug: {
+          hasUrl: !!supabaseUrl,
+          hasServiceKey: !!supabaseServiceKey
+        }
+      }, { status: 500 });
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Query chat_events table directly - this is where your production data is stored
-    console.log('[Conversations] Querying chat_events table...');
+    // Get all chat events, ordered by most recent
     const { data: chatEvents, error } = await supabase
       .from('chat_events')
       .select('*')
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('[Conversations] Supabase query error:', error);
-      return NextResponse.json({
-        waiting: [],
-        assigned: [],
-        all: [],
-        error: `Database error: ${error.message}`
-      });
+      console.error('[Simple Conversations] Supabase error:', error);
+      return NextResponse.json({ 
+        error: 'Database query failed',
+        details: error.message 
+      }, { status: 500 });
     }
-
-    console.log('[Conversations] Found chat events:', chatEvents?.length || 0);
 
     if (!chatEvents || chatEvents.length === 0) {
-      console.log('[Conversations] No chat events found, returning empty data');
       return NextResponse.json({
         waiting: [],
         assigned: [],
         all: [],
-        debug: 'No chat events in database'
+        debug: {
+          message: 'No chat events found in database',
+          totalEvents: 0
+        }
       });
     }
 
-    // Build conversations from chat events - SIMPLE APPROACH
+    // Group events by conversation_id and extract the latest message text
     const conversationMap = new Map();
 
     chatEvents.forEach((event: any) => {
@@ -67,7 +57,7 @@ export async function GET() {
           id: convId,
           contactId: `contact_${convId}`,
           contactName: `Customer ${convId.slice(-4)}`,
-          lastMessageBody: '', // This is what will fix the timestamp issue
+          lastMessageBody: '',
           lastMessageDate: event.created_at,
           unreadCount: 0,
           status: 'waiting',
@@ -79,14 +69,13 @@ export async function GET() {
 
       const conversation = conversationMap.get(convId);
 
-      // Extract actual message text from event.text field
+      // If this event has message text and is more recent, use it as lastMessageBody
       if (event.text && event.created_at >= conversation.lastMessageDate) {
-        conversation.lastMessageBody = event.text; // THIS IS THE KEY FIX
+        conversation.lastMessageBody = event.text;
         conversation.lastMessageDate = event.created_at;
-        console.log(`[Conversations] Set lastMessageBody for ${convId}: "${event.text}"`);
       }
 
-      // Count messages and set status
+      // Count messages and determine status
       if (event.type === 'inbound' || event.type === 'agent_send') {
         conversation.unreadCount++;
         
@@ -96,33 +85,29 @@ export async function GET() {
       }
     });
 
-    // Convert to arrays and sort by most recent
+    // Convert to arrays
     const allConversations = Array.from(conversationMap.values())
       .sort((a, b) => new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime());
 
     const waiting = allConversations.filter(conv => conv.status === 'waiting');
     const assigned = allConversations.filter(conv => conv.status === 'assigned');
 
-    console.log('[Conversations] Returning conversations:', {
-      waiting: waiting.length,
-      assigned: assigned.length,
-      total: allConversations.length,
-      sampleLastMessageBody: allConversations[0]?.lastMessageBody || 'none'
-    });
-
     return NextResponse.json({
       waiting,
       assigned,
-      all: allConversations
+      all: allConversations,
+      debug: {
+        totalEvents: chatEvents.length,
+        totalConversations: allConversations.length,
+        sampleConversation: allConversations[0] || null
+      }
     });
 
   } catch (error) {
-    console.error('[Conversations] Unexpected error:', error);
-    return NextResponse.json({
-      waiting: [],
-      assigned: [],
-      all: [],
-      error: `Server error: ${error instanceof Error ? error.message : 'Unknown error'}`
+    console.error('[Simple Conversations] Error:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }
