@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Bot } from 'lucide-react';
 
 interface ChatInterfaceProps {
-  conversationId?: string;
+  conversationId: string;
+  onNewMessage?: (message: any) => void;
 }
 
-export function ChatInterface({ conversationId }: ChatInterfaceProps) {
+export function ChatInterface({ conversationId, onNewMessage }: ChatInterfaceProps) {
   const [showAiAssistant, setShowAiAssistant] = useState(false);
 
   if (!conversationId) {
@@ -75,6 +76,7 @@ export function ChatInterface({ conversationId }: ChatInterfaceProps) {
           <SimpleMessages 
             conversationId={conversationId}
             className="flex-1 overflow-y-auto"
+            onNewMessage={onNewMessage}
           />
           {/* Agent Reply Input */}
           <AgentReply 

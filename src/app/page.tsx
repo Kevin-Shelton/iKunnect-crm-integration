@@ -5,12 +5,14 @@ import { Header } from '@/components/layout/header';
 import { Sidebar } from '@/components/layout/sidebar';
 import { ChatInterface } from '@/components/chat/chat-interface';
 import { ContactSidebar } from '@/components/layout/contact-sidebar';
+import { NotificationSystem } from '@/components/chat/notification-system';
 import { useConversations } from '@/hooks/use-conversations';
 import { Conversation, ConversationQueue } from '@/lib/types';
 
 export default function Home() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [selectedContact, setSelectedContact] = useState<any>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   // Use conversations hook with safe defaults
   const {
@@ -20,6 +22,40 @@ export default function Home() {
     error = null,
     refreshConversations = () => {}
   } = useConversations() || {};
+
+  // Claim chat functionality
+  const claimChat = async (conversationId: string) => {
+    try {
+      const response = await fetch('/api/chat/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId, agentId: 'agent_1' })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        console.log('Chat claimed successfully');
+        refreshConversations(); // Refresh the conversation list
+        setSelectedConversationId(conversationId); // Auto-select the claimed conversation
+      } else {
+        console.error('Failed to claim chat:', data.error);
+      }
+    } catch (error) {
+      console.error('Error claiming chat:', error);
+    }
+  };
+
+  // Handle new message notifications
+  const handleNewMessage = (message: any) => {
+    if (notificationsEnabled && (window as any).notificationSystem) {
+      (window as any).notificationSystem.playSound();
+      (window as any).notificationSystem.showVisual(message.text);
+      (window as any).notificationSystem.showNotification(
+        'New Message',
+        `${message.contact?.name || 'Customer'}: ${message.text}`
+      );
+    }
+  };
 
   // Safe conversation selection
   const selectedConversation = selectedConversationId 
@@ -91,6 +127,9 @@ export default function Home() {
           <Sidebar
             conversations={conversations}
             onConversationSelect={handleConversationSelect}
+            onConversationClaim={claimChat}
+            onRefresh={refreshConversations}
+            isLoading={isLoading}
           />
         </div>
 
@@ -98,7 +137,10 @@ export default function Home() {
         <div className="flex-1 flex">
           <div className="flex-1">
             {selectedConversationId ? (
-              <ChatInterface conversationId={selectedConversationId} />
+              <ChatInterface 
+                conversationId={selectedConversationId}
+                onNewMessage={handleNewMessage}
+              />
             ) : (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">

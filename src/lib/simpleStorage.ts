@@ -80,3 +80,33 @@ export function debugStorage() {
   });
 }
 
+
+// Update conversation status
+export function updateConversationStatus(
+  conversationId: string, 
+  status: 'waiting' | 'active' | 'closed',
+  agentId?: string
+): Conversation | null {
+  const conversation = conversations.get(conversationId);
+  if (!conversation) return null;
+
+  conversation.status = status;
+  if (agentId) {
+    (conversation as any).assignedAgent = agentId;
+  }
+  conversation.lastActivity = new Date().toISOString();
+
+  conversations.set(conversationId, conversation);
+  console.log(`[Storage] Updated conversation ${conversationId} status to ${status}`);
+  
+  return conversation;
+}
+
+// Get all data for debugging
+export function getAllData() {
+  return {
+    conversations: Array.from(conversations.entries()),
+    totalConversations: conversations.size
+  };
+}
+
