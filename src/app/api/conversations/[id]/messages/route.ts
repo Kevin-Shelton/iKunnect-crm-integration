@@ -30,8 +30,8 @@ export async function GET(
       text: msg.text || '',
       sender: msg.sender || 'contact',
       timestamp: msg.createdAt || new Date().toISOString(),
-      type: msg.type || 'inbound',
-      contactId: msg.contactId || null
+      type: msg.direction || 'inbound',
+      contactId: msg.conversationId || null
     }));
 
     // Extract contact info from the first message
@@ -39,11 +39,11 @@ export async function GET(
     if (messages.length > 0) {
       const firstMessage = conversation.messages[0];
       contact = {
-        id: firstMessage.contactId || conversationId,
-        name: firstMessage.contactName || `Customer ${conversationId.slice(-4)}`,
-        email: firstMessage.contactEmail || '',
-        phone: firstMessage.contactPhone || '',
-        locationId: firstMessage.locationId || ''
+        id: firstMessage.conversationId || conversationId,
+        name: `Customer ${conversationId.slice(-4)}`,
+        email: '',
+        phone: '',
+        locationId: ''
       };
     }
 
