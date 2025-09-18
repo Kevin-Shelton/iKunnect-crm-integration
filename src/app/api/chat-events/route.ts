@@ -60,8 +60,9 @@ export async function POST(req: NextRequest) {
     
     // Handle messages array (legacy format)
     const mirrorPayload = payload as MirrorPayload;
-    const rawMessages = asArray(mirrorPayload.messages);
-    if (rawMessages.length > 0) {
+    if (mirrorPayload.messages && Array.isArray(mirrorPayload.messages)) {
+      const rawMessages = mirrorPayload.messages;
+      
       // Filter to only GhlMessage objects (those with 'type' property)
       const ghlMessages = rawMessages.filter((msg): msg is GhlMessage => 
         typeof msg === 'object' && msg !== null && 'type' in msg
