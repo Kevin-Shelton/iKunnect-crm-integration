@@ -200,6 +200,7 @@ export async function getConversations(): Promise<Array<{
   lastActivity: string;
   messageCount: number;
   assignedAgent?: string;
+  lastMessageBody?: string;
 }>> {
   console.log('[UnifiedStorage] getConversations called, useSupabase:', useSupabase);
   
@@ -232,6 +233,7 @@ async function getConversationsFromSupabase(): Promise<Array<{
   lastActivity: string;
   messageCount: number;
   assignedAgent?: string;
+  lastMessageBody?: string;
 }>> {
   // Try conversations table first
   try {
@@ -280,7 +282,9 @@ async function getConversationsFromSupabase(): Promise<Array<{
         status: 'waiting',
         lastActivity: event.created_at,
         messageCount: 0,
-        assignedAgent: undefined
+        assignedAgent: undefined,
+        lastMessageBody: '',
+        lastMessageDate: event.created_at
       });
     }
     
@@ -289,6 +293,12 @@ async function getConversationsFromSupabase(): Promise<Array<{
     // Count messages
     if (event.type === 'inbound' || event.type === 'agent_send') {
       conversation.messageCount++;
+      
+      // Update last message body if this is the most recent message
+      if (event.created_at >= conversation.lastMessageDate && event.text) {
+        conversation.lastMessageBody = event.text;
+        conversation.lastMessageDate = event.created_at;
+      }
     }
     
     // Update last activity
@@ -313,6 +323,7 @@ function getConversationsFromMemory(): Array<{
   lastActivity: string;
   messageCount: number;
   assignedAgent?: string;
+  lastMessageBody?: string;
 }> {
   return getAllConversationsFromMemory()
     .sort((a, b) => new Date(b.last_activity).getTime() - new Date(a.last_activity).getTime())
@@ -322,7 +333,8 @@ function getConversationsFromMemory(): Array<{
       status: conv.status,
       lastActivity: conv.last_activity,
       messageCount: conv.messages.length,
-      assignedAgent: conv.assigned_agent
+      assignedAgent: conv.assigned_agent,
+      lastMessageBody: conv.messages.length > 0 ? conv.messages[conv.messages.length - 1].text : ''
     }));
 }
 
