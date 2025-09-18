@@ -2,7 +2,7 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyHmac } from '@/lib/hmac';
 import { normalizeMessages } from '@/lib/normalize';
-import { ack, asArray } from '@/lib/safe';
+import { ack } from '@/lib/safe';
 import { pickTrace, nowIso } from '@/lib/trace';
 import { tapPush } from '@/lib/ring';
 import { insertChatEvent, supabase } from '@/lib/supabase';
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
             type: msg.sender === 'contact' ? 'inbound' : 'agent_send',
             message_id: msg.id,
             text: msg.text,
-            payload: msg
+            payload: msg as Record<string, unknown>
           });
           eventCount++;
         }
