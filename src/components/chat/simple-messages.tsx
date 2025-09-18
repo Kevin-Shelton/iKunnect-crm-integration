@@ -19,25 +19,32 @@ interface SimpleMessagesProps {
 
 export function SimpleMessages({ conversationId, className = '', onNewMessage }: SimpleMessagesProps) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<string>('');
 
   useEffect(() => {
     if (!conversationId) {
       setMessages([]);
-      setIsLoading(false);
+      setIsInitialLoading(false);
       return;
     }
 
-    const loadMessages = async () => {
+    let isMounted = true;
+
+    const loadMessages = async (isBackground = false) => {
       try {
-        setIsLoading(true);
+        if (!isBackground) {
+          setIsInitialLoading(true);
+        }
         setError(null);
         
         console.log(`[SimpleMessages] Loading messages for conversation: ${conversationId}`);
         
         const response = await fetch(`/api/conversations/${conversationId}/messages`);
         const data = await response.json();
+        
+        if (!isMounted) return; // Component unmounted
         
         if (!data.success) {
           throw new Error(data.error || 'Failed to load messages');
@@ -49,12 +56,16 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage }:
           sender: msg.sender === 'contact' ? 'customer' : msg.sender === 'human_agent' ? 'agent' : msg.sender
         }));
         
-        // Only update if messages actually changed
-        if (JSON.stringify(newMessages) !== JSON.stringify(messages)) {
+        // Check if data actually changed (compare by content, not reference)
+        const messagesChanged = JSON.stringify(newMessages) !== JSON.stringify(messages);
+        const timestampChanged = data.timestamp !== lastFetchTime;
+        
+        if (messagesChanged || timestampChanged) {
           setMessages(newMessages);
+          setLastFetchTime(data.timestamp);
           
-          // Trigger notification for new messages
-          if (newMessages.length > messages.length && onNewMessage) {
+          // Trigger notification for new messages (only for background updates)
+          if (isBackground && newMessages.length > messages.length && onNewMessage) {
             const latestMessage = newMessages[newMessages.length - 1];
             if (latestMessage.sender === 'customer') {
               onNewMessage(latestMessage);
@@ -63,21 +74,32 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage }:
         }
         
       } catch (err) {
+        if (!isMounted) return;
         console.error('[SimpleMessages] Error loading messages:', err);
         setError(err instanceof Error ? err.message : 'Failed to load messages');
       } finally {
-        setIsLoading(false);
+        if (!isMounted) return;
+        if (!isBackground) {
+          setIsInitialLoading(false);
+        }
       }
     };
 
-    loadMessages();
+    // Initial load
+    loadMessages(false);
     
-    // Reduce refresh frequency to every 10 seconds to prevent blinking
-    const interval = setInterval(loadMessages, 10000);
-    return () => clearInterval(interval);
-  }, [conversationId]); // Remove messages.length and onNewMessage from dependencies
+    // Smart background polling - only updates when data changes
+    const interval = setInterval(() => {
+      loadMessages(true); // Background update - no loading states
+    }, 3000); // Check every 3 seconds but only update UI if data changed
+    
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [conversationId]); // Only depend on conversationId
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return (
       <div className={`flex-1 flex items-center justify-center ${className}`}>
         <div className="text-center">

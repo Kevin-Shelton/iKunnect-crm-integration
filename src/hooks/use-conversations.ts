@@ -99,14 +99,37 @@ export function useConversations(): UseConversationsReturn {
     fetchConversations();
   }, [fetchConversations]);
 
-  // Auto-refresh every 30 seconds
+  // Smart background refresh - only updates UI when data changes
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchConversations();
-    }, 30000);
+    const backgroundRefresh = async () => {
+      try {
+        const response = await fetch('/api/chat/conversations');
+        if (!response.ok) return; // Silently fail background updates
+        
+        const data = await response.json();
+        const safeData = {
+          waiting: Array.isArray(data?.waiting) ? data.waiting : [],
+          assigned: Array.isArray(data?.assigned) ? data.assigned : [],
+          all: Array.isArray(data?.all) ? data.all : []
+        };
+        
+        // Only update if data actually changed
+        const currentData = JSON.stringify(conversations);
+        const newData = JSON.stringify(safeData);
+        
+        if (currentData !== newData) {
+          setConversations(safeData);
+          console.log('[useConversations] Background update: data changed, UI updated');
+        }
+      } catch (err) {
+        // Silently handle background refresh errors
+        console.log('[useConversations] Background refresh failed:', err);
+      }
+    };
 
+    const interval = setInterval(backgroundRefresh, 5000); // Check every 5 seconds
     return () => clearInterval(interval);
-  }, [fetchConversations]);
+  }, [conversations]); // Depend on conversations to detect changes
 
   return {
     conversations,
