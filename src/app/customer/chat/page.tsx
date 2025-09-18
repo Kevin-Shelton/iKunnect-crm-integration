@@ -44,7 +44,7 @@ export default function CustomerChatPage() {
 
   // Set up Supabase Realtime subscription
   useEffect(() => {
-    if (!session) return;
+    if (!session || !supabase) return;
 
     const channel = supabase
       .channel(session.channel)
