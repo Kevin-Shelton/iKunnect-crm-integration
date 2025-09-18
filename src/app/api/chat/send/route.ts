@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addMessage } from '@/lib/unifiedStorage';
+import type { Direction, Sender } from '@/lib/types';
+import { MsgTypeIndex } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,10 +30,20 @@ export async function POST(request: NextRequest) {
     const messageData = {
       id: body.messageId || `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       text: body.text.trim(),
-      sender: body.sender === 'agent' ? 'human_agent' : 'contact',
+      sender: (body.sender === 'agent' ? 'human_agent' : 'contact') as Sender,
       conversationId: body.conversationId,
       createdAt: new Date().toISOString(),
-      direction: body.sender === 'agent' ? 'outbound' : 'inbound'
+      direction: (body.sender === 'agent' ? 'outbound' : 'inbound') as Direction,
+      category: 'chat' as const,
+      raw: {
+        id: body.messageId || `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        body: body.text.trim(),
+        direction: (body.sender === 'agent' ? 'outbound' : 'inbound') as Direction,
+        conversationId: body.conversationId,
+        contactId: body.conversationId,
+        dateAdded: new Date().toISOString(),
+        type: MsgTypeIndex.TYPE_LIVE_CHAT
+      }
     };
     
     console.log('[Chat Send] Adding message to unified storage:', {
@@ -42,12 +54,7 @@ export async function POST(request: NextRequest) {
     });
     
     // Add message to unified storage
-    await addMessage(body.conversationId, messageData, {
-      id: body.conversationId,
-      name: body.contactName || `Customer ${body.conversationId.slice(-4)}`,
-      email: body.contactEmail || '',
-      phone: body.contactPhone || ''
-    });
+    await addMessage(body.conversationId, messageData);
     
     console.log('[Chat Send] Message stored successfully in unified storage');
     
