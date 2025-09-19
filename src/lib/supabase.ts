@@ -1,29 +1,33 @@
 import { createClient } from '@supabase/supabase-js';
+import { storeMessage, getMessages, getAllConversations } from './memory-storage';
 
 // Use the correct environment variable names from Vercel
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_TOKEN;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_TOKEN;
 
+// Check if we have valid Supabase configuration (not placeholder values)
+const hasValidSupabaseConfig = supabaseUrl && 
+  supabaseAnonKey && 
+  supabaseServiceKey &&
+  supabaseUrl !== 'https://your-project.supabase.co' &&
+  supabaseAnonKey !== 'your-anon-key' &&
+  supabaseServiceKey !== 'your-service-role-key';
+
 // Validate environment variables
-if (!supabaseUrl) {
-  console.error('Missing SUPABASE_URL environment variable');
-}
-if (!supabaseAnonKey) {
-  console.error('Missing NEXT_PUBLIC_SUPABASE_ANON_TOKEN environment variable');
-}
-if (!supabaseServiceKey) {
-  console.error('Missing SUPABASE_SERVICE_ROLE_TOKEN environment variable');
+if (!hasValidSupabaseConfig) {
+  console.warn('[Supabase] Using memory storage fallback - Supabase not configured or using placeholder values');
+  console.warn('[Supabase] To use Supabase, set valid values for: SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_TOKEN, SUPABASE_SERVICE_ROLE_TOKEN');
 }
 
-// Client for browser use (public operations) - only create if we have the required vars
-export const supabase = (supabaseUrl && supabaseAnonKey) 
-  ? createClient(supabaseUrl, supabaseAnonKey)
+// Client for browser use (public operations) - only create if we have valid config
+export const supabase = hasValidSupabaseConfig 
+  ? createClient(supabaseUrl!, supabaseAnonKey!)
   : null;
 
-// Service client for server-side operations (full access) - only create if we have the required vars
-export const supabaseService = (supabaseUrl && supabaseServiceKey) 
-  ? createClient(supabaseUrl, supabaseServiceKey)
+// Service client for server-side operations (full access) - only create if we have valid config
+export const supabaseService = hasValidSupabaseConfig 
+  ? createClient(supabaseUrl!, supabaseServiceKey!)
   : null;
 
 // Chat events table schema
@@ -45,45 +49,130 @@ export interface ChatEvent {
 
 // Helper to insert chat event
 export async function insertChatEvent(event: ChatEvent) {
+  // Use memory storage if Supabase is not available
   if (!supabaseService) {
-    console.warn('[Supabase] Service client not available, skipping insert');
-    return null;
+    console.log('[Storage] Using memory storage for chat event');
+    const storedMessage = storeMessage({
+      conversation_id: event.conversation_id,
+      type: event.type,
+      message_id: event.message_id || `msg_${Date.now()}`,
+      text: event.text || '',
+      payload: event.payload
+    });
+    return storedMessage;
   }
   
-  const { data, error } = await supabaseService
-    .from('chat_events')
-    .insert(event)
-    .select()
-    .single();
+  try {
+    const { data, error } = await supabaseService
+      .from('chat_events')
+      .insert(event)
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('[Supabase Insert Error]', error);
+      // Fallback to memory storage on error
+      console.log('[Storage] Falling back to memory storage due to Supabase error');
+      const storedMessage = storeMessage({
+        conversation_id: event.conversation_id,
+        type: event.type,
+        message_id: event.message_id || `msg_${Date.now()}`,
+        text: event.text || '',
+        payload: event.payload
+      });
+      return storedMessage;
+    }
     
-  if (error) {
-    console.error('[Supabase Insert Error]', error);
-    throw error;
+    return data;
+  } catch (error) {
+    console.error('[Supabase Insert Exception]', error);
+    // Fallback to memory storage on exception
+    console.log('[Storage] Falling back to memory storage due to Supabase exception');
+    const storedMessage = storeMessage({
+      conversation_id: event.conversation_id,
+      type: event.type,
+      message_id: event.message_id || `msg_${Date.now()}`,
+      text: event.text || '',
+      payload: event.payload
+    });
+    return storedMessage;
   }
-  
-  return data;
 }
 
 // Helper to get chat history
 export async function getChatHistory(conversationId: string, limit = 20) {
+  // Use memory storage if Supabase is not available
   if (!supabaseService) {
-    console.warn('[Supabase] Service client not available, returning empty history');
-    return [];
+    console.log('[Storage] Using memory storage for chat history');
+    return getMessages(conversationId, limit);
   }
   
-  const { data, error } = await supabaseService
-    .from('chat_events')
-    .select('*')
-    .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: true })
-    .limit(limit);
+  try {
+    const { data, error } = await supabaseService
+      .from('chat_events')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+      .limit(limit);
+      
+    if (error) {
+      console.error('[Supabase Query Error]', error);
+      // Fallback to memory storage on error
+      console.log('[Storage] Falling back to memory storage due to Supabase error');
+      return getMessages(conversationId, limit);
+    }
     
-  if (error) {
-    console.error('[Supabase Query Error]', error);
-    throw error;
+    return data || [];
+  } catch (error) {
+    console.error('[Supabase Query Exception]', error);
+    // Fallback to memory storage on exception
+    console.log('[Storage] Falling back to memory storage due to Supabase exception');
+    return getMessages(conversationId, limit);
+  }
+}
+
+// Helper to get all conversations
+export async function getAllConversationsFromStorage() {
+  // Use memory storage if Supabase is not available
+  if (!supabaseService) {
+    console.log('[Storage] Using memory storage for conversations list');
+    return getAllConversations();
   }
   
-  return data || [];
+  try {
+    const { data, error } = await supabaseService
+      .from('chat_events')
+      .select('conversation_id, created_at, type, text, message_id')
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      console.error('[Supabase Conversations Query Error]', error);
+      // Fallback to memory storage on error
+      console.log('[Storage] Falling back to memory storage due to Supabase error');
+      return getAllConversations();
+    }
+    
+    // Group by conversation and get latest message for each
+    const conversationMap = new Map();
+    (data || []).forEach(event => {
+      if (!conversationMap.has(event.conversation_id)) {
+        conversationMap.set(event.conversation_id, {
+          id: event.conversation_id,
+          messageCount: 1,
+          lastMessage: event
+        });
+      } else {
+        conversationMap.get(event.conversation_id).messageCount++;
+      }
+    });
+    
+    return Array.from(conversationMap.values());
+  } catch (error) {
+    console.error('[Supabase Conversations Query Exception]', error);
+    // Fallback to memory storage on exception
+    console.log('[Storage] Falling back to memory storage due to Supabase exception');
+    return getAllConversations();
+  }
 }
 
 // Helper to broadcast event to conversation channel

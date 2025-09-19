@@ -1,99 +1,50 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getAllConversationsFromStorage } from '@/lib/supabase';
 
 export async function GET() {
   try {
     console.log('[Conversations] Starting conversation fetch...');
     
-    // Initialize Supabase client directly (no complex unified storage)
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_TOKEN;
+    // Check environment configuration
+    const hasUrl = !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_TOKEN;
     
     console.log('[Conversations] Environment check:', {
-      hasUrl: !!supabaseUrl,
-      hasServiceKey: !!supabaseServiceKey,
+      hasUrl,
+      hasServiceKey,
       nodeEnv: process.env.NODE_ENV
     });
+
+    // Get all conversations from storage (will use memory storage if Supabase not configured)
+    const conversations = await getAllConversationsFromStorage();
     
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.log('[Conversations] Missing Supabase configuration, returning empty data');
-      return NextResponse.json({
-        waiting: [],
-        assigned: [],
-        all: [],
-        error: 'Missing Supabase configuration'
-      });
-    }
+    console.log('[Conversations] Retrieved conversations:', {
+      count: conversations.length,
+      conversations: conversations.slice(0, 3).map(c => ({
+        id: c.id,
+        messageCount: c.messageCount,
+        lastMessageText: c.lastMessage?.text?.substring(0, 30)
+      }))
+    });
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Query chat_events table directly - this is where your production data is stored
-    console.log('[Conversations] Querying chat_events table...');
-    const { data: chatEvents, error } = await supabase
-      .from('chat_events')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('[Conversations] Supabase query error:', error);
-      return NextResponse.json({
-        waiting: [],
-        assigned: [],
-        all: [],
-        error: `Database error: ${error.message}`
-      });
-    }
-
-    console.log('[Conversations] Found chat events:', chatEvents?.length || 0);
-
-    if (!chatEvents || chatEvents.length === 0) {
-      console.log('[Conversations] No chat events found, returning empty data');
-      return NextResponse.json({
-        waiting: [],
-        assigned: [],
-        all: [],
-        debug: 'No chat events in database'
-      });
-    }
-
-    // Build conversations from chat events - SIMPLE APPROACH
+    // Transform to expected format for the UI
     const conversationMap = new Map();
 
-    chatEvents.forEach((event: any) => {
-      const convId = event.conversation_id;
+    conversations.forEach(conv => {
+      const convId = conv.id;
       
-      if (!conversationMap.has(convId)) {
-        conversationMap.set(convId, {
-          id: convId,
-          contactId: `contact_${convId}`,
-          contactName: `Customer ${convId.slice(-4)}`,
-          lastMessageBody: '', // This is what will fix the timestamp issue
-          lastMessageDate: event.created_at,
-          unreadCount: 0,
-          status: 'waiting',
-          priority: 'normal',
-          tags: [],
-          messages: []
-        });
-      }
-
-      const conversation = conversationMap.get(convId);
-
-      // Extract actual message text from event.text field
-      if (event.text && event.created_at >= conversation.lastMessageDate) {
-        conversation.lastMessageBody = event.text; // THIS IS THE KEY FIX
-        conversation.lastMessageDate = event.created_at;
-        console.log(`[Conversations] Set lastMessageBody for ${convId}: "${event.text}"`);
-      }
-
-      // Count messages and set status
-      if (event.type === 'inbound' || event.type === 'agent_send') {
-        conversation.unreadCount++;
-        
-        if (event.type === 'agent_send') {
-          conversation.status = 'assigned';
-        }
-      }
+      conversationMap.set(convId, {
+        id: convId,
+        contactId: `contact_${convId}`,
+        contactName: `Customer ${convId.slice(-4)}`,
+        lastMessageBody: conv.lastMessage?.text || '', // Direct text mapping
+        lastMessageDate: conv.lastMessage?.created_at || new Date().toISOString(),
+        unreadCount: conv.messageCount,
+        status: 'waiting', // Default to waiting, will be updated if agent messages exist
+        priority: 'normal',
+        tags: [],
+        messages: []
+      });
     });
 
     // Convert to arrays and sort by most recent

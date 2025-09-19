@@ -25,7 +25,7 @@ export function AgentReply({ conversationId, onMessageSent, onRefreshNeeded }: A
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: message.trim(),
-          type: 'outbound',
+          type: 'agent_send', // Fixed: Use 'agent_send' instead of 'outbound'
           channel: 'webchat',
           conversation: {
             id: conversationId
@@ -40,13 +40,16 @@ export function AgentReply({ conversationId, onMessageSent, onRefreshNeeded }: A
       });
 
       const data = await response.json();
-      if (data.success) {
-        console.log('[Agent] Message sent successfully:', data.message);
-        setMessage('');
+      console.log('[Agent] API Response:', data); // Debug log
+      
+      if (response.ok && data.ok) {
+        // API returns { ok: true, counts: { messages: number, suggestions: number } }
+        console.log('[Agent] Message sent successfully:', data);
+        setMessage(''); // Clear input field
         onMessageSent?.(message.trim());
         onRefreshNeeded?.(); // Trigger refresh
       } else {
-        console.error('[Agent] Send failed:', data.error);
+        console.error('[Agent] Send failed:', data.error || 'Unknown error');
       }
     } catch (error) {
       console.error('[Agent] Send error:', error);
