@@ -108,7 +108,7 @@ export async function GET() {
         payloadStructures: Object.fromEntries(analysis.payloadStructures),
         eventTypes: Object.fromEntries(analysis.eventTypes)
       },
-      recommendations: []
+      recommendations: [] as any[]
     };
 
     // Add recommendations based on analysis
