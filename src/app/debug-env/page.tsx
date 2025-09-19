@@ -107,17 +107,7 @@ export default function DebugEnvPage() {
         </div>
       </div>
 
-      {/* Encrypted Configuration */}
-      {Object.keys(data.categorized_variables.encrypted).length > 0 && (
-        <div style={{ backgroundColor: '#d1ecf1', padding: '1rem', borderRadius: '8px', marginBottom: '2rem' }}>
-          <h2 style={{ margin: '0 0 1rem 0', color: '#0c5460' }}>🔐 Encrypted Configuration</h2>
-          {Object.entries(data.categorized_variables.encrypted).map(([key, value]) => (
-            <div key={key} style={{ marginBottom: '0.5rem', fontSize: '0.9rem' }}>
-              <strong>{key}:</strong> <code style={{ backgroundColor: '#fff', padding: '0.2rem 0.4rem', borderRadius: '3px' }}>{value}</code>
-            </div>
-          ))}
-        </div>
-      )}
+
 
       {/* Supabase Variables */}
       {Object.keys(data.categorized_variables.supabase).length > 0 && (
@@ -167,19 +157,7 @@ export default function DebugEnvPage() {
         >
           ← Back to Chat Desk
         </a>
-        <a 
-          href="/maintenance" 
-          style={{ 
-            display: 'inline-block', 
-            padding: '0.75rem 1.5rem', 
-            backgroundColor: '#28a745', 
-            color: 'white', 
-            textDecoration: 'none', 
-            borderRadius: '4px'
-          }}
-        >
-          🔧 Maintenance Page
-        </a>
+
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getChatHistory, getConfigurationStatus } from '@/lib/supabase-secure';
+import { getChatHistory } from '@/lib/supabase';
 
 export async function GET(
   request: NextRequest,
@@ -12,18 +12,14 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get('limit') || '25');
 
-    console.log('[Messages API Secure] Fetching messages for conversation:', conversationId, { limit });
+    console.log('[Messages API] Fetching messages for conversation:', conversationId, { limit });
 
-    // Get configuration status
-    const configStatus = getConfigurationStatus();
-    console.log('[Messages API Secure] Configuration status:', configStatus);
-
-    // Get chat history using secure configuration system
+    // Get chat history
     const chatEvents = await getChatHistory(conversationId, limit);
-    console.log('[Messages API Secure] Found chat events:', chatEvents?.length || 0);
+    console.log('[Messages API] Found chat events:', chatEvents?.length || 0);
 
     if (!chatEvents || chatEvents.length === 0) {
-      console.log('[Messages API Secure] No chat events found for conversation:', conversationId);
+      console.log('[Messages API] No chat events found for conversation:', conversationId);
       return NextResponse.json({
         success: true,
         messages: [],

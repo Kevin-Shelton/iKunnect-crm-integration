@@ -28,16 +28,13 @@ export async function GET() {
         categorizedVars.vercel[key] = maskedValue;
       } else if (key.startsWith('NEXT_')) {
         categorizedVars.next[key] = maskedValue;
-      } else if (key === 'ENCRYPTED_CONFIG') {
-        categorizedVars.encrypted[key] = maskedValue;
-      } else if (!key.startsWith('_') && !key.startsWith('npm_') && !key.startsWith('NODE_')) {
+      } else if (!key.startsWith('npm_') && !key.startsWith('NODE_')) {
         categorizedVars.custom[key] = maskedValue;
       }
     });
 
     // Check for specific variables we're looking for
     const targetVars = {
-      ENCRYPTED_CONFIG: envVars.ENCRYPTED_CONFIG ? 'SET' : 'NOT_SET',
       SUPABASE_URL: envVars.SUPABASE_URL ? 'SET' : 'NOT_SET',
       NEXT_PUBLIC_SUPABASE_URL: envVars.NEXT_PUBLIC_SUPABASE_URL ? 'SET' : 'NOT_SET',
       SUPABASE_SERVICE_ROLE_TOKEN: envVars.SUPABASE_SERVICE_ROLE_TOKEN ? 'SET' : 'NOT_SET',
