@@ -120,7 +120,7 @@ export async function GET() {
       });
     }
 
-    if (analysis.textFieldAnalysis.textFieldsFound.length === 0) {
+    if (analysis.textFieldAnalysis.textFieldsFound.size === 0) {
       result.recommendations.push({
         issue: 'No text fields found in payloads',
         description: 'None of the expected text fields (text, messageText, body, message, content) were found in webhook payloads',
