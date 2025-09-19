@@ -1,12 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+// Use the correct environment variable names from Vercel
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_TOKEN;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_TOKEN;
 
 // Validate environment variables
 if (!supabaseUrl) {
-  console.error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable');
+  console.error('Missing SUPABASE_URL environment variable');
 }
 if (!supabaseAnonKey) {
   console.error('Missing NEXT_PUBLIC_SUPABASE_ANON_TOKEN environment variable');
@@ -111,4 +112,3 @@ export async function broadcastToConversation(conversationId: string, token: str
   
   return broadcastResult;
 }
-

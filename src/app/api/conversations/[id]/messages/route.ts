@@ -14,13 +14,14 @@ export async function GET(
 
     console.log('[Messages API] Fetching messages for conversation:', conversationId, { limit });
 
-    // Initialize Supabase client directly (same approach as conversations API)
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    // Use the correct environment variable names from Vercel
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_TOKEN;
     
     console.log('[Messages API] Environment check:', {
       hasUrl: !!supabaseUrl,
       hasServiceKey: !!supabaseServiceKey,
+      urlSource: process.env.SUPABASE_URL ? 'SUPABASE_URL' : process.env.NEXT_PUBLIC_SUPABASE_URL ? 'NEXT_PUBLIC_SUPABASE_URL' : 'none',
       conversationId
     });
     

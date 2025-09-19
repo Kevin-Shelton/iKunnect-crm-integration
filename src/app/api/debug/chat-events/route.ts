@@ -2,25 +2,27 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
+    // Use the correct environment variable names from Vercel
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_TOKEN;
+    
     // Basic environment check
-    const hasSupabaseUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_TOKEN;
+    const hasSupabaseUrl = !!supabaseUrl;
+    const hasServiceKey = !!supabaseServiceKey;
     
     if (!hasSupabaseUrl || !hasServiceKey) {
       return NextResponse.json({
         error: 'Missing Supabase configuration',
         hasSupabaseUrl,
         hasServiceKey,
+        urlSource: process.env.SUPABASE_URL ? 'SUPABASE_URL' : process.env.NEXT_PUBLIC_SUPABASE_URL ? 'NEXT_PUBLIC_SUPABASE_URL' : 'none',
         timestamp: new Date().toISOString()
       });
     }
 
     // Try to connect to Supabase and get chat events
     const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_TOKEN!
-    );
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: chatEvents, error } = await supabase
       .from('chat_events')
