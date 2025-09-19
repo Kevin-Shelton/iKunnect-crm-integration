@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
+import { AlertCircle, Database, Settings } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -22,6 +23,7 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage }:
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchTime, setLastFetchTime] = useState<string>('');
+  const [configurationIssue, setConfigurationIssue] = useState<string | null>(null);
 
   useEffect(() => {
     if (!conversationId) {
@@ -38,6 +40,7 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage }:
           setIsInitialLoading(true);
         }
         setError(null);
+        setConfigurationIssue(null);
         
         console.log(`[SimpleMessages] Loading messages for conversation: ${conversationId}`);
         
@@ -47,6 +50,12 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage }:
         if (!isMounted) return; // Component unmounted
         
         if (!data.success) {
+          // Check if it's a configuration issue
+          if (data.error && data.error.includes('Missing Supabase configuration')) {
+            setConfigurationIssue('Supabase database is not configured. Please set up the database connection to view messages.');
+            setMessages([]);
+            return;
+          }
           throw new Error(data.error || 'Failed to load messages');
         }
         
@@ -110,11 +119,47 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage }:
     );
   }
 
+  if (configurationIssue) {
+    return (
+      <div className={`flex-1 flex items-center justify-center ${className}`}>
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-center mb-3">
+              <Database className="h-8 w-8 text-yellow-600" />
+            </div>
+            <h3 className="text-lg font-medium text-yellow-800 mb-2">Database Configuration Required</h3>
+            <p className="text-yellow-700 text-sm mb-4">{configurationIssue}</p>
+            <div className="bg-yellow-100 border border-yellow-300 rounded p-3 text-left">
+              <p className="text-xs text-yellow-800 font-medium mb-2">To fix this issue:</p>
+              <ol className="text-xs text-yellow-700 space-y-1">
+                <li>1. Set up Supabase database credentials</li>
+                <li>2. Configure environment variables in Vercel</li>
+                <li>3. Redeploy the application</li>
+              </ol>
+            </div>
+          </div>
+          <div className="text-center">
+            <button 
+              onClick={() => window.open('/api/debug/chat-events', '_blank')}
+              className="inline-flex items-center px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              View Debug Info
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className={`flex-1 flex items-center justify-center ${className}`}>
         <div className="text-center">
-          <div className="text-red-500 mb-2">❌ Error loading messages</div>
+          <div className="flex items-center justify-center mb-2">
+            <AlertCircle className="h-6 w-6 text-red-500" />
+          </div>
+          <div className="text-red-500 mb-2">Error loading messages</div>
           <div className="text-gray-500 text-sm">{error}</div>
         </div>
       </div>
@@ -126,7 +171,10 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage }:
       <div className={`flex-1 flex items-center justify-center ${className}`}>
         <div className="text-center">
           <div className="text-gray-400 text-lg mb-2">💬</div>
-          <div className="text-gray-500">No messages yet</div>
+          <div className="text-gray-500 mb-2">No messages yet</div>
+          <div className="text-gray-400 text-sm">
+            Messages will appear here when customers start chatting
+          </div>
         </div>
       </div>
     );
@@ -169,4 +217,3 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage }:
     </div>
   );
 }
-
