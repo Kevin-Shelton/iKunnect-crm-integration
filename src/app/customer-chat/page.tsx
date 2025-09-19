@@ -30,22 +30,29 @@ export default function CustomerChatPage() {
     setNewMessage('');
 
     try {
-      // Send message to the customer message API (which will call n8n webhook)
-      const response = await fetch('/api/customer-message', {
+      // Store message in database using existing chat-events API (same as n8n does)
+      const response = await fetch('/api/chat-events', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           text: messageText,
-          conversation_id: `customer_chat_${Date.now()}`,
-          customer_id: `customer_${Date.now()}`
+          type: 'inbound',
+          channel: 'webchat',
+          conversation: {
+            id: `customer_chat_${Date.now()}`
+          },
+          contact: {
+            id: `customer_${Date.now()}`
+          },
+          timestamp: new Date().toISOString(),
+          source: 'customer_chat'
         })
       });
 
       if (!response.ok) {
-        console.error('Failed to send message to webhook:', response.statusText);
-        // Add error message to chat
+        console.error('Failed to store message:', response.statusText);
         const errorMessage = {
           id: (Date.now() + 1).toString(),
           text: 'Sorry, there was an error sending your message. Please try again.',
@@ -54,28 +61,18 @@ export default function CustomerChatPage() {
         };
         setMessages(prev => [...prev, errorMessage]);
       } else {
-        console.log('Message sent to n8n webhook successfully');
-        const responseData = await response.json();
+        console.log('Message stored successfully');
+        // Show confirmation - n8n will process and respond via existing webhook
+        const confirmMessage = {
+          id: (Date.now() + 1).toString(),
+          text: 'Message sent. An agent will respond shortly.',
+          sender: 'system',
+          timestamp: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, confirmMessage]);
         
-        // If n8n returned an agent response, show it
-        if (responseData.agent_response) {
-          const agentMessage = {
-            id: (Date.now() + 1).toString(),
-            text: responseData.agent_response,
-            sender: 'agent',
-            timestamp: new Date().toISOString()
-          };
-          setMessages(prev => [...prev, agentMessage]);
-        } else {
-          // Show confirmation message if no immediate response
-          const confirmMessage = {
-            id: (Date.now() + 1).toString(),
-            text: responseData.warning || 'Message received. An agent will respond shortly.',
-            sender: 'system',
-            timestamp: new Date().toISOString()
-          };
-          setMessages(prev => [...prev, confirmMessage]);
-        }
+        // TODO: Add polling or WebSocket to get real-time responses from n8n
+        // For now, customer will see responses when they refresh or via agent interface
       }
     } catch (error) {
       console.error('Error sending message:', error);
