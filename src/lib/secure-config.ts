@@ -101,6 +101,23 @@ export function getSecureConfig(): SecureConfig {
       }
     }
 
+    // If we reach here, provide demo configuration
+    if (!cachedConfig) {
+      cachedConfig = {
+        supabase: {
+          url: 'demo-url',
+          anonKey: 'demo-anon-key',
+          serviceKey: 'demo-service-key'
+        },
+        n8n: {
+          webhookUrl: 'demo-webhook-url'
+        },
+        hmac: {
+          secret: 'demo-hmac-secret'
+        }
+      };
+    }
+
     return cachedConfig;
   } catch (error) {
     console.error('Failed to load secure configuration:', error);
