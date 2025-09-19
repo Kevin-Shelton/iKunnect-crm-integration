@@ -124,9 +124,10 @@ export async function POST(request: NextRequest) {
       // If this is a customer message from the customer chat interface, trigger n8n workflow
       if (payloadObj.source === 'customer_chat' && messageText && validType === 'inbound') {
         try {
-          const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
-          if (n8nWebhookUrl) {
-            const n8nPayload = {
+          // Use the existing n8n webhook URL (same as ai-draft route)
+          const n8nWebhookUrl = 'https://invictusbpo.app.n8n.cloud/webhook';
+          
+          const n8nPayload = {
               body: messageText,
               text: messageText,
               message: messageText,
@@ -155,9 +156,6 @@ export async function POST(request: NextRequest) {
             });
 
             console.log('[Chat Events] Triggered n8n /ghl-chat-inbound for customer message:', messageText.substring(0, 50));
-          } else {
-            console.log('[Chat Events] N8N_WEBHOOK_URL not configured');
-          }
         } catch (error) {
           console.warn('[Chat Events] Failed to trigger n8n webhook:', error);
         }
