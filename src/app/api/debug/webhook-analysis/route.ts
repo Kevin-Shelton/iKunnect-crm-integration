@@ -41,7 +41,7 @@ export async function GET() {
         emptyTextCount: 0,
         nonEmptyTextCount: 0,
         textFieldsFound: new Set<string>(),
-        samplePayloads: []
+        samplePayloads: [] as any[]
       },
       payloadStructures: new Map<string, number>(),
       eventTypes: new Map<string, number>()
