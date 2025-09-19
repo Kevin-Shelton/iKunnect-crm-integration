@@ -1,10 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Eye, EyeOff, Lock, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
 
 export default function MaintenancePage() {
   const [credentials, setCredentials] = useState({
@@ -114,238 +110,342 @@ export default function MaintenancePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl">
-        <CardHeader className="text-center">
-          <div className="flex items-center justify-center mb-4">
-            <Shield className="h-8 w-8 text-blue-600 mr-2" />
-            <CardTitle className="text-2xl">Secure Configuration Setup</CardTitle>
+    <div style={{ 
+      minHeight: '100vh', 
+      backgroundColor: '#f9fafb', 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      padding: '1rem',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }}>
+      <div style={{ 
+        width: '100%', 
+        maxWidth: '42rem', 
+        backgroundColor: 'white', 
+        borderRadius: '0.5rem', 
+        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)', 
+        padding: '2rem' 
+      }}>
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+            <span style={{ fontSize: '2rem', marginRight: '0.5rem' }}>🔐</span>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>Secure Configuration Setup</h1>
           </div>
-          <CardDescription>
+          <p style={{ color: '#6b7280', margin: 0 }}>
             Enter your Supabase credentials to configure the iKunnect CRM integration.
             All data is processed securely and never stored on this page.
-          </CardDescription>
-        </CardHeader>
+          </p>
+        </div>
 
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Supabase URL */}
-            <div className="space-y-2">
-              <label htmlFor="supabaseUrl" className="text-sm font-medium">
-                Supabase URL <span className="text-red-500">*</span>
-              </label>
-              <Input
-                id="supabaseUrl"
-                type="url"
-                placeholder="https://your-project.supabase.co"
-                value={credentials.supabaseUrl}
-                onChange={(e) => setCredentials(prev => ({ ...prev, supabaseUrl: e.target.value }))}
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Supabase URL */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+              Supabase URL <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <input
+              type="url"
+              placeholder="https://your-project.supabase.co"
+              value={credentials.supabaseUrl}
+              onChange={(e) => setCredentials(prev => ({ ...prev, supabaseUrl: e.target.value }))}
+              required
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem'
+              }}
+            />
+          </div>
+
+          {/* Supabase Anon Key */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+              Supabase Anon Key <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showKeys.anonKey ? "text" : "password"}
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                value={credentials.supabaseAnonKey}
+                onChange={(e) => setCredentials(prev => ({ ...prev, supabaseAnonKey: e.target.value }))}
                 required
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  paddingRight: '2.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.875rem'
+                }}
               />
+              <button
+                type="button"
+                onClick={() => toggleVisibility('anonKey')}
+                style={{
+                  position: 'absolute',
+                  right: '0.5rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem'
+                }}
+              >
+                {showKeys.anonKey ? '🙈' : '👁️'}
+              </button>
             </div>
+          </div>
 
-            {/* Supabase Anon Key */}
-            <div className="space-y-2">
-              <label htmlFor="supabaseAnonKey" className="text-sm font-medium">
-                Supabase Anon Key <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Input
-                  id="supabaseAnonKey"
-                  type={showKeys.anonKey ? "text" : "password"}
-                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  value={credentials.supabaseAnonKey}
-                  onChange={(e) => setCredentials(prev => ({ ...prev, supabaseAnonKey: e.target.value }))}
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                  onClick={() => toggleVisibility('anonKey')}
-                >
-                  {showKeys.anonKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-
-            {/* Supabase Service Key */}
-            <div className="space-y-2">
-              <label htmlFor="supabaseServiceKey" className="text-sm font-medium">
-                Supabase Service Role Key <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Input
-                  id="supabaseServiceKey"
-                  type={showKeys.serviceKey ? "text" : "password"}
-                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  value={credentials.supabaseServiceKey}
-                  onChange={(e) => setCredentials(prev => ({ ...prev, supabaseServiceKey: e.target.value }))}
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                  onClick={() => toggleVisibility('serviceKey')}
-                >
-                  {showKeys.serviceKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-
-            {/* N8N Webhook URL (Optional) */}
-            <div className="space-y-2">
-              <label htmlFor="n8nWebhookUrl" className="text-sm font-medium">
-                N8N Webhook URL <span className="text-gray-500">(Optional)</span>
-              </label>
-              <Input
-                id="n8nWebhookUrl"
-                type="url"
-                placeholder="https://your-n8n-webhook-url"
-                value={credentials.n8nWebhookUrl}
-                onChange={(e) => setCredentials(prev => ({ ...prev, n8nWebhookUrl: e.target.value }))}
+          {/* Supabase Service Key */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+              Supabase Service Role Key <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showKeys.serviceKey ? "text" : "password"}
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                value={credentials.supabaseServiceKey}
+                onChange={(e) => setCredentials(prev => ({ ...prev, supabaseServiceKey: e.target.value }))}
+                required
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  paddingRight: '2.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.875rem'
+                }}
               />
+              <button
+                type="button"
+                onClick={() => toggleVisibility('serviceKey')}
+                style={{
+                  position: 'absolute',
+                  right: '0.5rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem'
+                }}
+              >
+                {showKeys.serviceKey ? '🙈' : '👁️'}
+              </button>
             </div>
+          </div>
 
-            {/* HMAC Secret (Optional) */}
-            <div className="space-y-2">
-              <label htmlFor="hmacSecret" className="text-sm font-medium">
-                HMAC Secret <span className="text-gray-500">(Optional)</span>
-              </label>
-              <div className="relative">
-                <Input
-                  id="hmacSecret"
-                  type={showKeys.hmacSecret ? "text" : "password"}
-                  placeholder="your-hmac-secret"
-                  value={credentials.hmacSecret}
-                  onChange={(e) => setCredentials(prev => ({ ...prev, hmacSecret: e.target.value }))}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                  onClick={() => toggleVisibility('hmacSecret')}
-                >
-                  {showKeys.hmacSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
+          {/* N8N Webhook URL (Optional) */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+              N8N Webhook URL <span style={{ color: '#6b7280' }}>(Optional)</span>
+            </label>
+            <input
+              type="url"
+              placeholder="https://your-n8n-webhook-url"
+              value={credentials.n8nWebhookUrl}
+              onChange={(e) => setCredentials(prev => ({ ...prev, n8nWebhookUrl: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem'
+              }}
+            />
+          </div>
+
+          {/* HMAC Secret (Optional) */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+              HMAC Secret <span style={{ color: '#6b7280' }}>(Optional)</span>
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showKeys.hmacSecret ? "text" : "password"}
+                placeholder="your-hmac-secret"
+                value={credentials.hmacSecret}
+                onChange={(e) => setCredentials(prev => ({ ...prev, hmacSecret: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  paddingRight: '2.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.875rem'
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => toggleVisibility('hmacSecret')}
+                style={{
+                  position: 'absolute',
+                  right: '0.5rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem'
+                }}
+              >
+                {showKeys.hmacSecret ? '🙈' : '👁️'}
+              </button>
             </div>
+          </div>
 
-            {/* Setup Key */}
-            <div className="space-y-2">
-              <label htmlFor="setupKey" className="text-sm font-medium">
-                Setup Key <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Input
-                  id="setupKey"
-                  type={showKeys.setupKey ? "text" : "password"}
-                  placeholder="ikunnect-setup-2025"
-                  value={credentials.setupKey}
-                  onChange={(e) => setCredentials(prev => ({ ...prev, setupKey: e.target.value }))}
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                  onClick={() => toggleVisibility('setupKey')}
-                >
-                  {showKeys.setupKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-              <p className="text-xs text-gray-500">
-                Default setup key: ikunnect-setup-2025
-              </p>
+          {/* Setup Key */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+              Setup Key <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showKeys.setupKey ? "text" : "password"}
+                placeholder="ikunnect-setup-2025"
+                value={credentials.setupKey}
+                onChange={(e) => setCredentials(prev => ({ ...prev, setupKey: e.target.value }))}
+                required
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  paddingRight: '2.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.875rem'
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => toggleVisibility('setupKey')}
+                style={{
+                  position: 'absolute',
+                  right: '0.5rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem'
+                }}
+              >
+                {showKeys.setupKey ? '🙈' : '👁️'}
+              </button>
             </div>
+            <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0.25rem 0 0 0' }}>
+              Default setup key: ikunnect-setup-2025
+            </p>
+          </div>
 
-            {/* Submit Button */}
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={status === 'configuring'}
-            >
-              <Lock className="h-4 w-4 mr-2" />
-              {status === 'configuring' ? 'Generating Configuration...' : 'Generate Secure Configuration'}
-            </Button>
-          </form>
+          {/* Submit Button */}
+          <button 
+            type="submit" 
+            disabled={status === 'configuring'}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              backgroundColor: status === 'configuring' ? '#9ca3af' : '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.375rem',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              cursor: status === 'configuring' ? 'not-allowed' : 'pointer'
+            }}
+          >
+            🔒 {status === 'configuring' ? 'Generating Configuration...' : 'Generate Secure Configuration'}
+          </button>
+        </form>
 
-          {/* Status Messages */}
-          {message && (
-            <div className={`mt-4 p-4 rounded-lg border ${
-              status === 'success' ? 'border-green-200 bg-green-50' : 
-              status === 'error' ? 'border-red-200 bg-red-50' : 
-              'border-blue-200 bg-blue-50'
-            }`}>
-              <div className="flex items-start">
-                {status === 'success' ? (
-                  <CheckCircle className="h-5 w-5 text-green-600 mr-2 mt-0.5" />
-                ) : status === 'error' ? (
-                  <AlertTriangle className="h-5 w-5 text-red-600 mr-2 mt-0.5" />
-                ) : null}
-                <div className={`text-sm ${
-                  status === 'success' ? 'text-green-800' : 
-                  status === 'error' ? 'text-red-800' : 
-                  'text-blue-800'
-                }`}>
-                  {message}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Encrypted Configuration Output */}
-          {encryptedConfig && (
-            <div className="mt-6 space-y-4">
-              <div className="bg-gray-100 p-4 rounded-lg">
-                <label className="text-sm font-medium mb-2 block">
-                  Encrypted Configuration (Copy this to Vercel):
-                </label>
-                <div className="bg-white p-3 rounded border font-mono text-sm break-all">
-                  {encryptedConfig}
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => copyToClipboard(encryptedConfig)}
-                >
-                  Copy to Clipboard
-                </Button>
-              </div>
-
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="font-medium text-blue-900 mb-2">Next Steps:</h4>
-                <ol className="text-sm text-blue-800 space-y-1">
-                  <li>1. Copy the encrypted configuration above</li>
-                  <li>2. Go to Vercel Dashboard → Project Settings → Environment Variables</li>
-                  <li>3. Add: <code className="bg-blue-100 px-1 rounded">ENCRYPTED_CONFIG</code> = <em>paste the value</em></li>
-                  <li>4. Set environment to "Production"</li>
-                  <li>5. Save and redeploy the application</li>
-                  <li>6. Your system will automatically use real Supabase data!</li>
-                </ol>
-              </div>
-            </div>
-          )}
-
-          {/* Security Notice */}
-          <div className="mt-6 bg-yellow-50 p-4 rounded-lg">
-            <div className="flex items-start">
-              <Shield className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
-              <div className="text-sm text-yellow-800">
-                <strong>Security Notice:</strong> Your credentials are processed locally in your browser and never stored on this page. 
-                The encrypted configuration uses base64 encoding and can only be decrypted by your application.
+        {/* Status Messages */}
+        {message && (
+          <div style={{
+            marginTop: '1rem',
+            padding: '1rem',
+            borderRadius: '0.375rem',
+            border: `1px solid ${status === 'success' ? '#10b981' : status === 'error' ? '#ef4444' : '#3b82f6'}`,
+            backgroundColor: status === 'success' ? '#ecfdf5' : status === 'error' ? '#fef2f2' : '#eff6ff'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+              <span style={{ marginRight: '0.5rem', fontSize: '1.25rem' }}>
+                {status === 'success' ? '✅' : status === 'error' ? '❌' : 'ℹ️'}
+              </span>
+              <div style={{
+                fontSize: '0.875rem',
+                color: status === 'success' ? '#065f46' : status === 'error' ? '#991b1b' : '#1e40af'
+              }}>
+                {message}
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        )}
+
+        {/* Encrypted Configuration Output */}
+        {encryptedConfig && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <div style={{ backgroundColor: '#f3f4f6', padding: '1rem', borderRadius: '0.375rem' }}>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+                Encrypted Configuration (Copy this to Vercel):
+              </label>
+              <div style={{
+                backgroundColor: 'white',
+                padding: '0.75rem',
+                borderRadius: '0.25rem',
+                border: '1px solid #d1d5db',
+                fontFamily: 'monospace',
+                fontSize: '0.75rem',
+                wordBreak: 'break-all',
+                marginBottom: '0.5rem'
+              }}>
+                {encryptedConfig}
+              </div>
+              <button
+                type="button"
+                onClick={() => copyToClipboard(encryptedConfig)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: 'white',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.25rem',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer'
+                }}
+              >
+                📋 Copy to Clipboard
+              </button>
+            </div>
+
+            <div style={{ backgroundColor: '#dbeafe', padding: '1rem', borderRadius: '0.375rem', marginTop: '1rem' }}>
+              <h4 style={{ fontWeight: '500', color: '#1e40af', margin: '0 0 0.5rem 0' }}>Next Steps:</h4>
+              <ol style={{ fontSize: '0.875rem', color: '#1e40af', margin: 0, paddingLeft: '1.25rem' }}>
+                <li>Copy the encrypted configuration above</li>
+                <li>Go to Vercel Dashboard → Project Settings → Environment Variables</li>
+                <li>Add: <code style={{ backgroundColor: '#bfdbfe', padding: '0.125rem 0.25rem', borderRadius: '0.125rem' }}>ENCRYPTED_CONFIG</code> = <em>paste the value</em></li>
+                <li>Set environment to "Production"</li>
+                <li>Save and redeploy the application</li>
+                <li>Your system will automatically use real Supabase data!</li>
+              </ol>
+            </div>
+          </div>
+        )}
+
+        {/* Security Notice */}
+        <div style={{ backgroundColor: '#fef3c7', padding: '1rem', borderRadius: '0.375rem', marginTop: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '1.25rem', marginRight: '0.5rem' }}>🛡️</span>
+            <div style={{ fontSize: '0.875rem', color: '#92400e' }}>
+              <strong>Security Notice:</strong> Your credentials are processed locally in your browser and never stored on this page. 
+              The encrypted configuration uses base64 encoding and can only be decrypted by your application.
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
