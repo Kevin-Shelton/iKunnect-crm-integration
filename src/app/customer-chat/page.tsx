@@ -15,7 +15,7 @@ export default function CustomerChatPage() {
   const [newMessage, setNewMessage] = useState('');
   const [isConnected, setIsConnected] = useState(true);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!newMessage.trim()) return;
 
     const message = {
@@ -26,18 +26,67 @@ export default function CustomerChatPage() {
     };
 
     setMessages(prev => [...prev, message]);
+    const messageText = newMessage;
     setNewMessage('');
 
-    // Simulate agent response after a delay
-    setTimeout(() => {
-      const agentResponse = {
+    try {
+      // Send message to the customer message API (which will call n8n webhook)
+      const response = await fetch('/api/customer-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: messageText,
+          conversation_id: `customer_chat_${Date.now()}`,
+          customer_id: `customer_${Date.now()}`
+        })
+      });
+
+      if (!response.ok) {
+        console.error('Failed to send message to webhook:', response.statusText);
+        // Add error message to chat
+        const errorMessage = {
+          id: (Date.now() + 1).toString(),
+          text: 'Sorry, there was an error sending your message. Please try again.',
+          sender: 'system',
+          timestamp: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      } else {
+        console.log('Message sent to n8n webhook successfully');
+        const responseData = await response.json();
+        
+        // If n8n returned an agent response, show it
+        if (responseData.agent_response) {
+          const agentMessage = {
+            id: (Date.now() + 1).toString(),
+            text: responseData.agent_response,
+            sender: 'agent',
+            timestamp: new Date().toISOString()
+          };
+          setMessages(prev => [...prev, agentMessage]);
+        } else {
+          // Show confirmation message if no immediate response
+          const confirmMessage = {
+            id: (Date.now() + 1).toString(),
+            text: responseData.warning || 'Message received. An agent will respond shortly.',
+            sender: 'system',
+            timestamp: new Date().toISOString()
+          };
+          setMessages(prev => [...prev, confirmMessage]);
+        }
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage = {
         id: (Date.now() + 1).toString(),
-        text: 'Thank you for your message. An agent will be with you shortly.',
-        sender: 'agent',
+        text: 'Connection error. Please check your internet connection and try again.',
+        sender: 'system',
         timestamp: new Date().toISOString()
       };
-      setMessages(prev => [...prev, agentResponse]);
-    }, 1000);
+      setMessages(prev => [...prev, errorMessage]);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
