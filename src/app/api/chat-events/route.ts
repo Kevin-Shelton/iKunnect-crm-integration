@@ -120,6 +120,48 @@ export async function POST(request: NextRequest) {
         payload: payloadObj
       });
       eventCount++;
+
+      // If this is a customer message from the customer chat interface, trigger n8n workflow
+      if (payloadObj.source === 'customer_chat' && messageText && validType === 'inbound') {
+        try {
+          const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
+          if (n8nWebhookUrl) {
+            const n8nPayload = {
+              body: messageText,
+              text: messageText,
+              message: messageText,
+              conversation: {
+                id: convId
+              },
+              contact: {
+                id: payloadObj.contact?.id || convId.replace('conv_', 'customer_'),
+                name: payloadObj.contact?.name || `Customer ${convId.slice(-4)}`
+              },
+              locationId: 'DKs2AdSvw0MGWJYyXwk1',
+              channel: 'webchat',
+              timestamp: payloadObj.timestamp || new Date().toISOString(),
+              source: 'customer_chat_interface'
+            };
+
+            // Call n8n /ghl-chat-inbound webhook
+            fetch(`${n8nWebhookUrl}/ghl-chat-inbound`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(n8nPayload)
+            }).catch(error => {
+              console.warn('[Chat Events] n8n webhook failed:', error.message);
+            });
+
+            console.log('[Chat Events] Triggered n8n /ghl-chat-inbound for customer message:', messageText.substring(0, 50));
+          } else {
+            console.log('[Chat Events] N8N_WEBHOOK_URL not configured');
+          }
+        } catch (error) {
+          console.warn('[Chat Events] Failed to trigger n8n webhook:', error);
+        }
+      }
     }
 
     tapPush({ 

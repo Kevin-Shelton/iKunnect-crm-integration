@@ -19,42 +19,38 @@ export default function CustomerChatPage() {
   const [newMessage, setNewMessage] = useState('');
   const [isConnected, setIsConnected] = useState(true);
 
-  // Poll for new messages from n8n responses
+  // Load initial messages and poll for updates (client-side only)
   useEffect(() => {
-    const pollForMessages = async () => {
+    if (typeof window === 'undefined') return; // Prevent SSR issues
+    
+    const loadMessages = async () => {
       try {
         const response = await fetch(`/api/conversations/${conversationId}/messages`);
         if (response.ok) {
           const data = await response.json();
-          if (data.success && data.messages) {
-            // Update messages with any new ones from the server
+          if (data.success && data.messages && data.messages.length > 0) {
             const serverMessages = data.messages.map((msg: any) => ({
               id: msg.id,
-              text: msg.text,
+              text: msg.text || '',
               sender: msg.sender === 'customer' ? 'customer' : 'agent',
               timestamp: msg.timestamp
             }));
             
-            // Only update if we have different messages
-            setMessages(prev => {
-              const existingIds = new Set(prev.map(m => m.id));
-              const newMessages = serverMessages.filter((msg: any) => !existingIds.has(msg.id));
-              if (newMessages.length > 0) {
-                return [...prev, ...newMessages];
-              }
-              return prev;
-            });
+            // Replace initial message with server messages
+            setMessages(serverMessages);
           }
         }
       } catch (error) {
-        console.error('Error polling for messages:', error);
+        console.error('Error loading messages:', error);
       }
     };
 
-    // Poll every 3 seconds for new messages
-    const interval = setInterval(pollForMessages, 3000);
+    // Load messages once on mount
+    loadMessages();
     
-    // Cleanup interval on unmount
+    // Set up polling for new messages (less frequent to avoid hydration issues)
+    const interval = setInterval(loadMessages, 5000);
+    
     return () => clearInterval(interval);
   }, [conversationId]);
 
