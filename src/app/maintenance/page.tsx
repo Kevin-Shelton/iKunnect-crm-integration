@@ -426,7 +426,7 @@ export default function MaintenancePage() {
               <ol style={{ fontSize: '0.875rem', color: '#1e40af', margin: 0, paddingLeft: '1.25rem' }}>
                 <li>Copy the encrypted configuration above</li>
                 <li>Go to Vercel Dashboard → Project Settings → Environment Variables</li>
-                <li>Add: <code style={{ backgroundColor: '#bfdbfe', padding: '0.125rem 0.25rem', borderRadius: '0.125rem' }}>ENCRYPTED_CONFIG</code> = <em>paste the value</em></li>
+                <li>Add: ENCRYPTED_CONFIG = <em>paste the value</em></li>
                 <li>Set environment to "Production"</li>
                 <li>Save and redeploy the application</li>
                 <li>Your system will automatically use real Supabase data!</li>
