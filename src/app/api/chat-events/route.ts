@@ -135,8 +135,8 @@ export async function POST(request: NextRequest) {
                 id: convId
               },
               contact: {
-                id: payloadObj.contact?.id || convId.replace('conv_', 'customer_'),
-                name: payloadObj.contact?.name || `Customer ${convId.slice(-4)}`
+                id: (payloadObj.contact as any)?.id || convId.replace('conv_', 'customer_'),
+                name: (payloadObj.contact as any)?.name || `Customer ${convId.slice(-4)}`
               },
               locationId: 'DKs2AdSvw0MGWJYyXwk1',
               channel: 'webchat',
