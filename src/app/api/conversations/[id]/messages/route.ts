@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getChatHistory, getConfigurationStatus } from '@/lib/supabase-secure';
 
 export async function GET(
   request: NextRequest,
@@ -12,70 +12,18 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get('limit') || '25');
 
-    console.log('[Messages API] Fetching messages for conversation:', conversationId, { limit });
+    console.log('[Messages API Secure] Fetching messages for conversation:', conversationId, { limit });
 
-    // Use the correct environment variable names from Vercel
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_TOKEN;
-    
-    console.log('[Messages API] Environment check:', {
-      hasUrl: !!supabaseUrl,
-      hasServiceKey: !!supabaseServiceKey,
-      urlSource: process.env.SUPABASE_URL ? 'SUPABASE_URL' : process.env.NEXT_PUBLIC_SUPABASE_URL ? 'NEXT_PUBLIC_SUPABASE_URL' : 'none',
-      conversationId
-    });
-    
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.log('[Messages API] Missing Supabase configuration, returning empty messages');
-      return NextResponse.json({
-        success: true,
-        messages: [],
-        contact: {
-          id: conversationId,
-          name: `Customer ${conversationId.slice(-4)}`,
-          email: '',
-          phone: '',
-          locationId: ''
-        },
-        total: 0,
-        timestamp: new Date().toISOString(),
-        error: 'Missing Supabase configuration'
-      });
-    }
+    // Get configuration status
+    const configStatus = getConfigurationStatus();
+    console.log('[Messages API Secure] Configuration status:', configStatus);
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Query chat_events table directly for this specific conversation
-    console.log('[Messages API] Querying chat_events for conversation:', conversationId);
-    const { data: chatEvents, error } = await supabase
-      .from('chat_events')
-      .select('*')
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true })
-      .limit(limit);
-
-    if (error) {
-      console.error('[Messages API] Supabase query error:', error);
-      return NextResponse.json({
-        success: false,
-        messages: [],
-        contact: {
-          id: conversationId,
-          name: `Customer ${conversationId.slice(-4)}`,
-          email: '',
-          phone: '',
-          locationId: ''
-        },
-        total: 0,
-        timestamp: new Date().toISOString(),
-        error: `Database error: ${error.message}`
-      });
-    }
-
-    console.log('[Messages API] Found chat events:', chatEvents?.length || 0);
+    // Get chat history using secure configuration system
+    const chatEvents = await getChatHistory(conversationId, limit);
+    console.log('[Messages API Secure] Found chat events:', chatEvents?.length || 0);
 
     if (!chatEvents || chatEvents.length === 0) {
-      console.log('[Messages API] No chat events found for conversation:', conversationId);
+      console.log('[Messages API Secure] No chat events found for conversation:', conversationId);
       return NextResponse.json({
         success: true,
         messages: [],
@@ -87,7 +35,8 @@ export async function GET(
           locationId: ''
         },
         total: 0,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        configStatus: configStatus.isProductionConfig ? 'production' : 'demo'
       });
     }
 
@@ -103,9 +52,10 @@ export async function GET(
         contactId: conversationId
       }));
 
-    console.log('[Messages API] Transformed messages:', {
+    console.log('[Messages API Secure] Transformed messages:', {
       messageCount: messages.length,
       conversationId,
+      isProduction: configStatus.isProductionConfig,
       sampleMessages: messages.slice(0, 2).map(m => ({ id: m.id, text: m.text?.substring(0, 50), sender: m.sender }))
     });
 
@@ -120,11 +70,13 @@ export async function GET(
         locationId: ''
       },
       total: messages.length,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      configStatus: configStatus.isProductionConfig ? 'production' : 'demo',
+      dataSource: configStatus.hasSupabaseService ? 'supabase' : 'mock'
     });
 
   } catch (error) {
-    console.error('[Messages API] Unexpected error:', error);
+    console.error('[Messages API Secure] Unexpected error:', error);
     return NextResponse.json({
       success: false,
       messages: [],
@@ -137,7 +89,8 @@ export async function GET(
       },
       total: 0,
       timestamp: new Date().toISOString(),
-      error: `Server error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      error: `Server error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      configStatus: 'error'
     }, { status: 500 });
   }
 }
