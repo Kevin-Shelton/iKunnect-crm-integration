@@ -2,71 +2,55 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    // First, just return basic info to test if the endpoint works
-    const basicInfo = {
-      status: 'Debug endpoint is working',
-      timestamp: new Date().toISOString(),
-      environment: {
-        hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_TOKEN,
-        nodeEnv: process.env.NODE_ENV
-      }
-    };
-
-    // Try to connect to Supabase
-    try {
-      const { createClient } = await import('@supabase/supabase-js');
-      
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_TOKEN;
-      
-      if (!supabaseUrl || !supabaseServiceKey) {
-        return NextResponse.json({
-          ...basicInfo,
-          error: 'Missing Supabase configuration',
-          supabaseUrl: supabaseUrl ? 'present' : 'missing',
-          serviceKey: supabaseServiceKey ? 'present' : 'missing'
-        });
-      }
-
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-      // Get recent chat events
-      const { data: chatEvents, error } = await supabase
-        .from('chat_events')
-        .select('id, conversation_id, type, text, payload, created_at')
-        .order('created_at', { ascending: false })
-        .limit(3);
-
-      if (error) {
-        return NextResponse.json({
-          ...basicInfo,
-          error: 'Database query failed',
-          details: error.message
-        });
-      }
-
+    // Basic environment check
+    const hasSupabaseUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_TOKEN;
+    
+    if (!hasSupabaseUrl || !hasServiceKey) {
       return NextResponse.json({
-        ...basicInfo,
-        success: true,
-        eventCount: chatEvents?.length || 0,
-        recentEvents: chatEvents?.map(event => ({
-          id: event.id,
-          conversation_id: event.conversation_id,
-          type: event.type,
-          text: event.text || '(empty)',
-          hasPayload: !!event.payload,
-          created_at: event.created_at
-        })) || []
-      });
-
-    } catch (supabaseError) {
-      return NextResponse.json({
-        ...basicInfo,
-        error: 'Supabase connection failed',
-        details: supabaseError instanceof Error ? supabaseError.message : 'Unknown error'
+        error: 'Missing Supabase configuration',
+        hasSupabaseUrl,
+        hasServiceKey,
+        timestamp: new Date().toISOString()
       });
     }
+
+    // Try to connect to Supabase and get chat events
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_TOKEN!
+    );
+
+    const { data: chatEvents, error } = await supabase
+      .from('chat_events')
+      .select('id, conversation_id, type, text, payload, created_at')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (error) {
+      return NextResponse.json({
+        error: 'Database query failed',
+        details: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      eventCount: chatEvents?.length || 0,
+      recentEvents: chatEvents?.map(event => ({
+        id: event.id,
+        conversation_id: event.conversation_id,
+        type: event.type,
+        text: event.text || '(empty)',
+        textLength: event.text?.length || 0,
+        hasPayload: !!event.payload,
+        payloadPreview: event.payload ? JSON.stringify(event.payload).substring(0, 100) + '...' : null,
+        created_at: event.created_at
+      })) || []
+    });
 
   } catch (error) {
     return NextResponse.json({
