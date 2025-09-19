@@ -92,9 +92,8 @@ export function Header({
   };
 
   const openCustomerChatScreen = () => {
-    // This would open a customer-facing chat interface
-    // For now, we'll open the main interface in a new tab
-    window.open('/', '_blank');
+    // Open the customer-facing chat interface
+    window.open('/customer-chat', '_blank');
   };
 
   return (

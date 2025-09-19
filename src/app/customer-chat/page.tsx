@@ -1,0 +1,131 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { Send, MessageCircle } from 'lucide-react';
+
+export default function CustomerChatPage() {
+  const [messages, setMessages] = useState([
+    {
+      id: '1',
+      text: 'Hello! How can I help you today?',
+      sender: 'agent',
+      timestamp: new Date().toISOString()
+    }
+  ]);
+  const [newMessage, setNewMessage] = useState('');
+  const [isConnected, setIsConnected] = useState(true);
+
+  const sendMessage = () => {
+    if (!newMessage.trim()) return;
+
+    const message = {
+      id: Date.now().toString(),
+      text: newMessage,
+      sender: 'customer',
+      timestamp: new Date().toISOString()
+    };
+
+    setMessages(prev => [...prev, message]);
+    setNewMessage('');
+
+    // Simulate agent response after a delay
+    setTimeout(() => {
+      const agentResponse = {
+        id: (Date.now() + 1).toString(),
+        text: 'Thank you for your message. An agent will be with you shortly.',
+        sender: 'agent',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, agentResponse]);
+    }, 1000);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 p-4">
+        <div className="max-w-4xl mx-auto flex items-center space-x-3">
+          <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+            <MessageCircle className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Customer Support Chat</h1>
+            <p className="text-sm text-gray-500">
+              {isConnected ? 'Connected - Chat with our support team' : 'Connecting...'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Chat Container */}
+      <div className="flex-1 max-w-4xl mx-auto w-full flex flex-col bg-white shadow-sm">
+        {/* Messages Area */}
+        <div className="flex-1 p-4 overflow-y-auto space-y-4">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex ${message.sender === 'customer' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                  message.sender === 'customer'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-900'
+                }`}
+              >
+                <p className="text-sm">{message.text}</p>
+                <p className={`text-xs mt-1 ${
+                  message.sender === 'customer' ? 'text-blue-100' : 'text-gray-500'
+                }`}>
+                  {new Date(message.timestamp).toLocaleTimeString()}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Input Area */}
+        <div className="border-t border-gray-200 p-4">
+          <div className="flex space-x-2">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Type your message..."
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={!isConnected}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={!newMessage.trim() || !isConnected}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+            >
+              <Send className="h-4 w-4" />
+              <span>Send</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="bg-gray-50 border-t border-gray-200 p-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-xs text-gray-500">
+            Powered by iKunnect CRM Integration • 
+            <span className="ml-1">
+              Status: {isConnected ? '🟢 Online' : '🔴 Offline'}
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
