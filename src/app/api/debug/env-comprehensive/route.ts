@@ -57,7 +57,7 @@ export async function GET() {
 
     // Determine the primary issue
     let primaryIssue = 'Unknown';
-    let recommendations = [];
+    const recommendations = [];
 
     if (!envCheck.SUPABASE_URL.exists && !envCheck.NEXT_PUBLIC_SUPABASE_URL.exists) {
       primaryIssue = 'No Supabase URL found';
@@ -97,7 +97,7 @@ export async function GET() {
       vercelSystemVars: vercelEnv,
       analysis: {
         totalEnvVars: allEnvKeys.length,
-        supabaseRelatedKeys,
+        supabaseRelatedKeys: supabaseKeys,
         primaryIssue,
         recommendations
       },

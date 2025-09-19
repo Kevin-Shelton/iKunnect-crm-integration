@@ -7,8 +7,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('[Chat Events API Secure] Received webhook:', JSON.stringify(body, null, 2));
 
-    // Get configuration
-    const config = getSecureConfig();
+    // Get configuration status
     const configStatus = getConfigurationStatus();
     
     // Extract conversation ID from various possible fields
