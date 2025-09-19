@@ -4,6 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { Send, MessageCircle } from 'lucide-react';
 
 export default function CustomerChatPage() {
+  // Generate consistent session IDs that persist during the chat session
+  const [conversationId] = useState(() => `customer_chat_${Date.now()}`);
+  const [customerId] = useState(() => `customer_${Date.now()}`);
+  
   const [messages, setMessages] = useState([
     {
       id: '1',
@@ -14,6 +18,45 @@ export default function CustomerChatPage() {
   ]);
   const [newMessage, setNewMessage] = useState('');
   const [isConnected, setIsConnected] = useState(true);
+
+  // Poll for new messages from n8n responses
+  useEffect(() => {
+    const pollForMessages = async () => {
+      try {
+        const response = await fetch(`/api/conversations/${conversationId}/messages`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.messages) {
+            // Update messages with any new ones from the server
+            const serverMessages = data.messages.map((msg: any) => ({
+              id: msg.id,
+              text: msg.text,
+              sender: msg.sender === 'customer' ? 'customer' : 'agent',
+              timestamp: msg.timestamp
+            }));
+            
+            // Only update if we have different messages
+            setMessages(prev => {
+              const existingIds = new Set(prev.map(m => m.id));
+              const newMessages = serverMessages.filter((msg: any) => !existingIds.has(msg.id));
+              if (newMessages.length > 0) {
+                return [...prev, ...newMessages];
+              }
+              return prev;
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error polling for messages:', error);
+      }
+    };
+
+    // Poll every 3 seconds for new messages
+    const interval = setInterval(pollForMessages, 3000);
+    
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, [conversationId]);
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
@@ -41,10 +84,10 @@ export default function CustomerChatPage() {
           type: 'inbound',
           channel: 'webchat',
           conversation: {
-            id: `customer_chat_${Date.now()}`
+            id: conversationId
           },
           contact: {
-            id: `customer_${Date.now()}`
+            id: customerId
           },
           timestamp: new Date().toISOString(),
           source: 'customer_chat'

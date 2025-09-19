@@ -20,14 +20,22 @@ export function AgentReply({ conversationId, onMessageSent, onRefreshNeeded }: A
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/chat/send', {
+      const response = await fetch('/api/chat-events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          conversationId,
-          messageId: `agent_${Date.now()}`,
           text: message.trim(),
-          sender: 'agent'
+          type: 'outbound',
+          channel: 'webchat',
+          conversation: {
+            id: conversationId
+          },
+          contact: {
+            id: conversationId.replace('conv_', 'customer_')
+          },
+          timestamp: new Date().toISOString(),
+          source: 'agent_interface',
+          messageId: `agent_${Date.now()}`
         })
       });
 
