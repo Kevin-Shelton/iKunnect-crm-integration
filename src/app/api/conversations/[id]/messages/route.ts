@@ -31,8 +31,7 @@ export async function GET(
           locationId: ''
         },
         total: 0,
-        timestamp: new Date().toISOString(),
-        configStatus: configStatus.isProductionConfig ? 'production' : 'demo'
+        timestamp: new Date().toISOString()
       });
     }
 
@@ -51,7 +50,6 @@ export async function GET(
     console.log('[Messages API Secure] Transformed messages:', {
       messageCount: messages.length,
       conversationId,
-      isProduction: configStatus.isProductionConfig,
       sampleMessages: messages.slice(0, 2).map(m => ({ id: m.id, text: m.text?.substring(0, 50), sender: m.sender }))
     });
 
@@ -66,9 +64,7 @@ export async function GET(
         locationId: ''
       },
       total: messages.length,
-      timestamp: new Date().toISOString(),
-      configStatus: configStatus.isProductionConfig ? 'production' : 'demo',
-      dataSource: configStatus.hasSupabaseService ? 'supabase' : 'mock'
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {
@@ -85,8 +81,7 @@ export async function GET(
       },
       total: 0,
       timestamp: new Date().toISOString(),
-      error: `Server error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      configStatus: 'error'
+      error: `Server error: ${error instanceof Error ? error.message : 'Unknown error'}`
     }, { status: 500 });
   }
 }
