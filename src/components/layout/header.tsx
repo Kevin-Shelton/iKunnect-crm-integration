@@ -24,7 +24,10 @@ import {
   Keyboard,
   HelpCircle,
   BellOff,
-  ChevronDown
+  ChevronDown,
+  Bug,
+  ExternalLink,
+  Monitor
 } from 'lucide-react';
 import { useAuth, useAgentStatus } from '@/contexts/auth-context';
 import { useAlerts } from '@/components/alerts/alert-system';
@@ -84,6 +87,16 @@ export function Header({
     }
   };
 
+  const openDebugScreen = () => {
+    window.open('/api/debug/chat-events', '_blank');
+  };
+
+  const openCustomerChatScreen = () => {
+    // This would open a customer-facing chat interface
+    // For now, we'll open the main interface in a new tab
+    window.open('/', '_blank');
+  };
+
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
@@ -133,8 +146,33 @@ export function Header({
           </form>
         </div>
 
-        {/* Right Section - Agent Status and Controls */}
+        {/* Right Section - Navigation, Agent Status and Controls */}
         <div className="flex items-center space-x-4">
+          {/* Navigation Links */}
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openDebugScreen}
+              className="flex items-center space-x-1"
+            >
+              <Bug className="h-4 w-4" />
+              <span>Debug</span>
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openCustomerChatScreen}
+              className="flex items-center space-x-1"
+            >
+              <Monitor className="h-4 w-4" />
+              <span>Customer View</span>
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+          </div>
+
           {/* Sound Toggle */}
           <div className="flex items-center space-x-2">
             <Bell className={`h-4 w-4 ${soundEnabled ? 'text-blue-500' : 'text-gray-400'}`} />
@@ -197,4 +235,3 @@ export function Header({
     </header>
   );
 }
-
