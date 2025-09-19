@@ -3,9 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Lock, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
 
 export default function MaintenancePage() {
@@ -15,7 +13,7 @@ export default function MaintenancePage() {
     supabaseServiceKey: '',
     n8nWebhookUrl: '',
     hmacSecret: '',
-    setupKey: ''
+    setupKey: 'ikunnect-setup-2025'
   });
 
   const [showKeys, setShowKeys] = useState({
@@ -133,9 +131,9 @@ export default function MaintenancePage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Supabase URL */}
             <div className="space-y-2">
-              <Label htmlFor="supabaseUrl" className="text-sm font-medium">
+              <label htmlFor="supabaseUrl" className="text-sm font-medium">
                 Supabase URL <span className="text-red-500">*</span>
-              </Label>
+              </label>
               <Input
                 id="supabaseUrl"
                 type="url"
@@ -148,9 +146,9 @@ export default function MaintenancePage() {
 
             {/* Supabase Anon Key */}
             <div className="space-y-2">
-              <Label htmlFor="supabaseAnonKey" className="text-sm font-medium">
+              <label htmlFor="supabaseAnonKey" className="text-sm font-medium">
                 Supabase Anon Key <span className="text-red-500">*</span>
-              </Label>
+              </label>
               <div className="relative">
                 <Input
                   id="supabaseAnonKey"
@@ -174,9 +172,9 @@ export default function MaintenancePage() {
 
             {/* Supabase Service Key */}
             <div className="space-y-2">
-              <Label htmlFor="supabaseServiceKey" className="text-sm font-medium">
+              <label htmlFor="supabaseServiceKey" className="text-sm font-medium">
                 Supabase Service Role Key <span className="text-red-500">*</span>
-              </Label>
+              </label>
               <div className="relative">
                 <Input
                   id="supabaseServiceKey"
@@ -200,9 +198,9 @@ export default function MaintenancePage() {
 
             {/* N8N Webhook URL (Optional) */}
             <div className="space-y-2">
-              <Label htmlFor="n8nWebhookUrl" className="text-sm font-medium">
+              <label htmlFor="n8nWebhookUrl" className="text-sm font-medium">
                 N8N Webhook URL <span className="text-gray-500">(Optional)</span>
-              </Label>
+              </label>
               <Input
                 id="n8nWebhookUrl"
                 type="url"
@@ -214,9 +212,9 @@ export default function MaintenancePage() {
 
             {/* HMAC Secret (Optional) */}
             <div className="space-y-2">
-              <Label htmlFor="hmacSecret" className="text-sm font-medium">
+              <label htmlFor="hmacSecret" className="text-sm font-medium">
                 HMAC Secret <span className="text-gray-500">(Optional)</span>
-              </Label>
+              </label>
               <div className="relative">
                 <Input
                   id="hmacSecret"
@@ -239,9 +237,9 @@ export default function MaintenancePage() {
 
             {/* Setup Key */}
             <div className="space-y-2">
-              <Label htmlFor="setupKey" className="text-sm font-medium">
+              <label htmlFor="setupKey" className="text-sm font-medium">
                 Setup Key <span className="text-red-500">*</span>
-              </Label>
+              </label>
               <div className="relative">
                 <Input
                   id="setupKey"
@@ -279,25 +277,35 @@ export default function MaintenancePage() {
 
           {/* Status Messages */}
           {message && (
-            <Alert className={`mt-4 ${status === 'success' ? 'border-green-200 bg-green-50' : status === 'error' ? 'border-red-200 bg-red-50' : ''}`}>
-              {status === 'success' ? (
-                <CheckCircle className="h-4 w-4 text-green-600" />
-              ) : status === 'error' ? (
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-              ) : null}
-              <AlertDescription className={status === 'success' ? 'text-green-800' : status === 'error' ? 'text-red-800' : ''}>
-                {message}
-              </AlertDescription>
-            </Alert>
+            <div className={`mt-4 p-4 rounded-lg border ${
+              status === 'success' ? 'border-green-200 bg-green-50' : 
+              status === 'error' ? 'border-red-200 bg-red-50' : 
+              'border-blue-200 bg-blue-50'
+            }`}>
+              <div className="flex items-start">
+                {status === 'success' ? (
+                  <CheckCircle className="h-5 w-5 text-green-600 mr-2 mt-0.5" />
+                ) : status === 'error' ? (
+                  <AlertTriangle className="h-5 w-5 text-red-600 mr-2 mt-0.5" />
+                ) : null}
+                <div className={`text-sm ${
+                  status === 'success' ? 'text-green-800' : 
+                  status === 'error' ? 'text-red-800' : 
+                  'text-blue-800'
+                }`}>
+                  {message}
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Encrypted Configuration Output */}
           {encryptedConfig && (
             <div className="mt-6 space-y-4">
               <div className="bg-gray-100 p-4 rounded-lg">
-                <Label className="text-sm font-medium mb-2 block">
+                <label className="text-sm font-medium mb-2 block">
                   Encrypted Configuration (Copy this to Vercel):
-                </Label>
+                </label>
                 <div className="bg-white p-3 rounded border font-mono text-sm break-all">
                   {encryptedConfig}
                 </div>
