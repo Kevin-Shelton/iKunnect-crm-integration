@@ -5,8 +5,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let conversationId = 'unknown';
   try {
-    const { id: conversationId } = await params;
+    const { id } = await params;
+    conversationId = id;
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get('limit') || '25');
 
