@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { insertChatEvent, getConfigurationStatus } from '@/lib/supabase-secure';
-import { getSecureConfig } from '@/lib/secure-config';
 
 export async function POST(request: NextRequest) {
   try {
