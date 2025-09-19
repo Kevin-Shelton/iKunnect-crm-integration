@@ -204,7 +204,7 @@ All endpoints tested successfully:
 ### Webhook Configuration
 Configure your n8n workflow to send POST requests to:
 ```
-https://your-vercel-app.vercel.app/api/chat-events
+https://i-kunnect-crm-int.vercel.app/api/chat-events
 ```
 
 ### Required Headers

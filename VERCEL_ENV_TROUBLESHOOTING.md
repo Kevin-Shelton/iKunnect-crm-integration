@@ -60,7 +60,7 @@ module.exports = {
 ## Debugging Steps
 
 ### Step 1: Check Environment Detection
-Visit: `https://your-app.vercel.app/api/debug/env-comprehensive`
+Visit: `https://i-kunnect-crm-int.vercel.app/api/debug/env-comprehensive`
 
 This will show:
 - Which environment variables are detected

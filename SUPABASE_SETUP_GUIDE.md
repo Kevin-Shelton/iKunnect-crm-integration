@@ -88,7 +88,7 @@ CREATE POLICY "Allow all operations on chat_events" ON chat_events
 After configuring the environment variables:
 1. Trigger a new deployment in Vercel
 2. Wait for deployment to complete
-3. Test the debug endpoint: `https://your-app.vercel.app/api/debug/chat-events`
+3. Test the debug endpoint: `https://i-kunnect-crm-int.vercel.app/api/debug/chat-events`
 
 ## Step 5: Verify Configuration
 
@@ -104,7 +104,7 @@ After configuring the environment variables:
 
 2. **Test Webhook**: Send a test webhook to `/api/chat-events`:
    ```bash
-   curl -X POST https://your-app.vercel.app/api/chat-events \
+   curl -X POST https://i-kunnect-crm-int.vercel.app/api/chat-events \
      -H "Content-Type: application/json" \
      -d '{
        "type": "inbound",

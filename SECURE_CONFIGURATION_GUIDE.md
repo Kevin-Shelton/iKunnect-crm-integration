@@ -26,10 +26,10 @@ This system provides a secure way to configure the iKunnect CRM integration with
 
 The system is already working with mock data. Test it:
 
-1. Visit: `https://your-app.vercel.app/`
+1. Visit: `https://i-kunnect-crm-int.vercel.app/`
 2. Click on conversations to see mock chat data
 3. Click "Debug" button to see system status
-4. Visit: `https://your-app.vercel.app/api/debug/chat-events-secure`
+4. Visit: `https://i-kunnect-crm-int.vercel.app/api/debug/chat-events-secure`
 
 ### Step 2: Configure Real Credentials (When Ready)
 
@@ -42,7 +42,7 @@ When you're ready to use real Supabase data:
 
 2. **Use the setup endpoint**:
    ```bash
-   curl -X POST https://your-app.vercel.app/api/setup-config \
+   curl -X POST https://i-kunnect-crm-int.vercel.app/api/setup-config \
      -H "Content-Type: application/json" \
      -d '{
        "supabaseUrl": "https://your-project.supabase.co",
@@ -63,7 +63,7 @@ When you're ready to use real Supabase data:
 
 After setup:
 
-1. Visit: `https://your-app.vercel.app/api/debug/chat-events-secure`
+1. Visit: `https://i-kunnect-crm-int.vercel.app/api/debug/chat-events-secure`
 2. Check that `isProductionConfig: true`
 3. Check that `dataSource: "supabase"`
 4. Test the main application with real data

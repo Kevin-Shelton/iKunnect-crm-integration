@@ -67,15 +67,15 @@ After deployment, test these endpoints:
 
 ```bash
 # Test message sending
-curl -X POST https://your-app.vercel.app/api/livechat/send \
+curl -X POST https://i-kunnect-crm-int.vercel.app/api/livechat/send \
   -H "Content-Type: application/json" \
   -d '{"conversation":{"id":"test-001"},"message":{"text":"Test message"}}'
 
 # Test conversation retrieval
-curl https://your-app.vercel.app/api/conversations/test-001/messages
+curl https://i-kunnect-crm-int.vercel.app/api/conversations/test-001/messages
 
 # Test AI suggestions
-curl -X POST https://your-app.vercel.app/api/ai-suggestions \
+curl -X POST https://i-kunnect-crm-int.vercel.app/api/ai-suggestions \
   -H "Content-Type: application/json" \
   -d '{"conversationId":"test-001","messages":[{"sender":"customer","text":"Hello"}]}'
 ```
@@ -121,7 +121,7 @@ Create a simple health check script:
 const fetch = require('node-fetch');
 
 async function healthCheck() {
-  const baseUrl = 'https://your-app.vercel.app';
+  const baseUrl = 'https://i-kunnect-crm-int.vercel.app';
   
   try {
     // Test message sending

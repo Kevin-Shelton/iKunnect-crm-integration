@@ -168,7 +168,7 @@ return {
 ```json
 {
   "method": "POST",
-  "url": "https://your-vercel-url.vercel.app/api/chat-events",
+  "url": "https://i-kunnect-crm-int.vercel.app/api/chat-events",
   "headers": {
     "Content-Type": "application/json",
     "X-Signature": "={{$json.signature}}"
@@ -203,21 +203,21 @@ MESSAGE='{"conversationId":"test_123","contactId":"contact_456","contactName":"T
 SIGNATURE=$(echo -n "$MESSAGE" | openssl dgst -sha256 -hmac "your_shared_hmac_secret_here_change_this_in_production" | cut -d' ' -f2)
 
 # Send test message
-curl -X POST https://your-vercel-url.vercel.app/api/chat-events \
+curl -X POST https://i-kunnect-crm-int.vercel.app/api/chat-events \
   -H "Content-Type: application/json" \
   -H "X-Signature: sha256=$SIGNATURE" \
   -d "$MESSAGE"
 ```
 
 ### 6.2 Check Agent Desk
-1. Open your Agent Desk: `https://your-vercel-url.vercel.app`
+1. Open your Agent Desk: `https://i-kunnect-crm-int.vercel.app`
 2. The page should show "Integration Active" status
 3. Check browser console for any errors
 
 ### 6.3 Verify API Response
 ```bash
 # Check if conversation was created
-curl https://your-vercel-url.vercel.app/api/conversations
+curl https://i-kunnect-crm-int.vercel.app/api/conversations
 ```
 
 ---
@@ -245,12 +245,12 @@ curl https://your-vercel-url.vercel.app/api/conversations
 
 #### Check System Status
 ```bash
-curl https://your-vercel-url.vercel.app/api/conversations
+curl https://i-kunnect-crm-int.vercel.app/api/conversations
 ```
 
 #### Test Chat Events (with proper HMAC)
 ```bash
-curl -X POST https://your-vercel-url.vercel.app/api/chat-events \
+curl -X POST https://i-kunnect-crm-int.vercel.app/api/chat-events \
   -H "Content-Type: application/json" \
   -H "X-Signature: sha256=YOUR_HMAC_HERE" \
   -d '{"conversationId":"debug_test","contactName":"Debug User","messageBody":"Test message","actor":"customer","timestamp":"2024-01-15T10:30:00Z"}'
