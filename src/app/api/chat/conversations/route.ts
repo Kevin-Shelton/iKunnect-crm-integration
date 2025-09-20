@@ -1,32 +1,22 @@
 import { NextResponse } from 'next/server';
 import { getAllConversationsWithStatus, initializeConversationStatus } from '@/lib/supabase-conversations';
 
-// Extract customer name from conversation data
-function extractCustomerNameFromConversation(conv: any): string {
-  // Try to extract name from the last message or conversation data
-  const lastMessageText = conv.lastMessage?.text || '';
-  
-  // Look for name patterns in the message
-  const namePatterns = [
-    /my name is ([a-zA-Z\s]+)/i,
-    /i'm ([a-zA-Z\s]+)/i,
-    /i am ([a-zA-Z\s]+)/i,
-    /this is ([a-zA-Z\s]+)/i,
-    /call me ([a-zA-Z\s]+)/i
-  ];
-  
-  for (const pattern of namePatterns) {
-    const match = lastMessageText.match(pattern);
-    if (match && match[1]) {
-      const name = match[1].trim();
-      if (name.length >= 2 && name.length <= 30 && /^[a-zA-Z\s]+$/.test(name)) {
-        return capitalizeWords(name);
-      }
-    }
+// Extract customer name from conversation data using GHL integration
+async function extractCustomerNameFromConversation(conv: any): Promise<string> {
+  try {
+    // Import customer identification service
+    const { customerIdentification } = await import('@/lib/customer-identification');
+    
+    // Get customer info from GHL integration
+    const customerInfo = customerIdentification.getCustomerInfo(conv.id);
+    
+    return customerInfo.name;
+  } catch (error) {
+    console.error('[Conversations] Error getting customer name:', error);
+    
+    // Fallback to visitor pattern with last 4 digits
+    return `Visitor ${conv.id.slice(-4)}`;
   }
-  
-  // Fallback to visitor pattern with last 4 digits
-  return `Visitor ${conv.id.slice(-4)}`;
 }
 
 function capitalizeWords(str: string): string {
@@ -58,9 +48,9 @@ export async function GET() {
     });
 
     // Transform to expected format for the UI
-    const transformedConversations = conversations.map(conv => {
-      // Extract customer name from conversation data
-      const customerName = extractCustomerNameFromConversation(conv);
+    const transformedConversations = await Promise.all(conversations.map(async (conv) => {
+      // Extract customer name from conversation data using GHL integration
+      const customerName = await extractCustomerNameFromConversation(conv);
       
       return {
         id: conv.id,
@@ -83,7 +73,7 @@ export async function GET() {
         tags: [],
         messages: []
       };
-    });
+    }));
 
     // Sort by most recent
     const sortedConversations = transformedConversations
