@@ -109,7 +109,6 @@ export function DraggableMultiChat({
     // Set as active chat if it's the first one
     if (chatBoxes.length === 0) {
       setActiveChatId(newChat.id);
-      setActiveChat(conversationId);
       onActiveChanged?.(conversationId);
     }
 
@@ -129,7 +128,7 @@ export function DraggableMultiChat({
         if (remainingChats.length > 0) {
           const newActiveId = remainingChats[0].id;
           setActiveChatId(newActiveId);
-          setActiveChat(remainingChats[0].conversationId);
+
           onActiveChanged?.(remainingChats[0].conversationId);
         } else {
           setActiveChatId(null);
@@ -155,7 +154,7 @@ export function DraggableMultiChat({
     if (chat) {
       setChatBoxes(prev => prev.map(c => ({ ...c, isActive: c.id === chatId })));
       setActiveChatId(chatId);
-      setActiveChat(chat.conversationId);
+
       onActiveChanged?.(chat.conversationId);
       bringToFront(chatId);
     }
