@@ -17,15 +17,19 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { Conversation, ConversationQueue } from '@/lib/types';
 import { EnhancedWaitingQueue } from '@/components/chat/enhanced-waiting-queue';
+import { RejectedChatQueue } from '@/components/chat/rejected-chat-queue';
 
 interface SidebarProps {
   conversations: ConversationQueue;
-  activeTab?: 'waiting' | 'assigned' | 'all';
-  onTabChange?: (tab: 'waiting' | 'assigned' | 'all') => void;
+  activeTab?: 'waiting' | 'assigned' | 'all' | 'rejected';
+  onTabChange?: (tab: 'waiting' | 'assigned' | 'all' | 'rejected') => void;
   onConversationSelect?: (conversationId: string) => void;
   onConversationClaim?: (conversationId: string) => void;
   onConversationPass?: (conversationId: string) => void;
   onConversationReject?: (conversationId: string) => void;
+  onConversationRestore?: (conversationId: string) => void;
+  onConversationDelete?: (conversationId: string) => void;
+  onConversationView?: (conversationId: string) => void;
   onRefresh?: () => void;
   isLoading?: boolean;
 }
@@ -38,6 +42,9 @@ export function Sidebar({
   onConversationClaim,
   onConversationPass,
   onConversationReject,
+  onConversationRestore,
+  onConversationDelete,
+  onConversationView,
   onRefresh,
   isLoading = false
 }: SidebarProps) {
@@ -170,13 +177,16 @@ export function Sidebar({
           </Button>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(value) => onTabChange?.(value as 'waiting' | 'assigned' | 'all')}>
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs value={activeTab} onValueChange={(value) => onTabChange?.(value as 'waiting' | 'assigned' | 'all' | 'rejected')}>
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="waiting" className="text-xs">
               Waiting ({conversations?.waiting?.length || 0})
             </TabsTrigger>
             <TabsTrigger value="assigned" className="text-xs">
               Assigned ({conversations?.assigned?.length || 0})
+            </TabsTrigger>
+            <TabsTrigger value="rejected" className="text-xs">
+              Rejected ({conversations?.rejected?.length || 0})
             </TabsTrigger>
             <TabsTrigger value="all" className="text-xs">
               All ({conversations?.all?.length || 0})
@@ -219,6 +229,28 @@ export function Sidebar({
                 <ConversationItem key={conversation.id} conversation={conversation} />
               ))
             )}
+          </TabsContent>
+
+          <TabsContent value="rejected" className="mt-0">
+            <RejectedChatQueue
+              conversations={(conversations?.rejected || []).map(conv => ({
+                id: conv.id,
+                contactName: conv.contactName,
+                lastMessageBody: conv.lastMessageBody,
+                lastMessageDate: conv.lastMessageDate,
+                rejectedAt: conv.rejectedAt || new Date().toISOString(),
+                rejectedBy: conv.rejectedBy || 'Unknown',
+                rejectionReason: conv.rejectionReason || 'No reason provided',
+                originalPriority: 'normal' as const,
+                tags: conv.tags || [],
+                messageCount: conv.messageCount || 0
+              }))}
+              onRestore={(conversationId) => onConversationRestore?.(conversationId)}
+              onPermanentDelete={(conversationId) => onConversationDelete?.(conversationId)}
+              onView={(conversationId) => onConversationView?.(conversationId)}
+              maxVisible={10}
+              isLoading={isLoading}
+            />
           </TabsContent>
 
           <TabsContent value="all" className="mt-0">

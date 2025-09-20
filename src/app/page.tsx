@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Header } from '@/components/layout/header';
 import { Sidebar } from '@/components/layout/sidebar';
 import { ChatInterface } from '@/components/chat/chat-interface';
-import { VerticalMultiChat, useVerticalMultiChat } from '@/components/chat/vertical-multi-chat';
+import { DraggableMultiChat } from '@/components/chat/draggable-multi-chat';
 import { ContactSidebar } from '@/components/layout/contact-sidebar';
 import { NotificationSystem } from '@/components/chat/notification-system';
 import { useConversations } from '@/hooks/use-conversations';
@@ -46,9 +46,9 @@ export default function Home() {
         const conversation = conversations.all?.find((conv: Conversation) => conv.id === conversationId);
         const contactName = conversation?.contactName || `Customer ${conversationId.slice(-4)}`;
         
-        // Add to vertical multi-chat interface
-        if ((window as any).verticalMultiChat) {
-          const added = (window as any).verticalMultiChat.addChat(conversationId, contactName);
+        // Add to draggable multi-chat interface
+        if ((window as any).draggableMultiChat) {
+          const added = (window as any).draggableMultiChat.addChat(conversationId, contactName);
           if (!added) {
             alert('Cannot add more chats. Maximum of 4 simultaneous chats allowed.');
             return;
@@ -143,6 +143,102 @@ export default function Home() {
     } catch (error) {
       console.error('Error rejecting chat:', error);
       alert(`Error rejecting chat: ${error}`);
+    }
+  };
+
+  // Restore rejected chat functionality
+  const restoreChat = async (conversationId: string) => {
+    try {
+      console.log('Attempting to restore conversation:', conversationId);
+      
+      const response = await fetch('/api/chat/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId, agentId: 'agent_1' })
+      });
+
+      const data = await response.json();
+      console.log('Restore response:', data);
+      
+      if (data.success) {
+        console.log('Chat restored successfully');
+        refreshConversations(); // Refresh the conversation list
+        
+        // Show notification
+        if (notificationsEnabled && (window as any).notificationSystem) {
+          (window as any).notificationSystem.showNotification(
+            'Chat Restored',
+            'Conversation moved back to waiting queue',
+            'success'
+          );
+        }
+      } else {
+        console.error('Failed to restore chat:', data.error);
+        alert(`Failed to restore chat: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error restoring chat:', error);
+      alert(`Error restoring chat: ${error}`);
+    }
+  };
+
+  // Permanently delete rejected chat functionality
+  const permanentDeleteChat = async (conversationId: string) => {
+    try {
+      console.log('Attempting to permanently delete conversation:', conversationId);
+      
+      const response = await fetch('/api/chat/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId, agentId: 'agent_1' })
+      });
+
+      const data = await response.json();
+      console.log('Delete response:', data);
+      
+      if (data.success) {
+        console.log('Chat deleted permanently');
+        refreshConversations(); // Refresh the conversation list
+        
+        // Show notification
+        if (notificationsEnabled && (window as any).notificationSystem) {
+          (window as any).notificationSystem.showNotification(
+            'Chat Deleted',
+            'Conversation permanently removed',
+            'warning'
+          );
+        }
+      } else {
+        console.error('Failed to delete chat:', data.error);
+        alert(`Failed to delete chat: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+      alert(`Error deleting chat: ${error}`);
+    }
+  };
+
+  // View rejected chat functionality
+  const viewRejectedChat = async (conversationId: string) => {
+    try {
+      console.log('Viewing rejected conversation:', conversationId);
+      
+      // Add to draggable multi-chat interface for viewing
+      const conversation = conversations.all?.find((conv: Conversation) => conv.id === conversationId);
+      const contactName = conversation?.contactName || `Customer ${conversationId.slice(-4)}`;
+      
+      if ((window as any).draggableMultiChat) {
+        const added = (window as any).draggableMultiChat.addChat(conversationId, contactName);
+        if (!added) {
+          alert('Cannot view chat. Maximum of 4 simultaneous chats allowed. Please close a chat first.');
+          return;
+        }
+      }
+      
+      setSelectedConversationId(conversationId);
+    } catch (error) {
+      console.error('Error viewing rejected chat:', error);
+      alert(`Error viewing chat: ${error}`);
     }
   };
 
@@ -266,15 +362,18 @@ export default function Home() {
             onConversationSelect={(conversationId) => {
               console.log('Conversation selected:', conversationId);
               setSelectedConversationId(conversationId);
-              // Also show in vertical multi-chat if not already there
+              // Also show in draggable multi-chat if not already there
               const conversation = conversations.all?.find((conv: Conversation) => conv.id === conversationId);
-              if (conversation && (window as any).verticalMultiChat) {
-                (window as any).verticalMultiChat.addChat(conversationId, conversation.contactName);
+              if (conversation && (window as any).draggableMultiChat) {
+                (window as any).draggableMultiChat.addChat(conversationId, conversation.contactName);
               }
             }}
             onConversationClaim={claimChat}
             onConversationPass={passChat}
             onConversationReject={rejectChat}
+            onConversationRestore={restoreChat}
+            onConversationDelete={permanentDeleteChat}
+            onConversationView={viewRejectedChat}
             onRefresh={refreshConversations}
             isLoading={isLoading}
           />
@@ -283,11 +382,16 @@ export default function Home() {
         {/* Chat Interface */}
         <div className="flex-1 flex">
           <div className="flex-1">
-            <VerticalMultiChat 
+            <DraggableMultiChat 
               onNewMessage={handleNewMessage}
               onChatClosed={(conversationId) => {
                 // Handle chat closed - could update conversation status
                 console.log('Chat closed:', conversationId);
+              }}
+              onActiveChanged={(conversationId) => {
+                // Handle active chat changed for context
+                console.log('Active chat changed:', conversationId);
+                setSelectedConversationId(conversationId);
               }}
               maxChats={4}
             />

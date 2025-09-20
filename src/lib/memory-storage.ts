@@ -187,3 +187,24 @@ export function updateConversationStatus(conversationId: string, updates: Partia
     return false;
   }
 }
+
+export function deleteConversation(conversationId: string): boolean {
+  try {
+    // Remove messages
+    const messagesDeleted = messageStore.delete(conversationId);
+    
+    // Remove conversation status
+    const statusDeleted = conversationStatusStore.delete(conversationId);
+    
+    console.log('[Memory Storage] Permanently deleted conversation:', {
+      conversationId,
+      messagesDeleted,
+      statusDeleted
+    });
+    
+    return messagesDeleted || statusDeleted;
+  } catch (error) {
+    console.error('[Memory Storage] Error deleting conversation:', error);
+    return false;
+  }
+}

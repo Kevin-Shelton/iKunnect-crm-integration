@@ -1,0 +1,477 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { SimpleMessages } from './simple-messages';
+import { AgentReply } from './agent-reply';
+import { X, MessageSquare, Users, Clock, AlertCircle, User, Move, Maximize2, Minimize2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { useWebSocket } from '@/lib/websocket-service';
+
+interface ChatBox {
+  id: string;
+  conversationId: string;
+  contactName: string;
+  lastActivity: string;
+  unreadCount: number;
+  status: 'active' | 'waiting' | 'typing';
+  isTyping?: boolean;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  isMinimized: boolean;
+  zIndex: number;
+  isActive: boolean; // New: indicates which chat is currently active for context
+}
+
+interface DraggableMultiChatProps {
+  onNewMessage?: (message: any) => void;
+  onChatClosed?: (conversationId: string) => void;
+  onActiveChanged?: (conversationId: string | null) => void;
+  maxChats?: number;
+}
+
+export function DraggableMultiChat({ 
+  onNewMessage, 
+  onChatClosed, 
+  onActiveChanged,
+  maxChats = 4 
+}: DraggableMultiChatProps) {
+  const [chatBoxes, setChatBoxes] = useState<ChatBox[]>([]);
+  const [dragState, setDragState] = useState<{
+    isDragging: boolean;
+    chatId: string | null;
+    offset: { x: number; y: number };
+  }>({ isDragging: false, chatId: null, offset: { x: 0, y: 0 } });
+  const [resizeState, setResizeState] = useState<{
+    isResizing: boolean;
+    chatId: string | null;
+    startPos: { x: number; y: number };
+    startSize: { width: number; height: number };
+  }>({ isResizing: false, chatId: null, startPos: { x: 0, y: 0 }, startSize: { width: 0, height: 0 } });
+  const [nextZIndex, setNextZIndex] = useState(1000);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+
+  const { ws, sendTypingStart, sendTypingStop, setActiveChat, on } = useWebSocket();
+
+  // Default chat box size and positions
+  const defaultSize = { width: 400, height: 500 };
+  const getDefaultPosition = (index: number) => {
+    const offset = index * 30;
+    return { x: 100 + offset, y: 100 + offset };
+  };
+
+  // Add a new chat box
+  const addChat = (conversationId: string, contactName: string) => {
+    if (chatBoxes.length >= maxChats) {
+      alert(`Maximum of ${maxChats} chats allowed. Please close a chat first.`);
+      return false;
+    }
+
+    const existingChat = chatBoxes.find(chat => chat.conversationId === conversationId);
+    if (existingChat) {
+      // Bring existing chat to front and make it active
+      bringToFront(existingChat.id);
+      setActiveChat(existingChat.id);
+      return true;
+    }
+
+    const newChat: ChatBox = {
+      id: `chat_${Date.now()}`,
+      conversationId,
+      contactName,
+      lastActivity: new Date().toISOString(),
+      unreadCount: 0,
+      status: 'active',
+      position: getDefaultPosition(chatBoxes.length),
+      size: { ...defaultSize },
+      isMinimized: false,
+      zIndex: nextZIndex,
+      isActive: chatBoxes.length === 0 // First chat is automatically active
+    };
+
+    setChatBoxes(prev => [...prev, newChat]);
+    setNextZIndex(prev => prev + 1);
+    
+    // Set as active chat if it's the first one
+    if (chatBoxes.length === 0) {
+      setActiveChatId(newChat.id);
+      setActiveChat(conversationId);
+      onActiveChanged?.(conversationId);
+    }
+
+    return true;
+  };
+
+  // Remove a chat box
+  const removeChat = (chatId: string) => {
+    const chat = chatBoxes.find(c => c.id === chatId);
+    if (chat) {
+      setChatBoxes(prev => prev.filter(c => c.id !== chatId));
+      onChatClosed?.(chat.conversationId);
+      
+      // If this was the active chat, set another as active
+      if (activeChatId === chatId) {
+        const remainingChats = chatBoxes.filter(c => c.id !== chatId);
+        if (remainingChats.length > 0) {
+          const newActiveId = remainingChats[0].id;
+          setActiveChatId(newActiveId);
+          setActiveChat(remainingChats[0].conversationId);
+          onActiveChanged?.(remainingChats[0].conversationId);
+        } else {
+          setActiveChatId(null);
+          onActiveChanged?.(null);
+        }
+      }
+    }
+  };
+
+  // Bring chat to front
+  const bringToFront = (chatId: string) => {
+    setChatBoxes(prev => prev.map(chat => 
+      chat.id === chatId 
+        ? { ...chat, zIndex: nextZIndex }
+        : chat
+    ));
+    setNextZIndex(prev => prev + 1);
+  };
+
+  // Set active chat
+  const setActiveChatHandler = (chatId: string) => {
+    const chat = chatBoxes.find(c => c.id === chatId);
+    if (chat) {
+      setChatBoxes(prev => prev.map(c => ({ ...c, isActive: c.id === chatId })));
+      setActiveChatId(chatId);
+      setActiveChat(chat.conversationId);
+      onActiveChanged?.(chat.conversationId);
+      bringToFront(chatId);
+    }
+  };
+
+  // Toggle minimize
+  const toggleMinimize = (chatId: string) => {
+    setChatBoxes(prev => prev.map(chat => 
+      chat.id === chatId 
+        ? { ...chat, isMinimized: !chat.isMinimized }
+        : chat
+    ));
+  };
+
+  // Mouse event handlers for dragging
+  const handleMouseDown = (e: React.MouseEvent, chatId: string, action: 'drag' | 'resize') => {
+    e.preventDefault();
+    bringToFront(chatId);
+    setActiveChatHandler(chatId);
+
+    const chat = chatBoxes.find(c => c.id === chatId);
+    if (!chat) return;
+
+    if (action === 'drag') {
+      setDragState({
+        isDragging: true,
+        chatId,
+        offset: {
+          x: e.clientX - chat.position.x,
+          y: e.clientY - chat.position.y
+        }
+      });
+    } else if (action === 'resize') {
+      setResizeState({
+        isResizing: true,
+        chatId,
+        startPos: { x: e.clientX, y: e.clientY },
+        startSize: { ...chat.size }
+      });
+    }
+  };
+
+  // Global mouse move handler
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (dragState.isDragging && dragState.chatId) {
+        setChatBoxes(prev => prev.map(chat => 
+          chat.id === dragState.chatId 
+            ? {
+                ...chat,
+                position: {
+                  x: Math.max(0, e.clientX - dragState.offset.x),
+                  y: Math.max(0, e.clientY - dragState.offset.y)
+                }
+              }
+            : chat
+        ));
+      }
+
+      if (resizeState.isResizing && resizeState.chatId) {
+        const deltaX = e.clientX - resizeState.startPos.x;
+        const deltaY = e.clientY - resizeState.startPos.y;
+        
+        setChatBoxes(prev => prev.map(chat => 
+          chat.id === resizeState.chatId 
+            ? {
+                ...chat,
+                size: {
+                  width: Math.max(300, resizeState.startSize.width + deltaX),
+                  height: Math.max(200, resizeState.startSize.height + deltaY)
+                }
+              }
+            : chat
+        ));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setDragState({ isDragging: false, chatId: null, offset: { x: 0, y: 0 } });
+      setResizeState({ isResizing: false, chatId: null, startPos: { x: 0, y: 0 }, startSize: { width: 0, height: 0 } });
+    };
+
+    if (dragState.isDragging || resizeState.isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragState, resizeState]);
+
+  // WebSocket typing indicators
+  useEffect(() => {
+    const unsubscribe = on('typing_indicator', (data: any) => {
+      const { conversationId, userType, isTyping } = data;
+      
+      setChatBoxes(prev => prev.map(chat => 
+        chat.conversationId === conversationId 
+          ? { 
+              ...chat, 
+              isTyping: userType === 'customer' ? isTyping : chat.isTyping,
+              status: isTyping && userType === 'customer' ? 'typing' : 'active'
+            }
+          : chat
+      ));
+    });
+
+    return unsubscribe;
+  }, [on]);
+
+  // Handle new messages
+  const handleNewMessage = (message: any) => {
+    setChatBoxes(prev => prev.map(chat => 
+      chat.conversationId === message.conversationId 
+        ? { 
+            ...chat, 
+            lastActivity: new Date().toISOString(),
+            unreadCount: chat.isActive ? 0 : chat.unreadCount + 1,
+            isTyping: false,
+            status: 'active'
+          }
+        : chat
+    ));
+    onNewMessage?.(message);
+  };
+
+  // Handle agent typing
+  const handleAgentTyping = (conversationId: string, isTyping: boolean) => {
+    if (isTyping) {
+      sendTypingStart(conversationId, 'agent');
+    } else {
+      sendTypingStop(conversationId, 'agent');
+    }
+  };
+
+  // Expose functions globally
+  useEffect(() => {
+    (window as any).draggableMultiChat = {
+      addChat,
+      removeChat,
+      setActiveChat: setActiveChatHandler,
+      activeChats: chatBoxes.length,
+      maxChats,
+      activeChatId
+    };
+
+    return () => {
+      if ((window as any).draggableMultiChat) {
+        delete (window as any).draggableMultiChat;
+      }
+    };
+  }, [chatBoxes, maxChats, activeChatId]);
+
+  if (chatBoxes.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="text-6xl mb-4">💬</div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Draggable Multi-Chat Agent Desk
+          </h2>
+          <p className="text-gray-600 mb-4">
+            Handle up to {maxChats} simultaneous conversations. Drag and resize chat windows as needed.
+          </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+            <div className="flex items-center mb-2">
+              <Users className="w-4 h-4 text-blue-600 mr-2" />
+              <span className="text-blue-800 font-medium">Advanced Multi-Chat Ready</span>
+            </div>
+            <p className="text-blue-700 text-sm">
+              • Drag chat windows around the screen<br/>
+              • Resize windows to fit your workflow<br/>
+              • Real-time typing indicators<br/>
+              • Active chat context management
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-full overflow-hidden">
+      {chatBoxes.map((chat) => {
+        const activeColor = chat.isActive ? 'border-blue-500 shadow-blue-200' : 'border-gray-300';
+        const headerColor = chat.isActive ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200';
+        
+        return (
+          <div
+            key={chat.id}
+            className={`absolute bg-white border-2 rounded-lg shadow-lg ${activeColor} ${
+              chat.isActive ? 'shadow-lg' : 'shadow-md'
+            }`}
+            style={{
+              left: chat.position.x,
+              top: chat.position.y,
+              width: chat.size.width,
+              height: chat.isMinimized ? 'auto' : chat.size.height,
+              zIndex: chat.zIndex,
+              cursor: dragState.isDragging && dragState.chatId === chat.id ? 'grabbing' : 'default'
+            }}
+            onClick={() => setActiveChatHandler(chat.id)}
+          >
+            {/* Chat Header */}
+            <div 
+              className={`border-b-2 p-3 ${headerColor} rounded-t-lg cursor-grab active:cursor-grabbing`}
+              onMouseDown={(e) => handleMouseDown(e, chat.id, 'drag')}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2 flex-1 min-w-0">
+                  <div className={`w-3 h-3 rounded-full ${
+                    chat.isActive ? 'bg-blue-500' :
+                    chat.status === 'typing' ? 'bg-yellow-400' :
+                    chat.status === 'active' ? 'bg-green-400' :
+                    'bg-gray-400'
+                  }`} />
+                  <Move className="w-4 h-4 text-gray-500" />
+                  <User className="w-4 h-4 text-gray-500" />
+                  <span className="font-medium text-gray-900 truncate">{chat.contactName}</span>
+                  {chat.unreadCount > 0 && (
+                    <Badge variant="destructive" className="text-xs px-1.5 py-0.5">
+                      {chat.unreadCount}
+                    </Badge>
+                  )}
+                  {chat.isActive && (
+                    <Badge variant="default" className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-800">
+                      Active
+                    </Badge>
+                  )}
+                </div>
+                
+                <div className="flex items-center space-x-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleMinimize(chat.id);
+                    }}
+                  >
+                    {chat.isMinimized ? <Maximize2 className="h-3 w-3" /> : <Minimize2 className="h-3 w-3" />}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 hover:bg-red-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeChat(chat.id);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Typing Indicators */}
+              {chat.isTyping && (
+                <div className="mt-2 text-xs text-gray-500 italic">
+                  Customer is typing...
+                </div>
+              )}
+            </div>
+
+            {/* Chat Content */}
+            {!chat.isMinimized && (
+              <div className="flex flex-col" style={{ height: chat.size.height - 60 }}>
+                {/* Messages Area */}
+                <div className="flex-1 overflow-hidden">
+                  <SimpleMessages 
+                    conversationId={chat.conversationId}
+                    onNewMessage={handleNewMessage}
+                    compact={true}
+                  />
+                </div>
+                
+                {/* Agent Reply */}
+                <div className="border-t border-gray-200">
+                  <AgentReply
+                    conversationId={chat.conversationId}
+                    onMessageSent={() => {
+                      setChatBoxes(prev => prev.map(c => 
+                        c.id === chat.id 
+                          ? { ...c, lastActivity: new Date().toISOString() }
+                          : c
+                      ));
+                    }}
+                    onTyping={(isTyping) => handleAgentTyping(chat.conversationId, isTyping)}
+                    compact={true}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Resize Handle */}
+            {!chat.isMinimized && (
+              <div
+                className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize bg-gray-300 hover:bg-gray-400"
+                style={{ 
+                  clipPath: 'polygon(100% 0%, 0% 100%, 100% 100%)',
+                }}
+                onMouseDown={(e) => handleMouseDown(e, chat.id, 'resize')}
+              />
+            )}
+          </div>
+        );
+      })}
+
+      {/* Status Bar */}
+      <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2">
+        <div className="flex items-center justify-between text-xs text-gray-600">
+          <div className="flex items-center space-x-4">
+            <span>Active Chats: {chatBoxes.filter(c => !c.isMinimized).length}</span>
+            <span>Total: {chatBoxes.length}/{maxChats}</span>
+            {activeChatId && (
+              <span className="text-blue-600 font-medium">
+                Context: {chatBoxes.find(c => c.id === activeChatId)?.contactName}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center space-x-1">
+            <MessageSquare className="w-3 h-3" />
+            <span>Draggable Multi-Chat</span>
+            {ws.isConnected && <span className="text-green-600">• Live</span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
