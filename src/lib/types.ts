@@ -131,10 +131,32 @@ export interface Conversation {
   phone?: string;
   tags?: string[];
   assignedTo?: string;
-  status?: 'open' | 'closed';
+  status?: 'waiting' | 'assigned' | 'rejected' | 'open' | 'closed';
   channel?: string;
   dateAdded?: string;
   dateUpdated?: string;
+  
+  // Agent assignment properties
+  agentId?: string;
+  claimedAt?: string;
+  
+  // Rejection properties
+  rejectedAt?: string;
+  rejectedBy?: string;
+  rejectionReason?: string;
+  
+  // Restoration properties
+  restoredAt?: string;
+  restoredBy?: string;
+  
+  // Queue management properties
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  passedCount?: number;
+  lastPassedAt?: string;
+  hidden?: boolean;
+  
+  // Message count for display
+  messageCount?: number;
 }
 
 export interface ConversationSearchResponse {
@@ -281,6 +303,51 @@ export interface ConversationQueue {
   assigned: Conversation[];
   rejected: Conversation[];
   all: Conversation[];
+}
+
+// Enhanced queue component interfaces
+export interface WaitingChat {
+  id: string;
+  contactName: string;
+  lastMessageBody: string;
+  lastMessageDate: string;
+  unreadCount: number;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  tags: string[];
+  waitTime: string;
+}
+
+export interface RejectedChat {
+  id: string;
+  contactName: string;
+  lastMessageBody: string;
+  lastMessageDate: string;
+  rejectedAt: string;
+  rejectedBy: string;
+  rejectionReason: string;
+  originalPriority: 'low' | 'normal' | 'high' | 'urgent';
+  tags: string[];
+  messageCount: number;
+}
+
+// Multi-chat interface types
+export interface ActiveChat {
+  conversationId: string;
+  contactName: string;
+  lastActivity: string;
+  unreadCount: number;
+  isMinimized: boolean;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  zIndex: number;
+}
+
+// Typing indicator types
+export interface TypingIndicator {
+  conversationId: string;
+  userType: 'agent' | 'customer';
+  userId: string;
+  timestamp: string;
 }
 
 // AI Assistant Types
