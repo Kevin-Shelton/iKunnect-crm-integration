@@ -23,6 +23,8 @@ interface ConversationStatus {
   rejectedBy?: string;
   rejectedAt?: string;
   rejectionReason?: string;
+  restoredBy?: string;
+  restoredAt?: string;
   priority?: 'low' | 'normal' | 'high' | 'urgent';
   hidden?: boolean;
 }
