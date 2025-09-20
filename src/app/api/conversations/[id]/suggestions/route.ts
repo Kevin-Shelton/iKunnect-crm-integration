@@ -3,10 +3,10 @@ import { getConversation } from '@/lib/chatStorage';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const conversationId = params.id;
+    const { id: conversationId } = await params;
     
     if (!conversationId) {
       return NextResponse.json(
@@ -38,10 +38,10 @@ export async function GET(
 // POST endpoint to add new suggestions
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const conversationId = params.id;
+    const { id: conversationId } = await params;
     const { suggestions } = await request.json();
     
     if (!conversationId) {
