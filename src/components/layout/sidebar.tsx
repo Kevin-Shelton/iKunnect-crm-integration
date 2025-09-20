@@ -235,9 +235,9 @@ export function Sidebar({
             <RejectedChatQueue
               conversations={(conversations?.rejected || []).map(conv => ({
                 id: conv.id,
-                contactName: conv.contactName,
-                lastMessageBody: conv.lastMessageBody,
-                lastMessageDate: conv.lastMessageDate,
+                contactName: conv.contactName || `Customer ${conv.id.slice(-4)}`,
+                lastMessageBody: conv.lastMessageBody || '',
+                lastMessageDate: conv.lastMessageDate || new Date().toISOString(),
                 rejectedAt: conv.rejectedAt || new Date().toISOString(),
                 rejectedBy: conv.rejectedBy || 'Unknown',
                 rejectionReason: conv.rejectionReason || 'No reason provided',
