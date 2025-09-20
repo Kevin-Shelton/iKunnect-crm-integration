@@ -27,6 +27,8 @@ export default function Home() {
   // Claim chat functionality
   const claimChat = async (conversationId: string) => {
     try {
+      console.log('Attempting to claim conversation:', conversationId);
+      
       const response = await fetch('/api/chat/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -34,6 +36,8 @@ export default function Home() {
       });
 
       const data = await response.json();
+      console.log('Claim response:', data);
+      
       if (data.success) {
         console.log('Chat claimed successfully');
         
@@ -57,9 +61,11 @@ export default function Home() {
         handleNewConversation(conversation);
       } else {
         console.error('Failed to claim chat:', data.error);
+        alert(`Failed to claim chat: ${data.error}`);
       }
     } catch (error) {
       console.error('Error claiming chat:', error);
+      alert(`Error claiming chat: ${error}`);
     }
   };
 
@@ -175,10 +181,20 @@ export default function Home() {
       {/* Main Content */}
       <div className="flex flex-1 pt-16">
         {/* Sidebar */}
-        <div className="w-80 bg-white border-r border-gray-200 flex-shrink-0">
+        <div className="w-80 bg-white border-r border-gray-200">
           <Sidebar
             conversations={conversations}
-            onConversationSelect={handleConversationSelect}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            onConversationSelect={(conversationId) => {
+              console.log('Conversation selected:', conversationId);
+              setSelectedConversationId(conversationId);
+              // Also show in multi-chat if not already there
+              const conversation = conversations.all?.find((conv: Conversation) => conv.id === conversationId);
+              if (conversation && (window as any).multiChatInterface) {
+                (window as any).multiChatInterface.addChat(conversationId, conversation.contactName);
+              }
+            }}
             onConversationClaim={claimChat}
             onRefresh={refreshConversations}
             isLoading={isLoading}
