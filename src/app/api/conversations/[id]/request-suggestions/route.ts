@@ -19,21 +19,24 @@ export async function POST(
     // Use existing n8n inbound webhook (production)
     const n8nInboundUrl = 'https://invictusbpo.app.n8n.cloud/webhook/ghl-chat-inbound';
 
-    // Prepare payload for existing n8n workflow suggestion path
+    // Prepare payload matching the exact format from n8n documentation
     const n8nPayload = {
       conversationId,
       channel: 'webchat', // Required to trigger suggestion path
-      locationId: 'DKs2AdSvw0MGWJYyXwk1', // Default location ID
+      locationId: 'DKs2AdSvw0MGWJYyXwk1',
       contact: {
-        id: `agent_assist_${conversationId}`,
+        id: conversationId.replace('customer_chat_', 'cnt_').replace('conv_', 'cnt_'),
         name: 'Agent Assist Request',
-        email: 'agent@ikunnect.com'
+        email: 'agent@ikunnect.com',
+        phone: '+13141236547'
       },
       message: {
         id: `msg_assist_${Date.now()}`,
-        text: 'Agent requesting suggestions for this conversation.'
+        text: 'Agent requesting suggestions for this conversation. Customer needs assistance.'
       }
     };
+
+    console.log('[Request Suggestions] Sending payload to n8n:', JSON.stringify(n8nPayload, null, 2));
 
     // Call n8n suggestion webhook
     try {
