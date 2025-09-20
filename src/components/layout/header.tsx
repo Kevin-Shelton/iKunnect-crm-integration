@@ -107,7 +107,7 @@ export function Header({
             iKunnect Agent Chat Desk
           </h1>
           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-            v2.5.0 - AGENT ASSIST
+            v2.5.1 - N8N FIXED
           </Badge>
           </div>
           

@@ -68,17 +68,30 @@ export async function POST(
       });
 
     } catch (fetchError) {
-      console.error('[Request Suggestions] n8n webhook error:', fetchError);
+      console.error('[Request Suggestions] n8n webhook error:', {
+        error: fetchError,
+        message: fetchError instanceof Error ? fetchError.message : String(fetchError),
+        conversationId,
+        url: n8nInboundUrl
+      });
       return NextResponse.json({
         success: false,
-        error: 'Failed to connect to n8n suggestion webhook'
+        error: 'Failed to connect to n8n suggestion webhook',
+        details: fetchError instanceof Error ? fetchError.message : String(fetchError)
       }, { status: 502 });
     }
 
   } catch (error) {
-    console.error('[Request Suggestions] Error:', error);
+    console.error('[Request Suggestions] Unexpected error:', {
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return NextResponse.json(
-      { error: 'Failed to request suggestions' },
+      { 
+        error: 'Failed to request suggestions',
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }
