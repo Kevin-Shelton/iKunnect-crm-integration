@@ -248,9 +248,11 @@ export function DraggableMultiChat({
     };
   }, [dragState, resizeState]);
 
-  // WebSocket typing indicators
+  // SSE typing indicators
   useEffect(() => {
-    const unsubscribe = on('typing_indicator', (data: any) => {
+    if (!sseService) return;
+
+    const handleTypingIndicator = (data: any) => {
       const { conversationId, userType, isTyping } = data;
       
       setChatBoxes(prev => prev.map(chat => 
@@ -262,10 +264,14 @@ export function DraggableMultiChat({
             }
           : chat
       ));
-    });
+    };
 
-    return unsubscribe;
-  }, [on]);
+    sseService.addEventListener('typing_indicator', handleTypingIndicator);
+
+    return () => {
+      sseService.removeEventListener('typing_indicator', handleTypingIndicator);
+    };
+  }, [sseService]);
 
   // Handle new messages
   const handleNewMessage = (message: any) => {
