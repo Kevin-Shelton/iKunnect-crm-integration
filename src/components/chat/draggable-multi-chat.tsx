@@ -91,6 +91,8 @@ export function DraggableMultiChat({
       return true;
     }
 
+    const chatId = `chat-${conversationId}-${Date.now()}`;
+    
     const newChat: ChatBox = {
       id: chatId,
       conversationId,
