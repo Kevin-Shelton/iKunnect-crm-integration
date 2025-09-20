@@ -50,30 +50,55 @@ export async function POST(request: NextRequest) {
       dataSize: JSON.stringify(data).length
     });
 
-    // Call n8n webhook
-    const n8nResponse = await fetch(n8nWebhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'iKunnect-Chat-System/1.0'
-      },
-      body: JSON.stringify(n8nPayload),
-      timeout: 30000 // 30 second timeout
-    });
-
-    if (!n8nResponse.ok) {
-      console.error(`[MCP GHL] n8n webhook failed:`, {
-        status: n8nResponse.status,
-        statusText: n8nResponse.statusText
+    // Call n8n webhook with timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
+    let n8nResult: any;
+    
+    try {
+      const n8nResponse = await fetch(n8nWebhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'iKunnect-Chat-System/1.0'
+        },
+        body: JSON.stringify(n8nPayload),
+        signal: controller.signal
       });
       
+      clearTimeout(timeoutId);
+
+      if (!n8nResponse.ok) {
+        console.error(`[MCP GHL] n8n webhook failed:`, {
+          status: n8nResponse.status,
+          statusText: n8nResponse.statusText
+        });
+        
+        return NextResponse.json({
+          success: false,
+          error: `n8n webhook failed: ${n8nResponse.status}`
+        }, { status: 502 });
+      }
+
+      n8nResult = await n8nResponse.json();
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        console.error('[MCP GHL] n8n webhook timeout');
+        return NextResponse.json({
+          success: false,
+          error: 'n8n webhook timeout after 30 seconds'
+        }, { status: 504 });
+      }
+      
+      console.error('[MCP GHL] n8n webhook fetch error:', fetchError);
       return NextResponse.json({
         success: false,
-        error: `n8n webhook failed: ${n8nResponse.status}`
+        error: 'Failed to connect to n8n webhook'
       }, { status: 502 });
     }
-
-    const n8nResult = await n8nResponse.json();
     
     console.log(`[MCP GHL] n8n response received:`, {
       success: n8nResult.success,
