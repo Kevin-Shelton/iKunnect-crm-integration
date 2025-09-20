@@ -202,13 +202,13 @@ export function Sidebar({
             <EnhancedWaitingQueue
               conversations={(conversations?.waiting || []).map(conv => ({
                 id: conv.id,
-                contactName: conv.contactName,
-                lastMessageBody: conv.lastMessageBody,
-                lastMessageDate: conv.lastMessageDate,
-                unreadCount: conv.unreadCount,
+                contactName: conv.contactName || `Customer ${conv.id.slice(-4)}`,
+                lastMessageBody: conv.lastMessageBody || '',
+                lastMessageDate: conv.lastMessageDate || new Date().toISOString(),
+                unreadCount: conv.unreadCount || 0,
                 priority: 'normal' as const,
                 tags: conv.tags || [],
-                waitTime: formatDistanceToNow(new Date(conv.lastMessageDate), { addSuffix: true })
+                waitTime: formatDistanceToNow(new Date(conv.lastMessageDate || new Date()), { addSuffix: true })
               }))}
               onClaim={(conversationId) => onConversationClaim?.(conversationId)}
               onPass={(conversationId) => onConversationPass?.(conversationId)}
