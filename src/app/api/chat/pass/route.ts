@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllConversations, updateConversationStatus } from '@/lib/memory-storage';
+import { 
+  getAllConversations as getAllConversationsPersistent,
+  updateConversationStatus as updateConversationStatusPersistent
+} from '@/lib/persistent-storage';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +18,7 @@ export async function POST(request: NextRequest) {
     console.log(`[Pass] Agent ${agentId} passing on conversation ${conversationId}`);
 
     // Check if conversation exists
-    const conversations = getAllConversations();
+    const conversations = await getAllConversationsPersistent();
     const conversation = conversations.find(c => c.id === conversationId);
     
     if (!conversation) {
@@ -26,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update conversation status to indicate it was passed
-    const success = updateConversationStatus(conversationId, {
+    const success = await updateConversationStatusPersistent(conversationId, {
       status: 'waiting',
       passedBy: agentId,
       passedAt: new Date().toISOString(),

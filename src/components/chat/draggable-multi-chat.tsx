@@ -6,7 +6,7 @@ import { AgentReply } from './agent-reply';
 import { X, MessageSquare, Users, Clock, AlertCircle, User, Move, Maximize2, Minimize2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useWebSocket } from '@/lib/websocket-service';
+import { getSSEService } from '@/lib/sse-service';
 
 interface ChatBox {
   id: string;
@@ -51,7 +51,21 @@ export function DraggableMultiChat({
   const [nextZIndex, setNextZIndex] = useState(1000);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
 
-  const { ws, sendTypingStart, sendTypingStop, setActiveChat, on } = useWebSocket();
+  const sseService = getSSEService();
+
+  // Expose methods globally for external access
+  useEffect(() => {
+    (window as any).draggableMultiChat = {
+      addChat,
+      removeChat,
+      chatBoxes,
+      activeChatId
+    };
+    
+    return () => {
+      delete (window as any).draggableMultiChat;
+    };
+  }, [chatBoxes, activeChatId]);
 
   // Default chat box size and positions
   const defaultSize = { width: 400, height: 500 };
@@ -71,7 +85,7 @@ export function DraggableMultiChat({
     if (existingChat) {
       // Bring existing chat to front and make it active
       bringToFront(existingChat.id);
-      setActiveChat(existingChat.id);
+      setActiveChatId(existingChat.id);
       return true;
     }
 
@@ -468,7 +482,7 @@ export function DraggableMultiChat({
           <div className="flex items-center space-x-1">
             <MessageSquare className="w-3 h-3" />
             <span>Draggable Multi-Chat</span>
-            {ws.isConnected() && <span className="text-green-600">• Live</span>}
+            {sseService?.isConnected() && <span className="text-green-600">• Live</span>}
           </div>
         </div>
       </div>

@@ -295,20 +295,37 @@ export default function Home() {
   } : null;
 
   const handleConversationSelect = (conversationId: string) => {
+    console.log('Selecting conversation:', conversationId);
     setSelectedConversationId(conversationId);
+    
     const conversation = conversations.all?.find((conv: Conversation) => conv.id === conversationId);
     if (conversation) {
       setSelectedContact(contactData);
+      
+      // Open in draggable multi-chat interface
+      const contactName = conversation.contactName || `Customer ${conversationId.slice(-4)}`;
+      
+      if ((window as any).draggableMultiChat) {
+        const added = (window as any).draggableMultiChat.addChat(conversationId, contactName);
+        if (!added) {
+          alert('Cannot open chat. Maximum of 4 simultaneous chats allowed. Please close a chat first.');
+          return;
+        }
+        console.log('Chat opened in multi-chat interface');
+      } else {
+        console.warn('Draggable multi-chat interface not available');
+      }
     }
   };
 
   if (isLoading) {
     return (
-      <div className="flex h-screen bg-gray-50">
+      <div className="flex h-screen bg-gradient-to-br from-slate-50 to-blue-50">
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading conversations...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mx-auto mb-6"></div>
+            <p className="text-slate-600 text-lg font-medium">Loading conversations...</p>
+            <p className="text-slate-400 text-sm mt-2">Setting up your workspace</p>
           </div>
         </div>
       </div>
@@ -317,16 +334,21 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="flex h-screen bg-gray-50">
+      <div className="flex h-screen bg-gradient-to-br from-red-50 to-orange-50">
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="text-red-600 mb-4">⚠️ Error loading conversations</div>
-            <p className="text-gray-600 mb-4">{error}</p>
+          <div className="text-center max-w-md mx-auto p-8 bg-white rounded-2xl shadow-xl border border-red-100">
+            <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-slate-800 mb-3">Connection Error</h3>
+            <p className="text-red-600 mb-6 text-sm">{error}</p>
             <button 
-              onClick={refreshConversations}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg transition-all duration-200 font-medium"
             >
-              Try Again
+              Retry Connection
             </button>
           </div>
         </div>
@@ -335,7 +357,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50">
         <Header 

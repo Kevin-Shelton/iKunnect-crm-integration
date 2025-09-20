@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { claimConversation, getConversationStatus, getAllConversations } from '@/lib/memory-storage';
+import { 
+  getAllConversations as getAllConversationsPersistent,
+  updateConversationStatus as updateConversationStatusPersistent
+} from '@/lib/persistent-storage';
 
 async function claimConversationWithStatus(conversationId: string, agentId: string) {
-  const success = claimConversation(conversationId, agentId);
+  const success = await updateConversationStatusPersistent(conversationId, {
+    status: 'assigned',
+    agentId,
+    claimedAt: new Date().toISOString()
+  });
   
   if (success) {
     console.log(`[Claim] Conversation ${conversationId} claimed by ${agentId}`);
@@ -35,8 +42,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Claim] Attempting to claim conversation ${conversationId} for agent ${agentId}`);
 
-    // Debug: Check what conversations exist in memory
-    const allConversations = getAllConversations();
+    // Debug: Check what conversations exist in persistent storage
+    const allConversations = await getAllConversationsPersistent();
     console.log(`[Claim] Available conversations:`, allConversations.map(c => ({ 
       id: c.id, 
       status: c.status?.status,
@@ -44,30 +51,9 @@ export async function POST(request: NextRequest) {
     })));
 
     // Check if conversation exists
-    const status = getConversationStatus(conversationId);
-    if (!status) {
-      console.log(`[Claim] Conversation ${conversationId} not found in status store`);
-      
-      // Check if it exists in message store but not status store
-      const conversations = getAllConversations();
-      const foundInMessages = conversations.find(c => c.id === conversationId);
-      
-      if (foundInMessages) {
-        console.log(`[Claim] Found conversation in messages but not in status store, creating status`);
-        // Create missing status
-        const newStatus = {
-          id: conversationId,
-          status: 'waiting' as const,
-          lastActivity: new Date().toISOString()
-        };
-        
-        // Manually add to status store
-        if (globalThis.__conversationStatusStore) {
-          globalThis.__conversationStatusStore.set(conversationId, newStatus);
-        }
-        
-        return await claimConversationWithStatus(conversationId, agentId);
-      }
+    const conversation = allConversations.find(c => c.id === conversationId);
+    if (!conversation) {
+      console.log(`[Claim] Conversation ${conversationId} not found in persistent storage`);
       
       return NextResponse.json(
         { success: false, error: `Conversation not found. Available: ${allConversations.map(c => c.id).join(', ')}` },
