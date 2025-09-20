@@ -51,6 +51,7 @@ export async function GET() {
 
     // Convert to arrays and sort by most recent
     const allConversations = Array.from(conversationMap.values())
+      .filter(conv => !conv.status?.hidden) // Filter out hidden/rejected conversations
       .sort((a, b) => new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime());
 
     const waiting = allConversations.filter(conv => conv.status === 'waiting');

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Conversation, ConversationQueue } from '@/lib/types';
+import { EnhancedWaitingQueue } from '@/components/chat/enhanced-waiting-queue';
 
 interface SidebarProps {
   conversations: ConversationQueue;
@@ -23,6 +24,8 @@ interface SidebarProps {
   onTabChange?: (tab: 'waiting' | 'assigned' | 'all') => void;
   onConversationSelect?: (conversationId: string) => void;
   onConversationClaim?: (conversationId: string) => void;
+  onConversationPass?: (conversationId: string) => void;
+  onConversationReject?: (conversationId: string) => void;
   onRefresh?: () => void;
   isLoading?: boolean;
 }
@@ -33,6 +36,8 @@ export function Sidebar({
   onTabChange,
   onConversationSelect,
   onConversationClaim,
+  onConversationPass,
+  onConversationReject,
   onRefresh,
   isLoading = false
 }: SidebarProps) {
@@ -184,16 +189,23 @@ export function Sidebar({
       <ScrollArea className="flex-1">
         <Tabs value={activeTab}>
           <TabsContent value="waiting" className="mt-0">
-            {(conversations?.waiting?.length || 0) === 0 ? (
-              <div className="p-4 text-center text-gray-500">
-                <MessageSquare className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                <p className="text-sm">No waiting conversations</p>
-              </div>
-            ) : (
-              (conversations?.waiting || []).map((conversation) => (
-                <ConversationItem key={conversation.id} conversation={conversation} />
-              ))
-            )}
+            <EnhancedWaitingQueue
+              conversations={(conversations?.waiting || []).map(conv => ({
+                id: conv.id,
+                contactName: conv.contactName,
+                lastMessageBody: conv.lastMessageBody,
+                lastMessageDate: conv.lastMessageDate,
+                unreadCount: conv.unreadCount,
+                priority: 'normal' as const,
+                tags: conv.tags || [],
+                waitTime: formatDistanceToNow(new Date(conv.lastMessageDate), { addSuffix: true })
+              }))}
+              onClaim={(conversationId) => onConversationClaim?.(conversationId)}
+              onPass={(conversationId) => onConversationPass?.(conversationId)}
+              onReject={(conversationId) => onConversationReject?.(conversationId)}
+              maxVisible={5}
+              isLoading={isLoading}
+            />
           </TabsContent>
 
           <TabsContent value="assigned" className="mt-0">

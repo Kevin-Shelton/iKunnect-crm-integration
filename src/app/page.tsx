@@ -70,6 +70,82 @@ export default function Home() {
     }
   };
 
+  // Pass chat functionality
+  const passChat = async (conversationId: string) => {
+    try {
+      console.log('Attempting to pass conversation:', conversationId);
+      
+      const response = await fetch('/api/chat/pass', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId, agentId: 'agent_1' })
+      });
+
+      const data = await response.json();
+      console.log('Pass response:', data);
+      
+      if (data.success) {
+        console.log('Chat passed successfully');
+        refreshConversations(); // Refresh the conversation list
+        
+        // Show notification
+        if (notificationsEnabled && (window as any).notificationSystem) {
+          (window as any).notificationSystem.showNotification(
+            'Chat Passed',
+            'Conversation moved to back of queue',
+            'info'
+          );
+        }
+      } else {
+        console.error('Failed to pass chat:', data.error);
+        alert(`Failed to pass chat: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error passing chat:', error);
+      alert(`Error passing chat: ${error}`);
+    }
+  };
+
+  // Reject chat functionality
+  const rejectChat = async (conversationId: string) => {
+    try {
+      console.log('Attempting to reject conversation:', conversationId);
+      
+      const response = await fetch('/api/chat/reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          conversationId, 
+          agentId: 'agent_1',
+          reason: 'Agent rejected - not suitable for handling'
+        })
+      });
+
+      const data = await response.json();
+      console.log('Reject response:', data);
+      
+      if (data.success) {
+        console.log('Chat rejected successfully');
+        refreshConversations(); // Refresh the conversation list
+        
+        // Show notification
+        if (notificationsEnabled && (window as any).notificationSystem) {
+          (window as any).notificationSystem.showNotification(
+            'Chat Rejected',
+            'Conversation removed from queue',
+            'warning'
+          );
+        }
+      } else {
+        console.error('Failed to reject chat:', data.error);
+        alert(`Failed to reject chat: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error rejecting chat:', error);
+      alert(`Error rejecting chat: ${error}`);
+    }
+  };
+
   // Handle new message notifications
   const handleNewMessage = (message: any) => {
     if (notificationsEnabled && (window as any).notificationSystem) {
@@ -197,6 +273,8 @@ export default function Home() {
               }
             }}
             onConversationClaim={claimChat}
+            onConversationPass={passChat}
+            onConversationReject={rejectChat}
             onRefresh={refreshConversations}
             isLoading={isLoading}
           />

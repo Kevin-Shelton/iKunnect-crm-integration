@@ -14,10 +14,17 @@ interface StoredMessage {
 
 interface ConversationStatus {
   id: string;
-  status: 'waiting' | 'assigned' | 'closed';
+  status: 'waiting' | 'assigned' | 'closed' | 'rejected';
   agentId?: string;
   claimedAt?: string;
   lastActivity: string;
+  passedBy?: string;
+  passedAt?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  hidden?: boolean;
 }
 
 // Use global scope to persist across requests in development
@@ -146,4 +153,37 @@ export function getAllConversations(): Array<{ id: string; messageCount: number;
     const bTime = b.lastMessage?.created_at || '';
     return bTime.localeCompare(aTime); // Most recent first
   });
+}
+
+export function updateConversationStatus(conversationId: string, updates: Partial<ConversationStatus>): boolean {
+  try {
+    const currentStatus = conversationStatusStore.get(conversationId);
+    
+    if (!currentStatus) {
+      // Create new status if it doesn't exist
+      const newStatus: ConversationStatus = {
+        id: conversationId,
+        status: 'waiting',
+        lastActivity: new Date().toISOString(),
+        ...updates
+      };
+      conversationStatusStore.set(conversationId, newStatus);
+      console.log('[Memory Storage] Created new conversation status:', newStatus);
+      return true;
+    }
+
+    // Update existing status
+    const updatedStatus: ConversationStatus = {
+      ...currentStatus,
+      ...updates,
+      lastActivity: new Date().toISOString()
+    };
+    
+    conversationStatusStore.set(conversationId, updatedStatus);
+    console.log('[Memory Storage] Updated conversation status:', updatedStatus);
+    return true;
+  } catch (error) {
+    console.error('[Memory Storage] Error updating conversation status:', error);
+    return false;
+  }
 }
