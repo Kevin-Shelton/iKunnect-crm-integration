@@ -32,7 +32,12 @@ interface ContactCreationData {
 }
 
 class GHLIntegrationService {
-  private mcpEndpoint = '/api/mcp/ghl';
+  // Use existing n8n endpoints from the workflow
+  private endpoints = {
+    chatHistory: process.env.N8N_GHL_CHAT_HISTORY_URL || 'https://your-n8n-instance.com/webhook/ghl-chat-history',
+    agentAdmin: process.env.N8N_GHL_ADMIN_URL || 'https://your-n8n-instance.com/webhook/agent-admin',
+    agentSend: process.env.N8N_GHL_SEND_URL || 'https://your-n8n-instance.com/webhook/agent-send'
+  };
 
   /**
    * Identify a contact based on available information
@@ -86,7 +91,7 @@ class GHLIntegrationService {
   }
 
   /**
-   * Search for contacts in GHL using n8n MCP
+   * Search for contacts in GHL using existing n8n chat history endpoint
    */
   private async searchContacts(searchData: {
     phone?: string;
@@ -95,12 +100,15 @@ class GHLIntegrationService {
     lastName?: string;
   }): Promise<{ contacts: GHLContact[] }> {
     try {
-      const response = await fetch(this.mcpEndpoint, {
+      // Use the existing chat history endpoint to find contacts
+      const response = await fetch(this.endpoints.chatHistory, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'search_contacts',
-          data: searchData
+          locationId: 'DKs2AdSvw0MGWJYyXwk1', // Default location from workflow
+          email: searchData.email,
+          phone: searchData.phone,
+          limit: 1 // Just need to check if contact exists
         })
       });
 
@@ -108,7 +116,23 @@ class GHLIntegrationService {
         throw new Error(`GHL search failed: ${response.status}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+      
+      // Extract contact info from the response
+      if (result.contact?.id) {
+        const contact: GHLContact = {
+          id: result.contact.id,
+          firstName: searchData.firstName,
+          lastName: searchData.lastName,
+          email: searchData.email,
+          phone: searchData.phone,
+          dateAdded: result.contact.created ? new Date().toISOString() : undefined
+        };
+        
+        return { contacts: [contact] };
+      }
+
+      return { contacts: [] };
     } catch (error) {
       console.error('[GHL] Search contacts error:', error);
       return { contacts: [] };
@@ -116,30 +140,30 @@ class GHLIntegrationService {
   }
 
   /**
-   * Create a new contact in GHL
+   * Create a new contact in GHL using the existing workflow
+   * The n8n workflow will automatically create contacts when they don't exist
    */
   async createContact(contactData: ContactCreationData): Promise<GHLContact | null> {
     try {
-      console.log('[GHL] Creating new contact:', {
+      console.log('[GHL] Creating new contact via n8n workflow:', {
         hasPhone: !!contactData.phone,
         hasEmail: !!contactData.email,
         hasName: !!(contactData.firstName || contactData.lastName),
         source: contactData.source
       });
 
-      const response = await fetch(this.mcpEndpoint, {
+      // Use the chat history endpoint with hints to trigger contact creation
+      const response = await fetch(this.endpoints.chatHistory, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'create_contact',
-          data: {
-            ...contactData,
-            tags: [...(contactData.tags || []), 'chat-customer', 'ikunnect-chat'],
-            customFields: {
-              ...contactData.customFields,
-              chatSource: 'iKunnect Chat System',
-              firstContactDate: new Date().toISOString()
-            }
+          locationId: 'DKs2AdSvw0MGWJYyXwk1',
+          email: contactData.email,
+          phone: contactData.phone,
+          hints: {
+            name: contactData.firstName ? `${contactData.firstName} ${contactData.lastName || ''}`.trim() : undefined,
+            email: contactData.email,
+            phone: contactData.phone
           }
         })
       });
@@ -149,8 +173,24 @@ class GHLIntegrationService {
       }
 
       const result = await response.json();
-      console.log('[GHL] Contact created successfully:', result.contact?.id);
-      return result.contact;
+      
+      if (result.contact?.id) {
+        const contact: GHLContact = {
+          id: result.contact.id,
+          firstName: contactData.firstName,
+          lastName: contactData.lastName,
+          email: contactData.email,
+          phone: contactData.phone,
+          source: contactData.source,
+          tags: contactData.tags,
+          dateAdded: new Date().toISOString()
+        };
+        
+        console.log('[GHL] Contact created successfully:', contact.id);
+        return contact;
+      }
+
+      return null;
 
     } catch (error) {
       console.error('[GHL] Error creating contact:', error);
@@ -159,32 +199,31 @@ class GHLIntegrationService {
   }
 
   /**
-   * Update an existing contact in GHL
+   * Get conversation messages using the existing n8n workflow
    */
-  async updateContact(contactId: string, updateData: Partial<ContactCreationData>): Promise<GHLContact | null> {
+  async getConversationMessages(conversationId: string, contactId?: string): Promise<any[]> {
     try {
-      const response = await fetch(this.mcpEndpoint, {
+      const response = await fetch(this.endpoints.chatHistory, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'update_contact',
-          data: {
-            contactId,
-            ...updateData
-          }
+          locationId: 'DKs2AdSvw0MGWJYyXwk1',
+          conversationId,
+          contactId,
+          limit: 50
         })
       });
 
       if (!response.ok) {
-        throw new Error(`GHL update contact failed: ${response.status}`);
+        throw new Error(`GHL get messages failed: ${response.status}`);
       }
 
       const result = await response.json();
-      return result.contact;
+      return result.messages || [];
 
     } catch (error) {
-      console.error('[GHL] Error updating contact:', error);
-      return null;
+      console.error('[GHL] Error getting messages:', error);
+      return [];
     }
   }
 

@@ -1,151 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// n8n MCP endpoint for GoHighLevel integration
-// This endpoint communicates with n8n workflows that handle GHL API calls
+// Health check endpoint for GHL integration status
+// The actual GHL integration uses existing n8n workflows directly
 
-interface MCPRequest {
-  action: 'search_contacts' | 'create_contact' | 'update_contact' | 'get_contact';
-  data: any;
+export async function GET() {
+  const endpoints = {
+    chatHistory: process.env.N8N_GHL_CHAT_HISTORY_URL,
+    agentAdmin: process.env.N8N_GHL_ADMIN_URL,
+    agentSend: process.env.N8N_GHL_SEND_URL
+  };
+  
+  const configured = Object.values(endpoints).every(url => !!url);
+  
+  return NextResponse.json({
+    status: 'healthy',
+    service: 'GHL Integration (via existing n8n workflows)',
+    configured,
+    endpoints: {
+      chatHistory: !!endpoints.chatHistory,
+      agentAdmin: !!endpoints.agentAdmin,
+      agentSend: !!endpoints.agentSend
+    },
+    timestamp: new Date().toISOString()
+  });
 }
 
-interface MCPResponse {
-  success: boolean;
-  data?: any;
-  error?: string;
-  contacts?: any[];
-  contact?: any;
-}
-
+// POST endpoint for testing connectivity
 export async function POST(request: NextRequest) {
   try {
-    const { action, data }: MCPRequest = await request.json();
-
-    console.log(`[MCP GHL] Processing action: ${action}`, {
-      hasData: !!data,
-      dataKeys: data ? Object.keys(data) : []
-    });
-
-    // Get n8n webhook URL from environment
-    const n8nWebhookUrl = process.env.N8N_GHL_WEBHOOK_URL;
+    const { endpoint, testData } = await request.json();
     
-    if (!n8nWebhookUrl) {
-      console.error('[MCP GHL] N8N_GHL_WEBHOOK_URL not configured');
+    const endpoints = {
+      chatHistory: process.env.N8N_GHL_CHAT_HISTORY_URL,
+      agentAdmin: process.env.N8N_GHL_ADMIN_URL,
+      agentSend: process.env.N8N_GHL_SEND_URL
+    };
+    
+    const targetUrl = endpoints[endpoint as keyof typeof endpoints];
+    
+    if (!targetUrl) {
       return NextResponse.json({
         success: false,
-        error: 'n8n webhook URL not configured'
-      }, { status: 500 });
+        error: `Unknown endpoint: ${endpoint}`
+      }, { status: 400 });
     }
-
-    // Prepare payload for n8n
-    const n8nPayload = {
-      action,
-      data,
-      timestamp: new Date().toISOString(),
-      source: 'ikunnect-chat'
-    };
-
-    console.log(`[MCP GHL] Sending to n8n:`, {
-      url: n8nWebhookUrl,
-      action,
-      dataSize: JSON.stringify(data).length
+    
+    // Test connectivity to the n8n endpoint
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(testData || { test: true })
     });
-
-    // Call n8n webhook with timeout handling
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
-    let n8nResult: any;
-    
-    try {
-      const n8nResponse = await fetch(n8nWebhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'iKunnect-Chat-System/1.0'
-        },
-        body: JSON.stringify(n8nPayload),
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-
-      if (!n8nResponse.ok) {
-        console.error(`[MCP GHL] n8n webhook failed:`, {
-          status: n8nResponse.status,
-          statusText: n8nResponse.statusText
-        });
-        
-        return NextResponse.json({
-          success: false,
-          error: `n8n webhook failed: ${n8nResponse.status}`
-        }, { status: 502 });
-      }
-
-      n8nResult = await n8nResponse.json();
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      
-      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        console.error('[MCP GHL] n8n webhook timeout');
-        return NextResponse.json({
-          success: false,
-          error: 'n8n webhook timeout after 30 seconds'
-        }, { status: 504 });
-      }
-      
-      console.error('[MCP GHL] n8n webhook fetch error:', fetchError);
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to connect to n8n webhook'
-      }, { status: 502 });
-    }
-    
-    console.log(`[MCP GHL] n8n response received:`, {
-      success: n8nResult.success,
-      hasData: !!n8nResult.data,
-      hasContacts: !!n8nResult.contacts,
-      hasContact: !!n8nResult.contact
+    return NextResponse.json({
+      success: response.ok,
+      status: response.status,
+      endpoint,
+      timestamp: new Date().toISOString()
     });
-
-    // Handle different action responses
-    const response: MCPResponse = {
-      success: n8nResult.success || false,
-      data: n8nResult.data,
-      error: n8nResult.error
-    };
-
-    switch (action) {
-      case 'search_contacts':
-        response.contacts = n8nResult.contacts || [];
-        break;
-      
-      case 'create_contact':
-      case 'update_contact':
-      case 'get_contact':
-        response.contact = n8nResult.contact;
-        break;
-    }
-
-    return NextResponse.json(response);
-
+    
   } catch (error) {
-    console.error('[MCP GHL] Error processing request:', error);
-    
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
-}
-
-// Handle GET requests for health check
-export async function GET() {
-  const n8nWebhookUrl = process.env.N8N_GHL_WEBHOOK_URL;
-  
-  return NextResponse.json({
-    status: 'healthy',
-    service: 'GHL MCP Integration',
-    configured: !!n8nWebhookUrl,
-    timestamp: new Date().toISOString()
-  });
 }
