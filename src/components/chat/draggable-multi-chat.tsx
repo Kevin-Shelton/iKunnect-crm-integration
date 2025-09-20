@@ -468,7 +468,7 @@ export function DraggableMultiChat({
           <div className="flex items-center space-x-1">
             <MessageSquare className="w-3 h-3" />
             <span>Draggable Multi-Chat</span>
-            {ws.isConnected && <span className="text-green-600">• Live</span>}
+            {ws.isConnected() && <span className="text-green-600">• Live</span>}
           </div>
         </div>
       </div>
