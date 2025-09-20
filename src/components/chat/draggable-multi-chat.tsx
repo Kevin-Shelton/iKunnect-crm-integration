@@ -169,6 +169,33 @@ export function DraggableMultiChat({
     ));
   };
 
+  // Handle end chat
+  const handleEndChat = async (conversationId: string) => {
+    if (confirm('Are you sure you want to end this chat? This will close the conversation.')) {
+      try {
+        // Call API to end the conversation
+        const response = await fetch('/api/chat/end', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId, agentId: 'agent_1' })
+        });
+
+        if (response.ok) {
+          // Remove the chat from the interface
+          const chatToRemove = chatBoxes.find(chat => chat.conversationId === conversationId);
+          if (chatToRemove) {
+            removeChat(chatToRemove.id);
+          }
+        } else {
+          alert('Failed to end chat. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error ending chat:', error);
+        alert('Error ending chat. Please try again.');
+      }
+    }
+  };
+
   // Mouse event handlers for dragging
   const handleMouseDown = (e: React.MouseEvent, chatId: string, action: 'drag' | 'resize') => {
     e.preventDefault();
@@ -344,8 +371,8 @@ export function DraggableMultiChat({
   return (
     <div className="relative w-full h-full overflow-hidden">
       {chatBoxes.map((chat) => {
-        const activeColor = chat.isActive ? 'border-blue-500 shadow-blue-200' : 'border-gray-300';
-        const headerColor = chat.isActive ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200';
+        const activeColor = chat.isActive ? 'border-green-500 shadow-green-200' : 'border-gray-300';
+        const headerColor = chat.isActive ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200';
         
         return (
           <div
@@ -392,6 +419,18 @@ export function DraggableMultiChat({
                 </div>
                 
                 <div className="flex items-center space-x-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-xs px-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEndChat(chat.conversationId);
+                    }}
+                    title="End Chat"
+                  >
+                    End
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"

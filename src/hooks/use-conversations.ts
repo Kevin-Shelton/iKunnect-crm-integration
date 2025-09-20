@@ -83,6 +83,14 @@ export function useConversations(): UseConversationsReturn {
 
       toast.success('Conversation claimed successfully');
       await refreshConversations();
+      
+      // Auto-open the claimed conversation in a chat window
+      setTimeout(() => {
+        const conversation = conversations.all.find(c => c.id === conversationId);
+        if (conversation && (window as any).draggableMultiChat) {
+          (window as any).draggableMultiChat.addChat(conversationId, conversation.contactName);
+        }
+      }, 500); // Small delay to ensure UI updates
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to claim conversation';
       toast.error(errorMessage);
