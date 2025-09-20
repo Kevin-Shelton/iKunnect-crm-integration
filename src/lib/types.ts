@@ -279,6 +279,7 @@ export interface QueueStats {
 export interface ConversationQueue {
   waiting: Conversation[];
   assigned: Conversation[];
+  rejected: Conversation[];
   all: Conversation[];
 }
 

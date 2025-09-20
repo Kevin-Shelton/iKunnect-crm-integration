@@ -23,6 +23,7 @@ export function useConversations(): UseConversationsReturn {
   const [conversations, setConversations] = useState<ConversationQueue>({
     waiting: [],
     assigned: [],
+    rejected: [],
     all: []
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -45,6 +46,7 @@ export function useConversations(): UseConversationsReturn {
       const safeData = {
         waiting: Array.isArray(data?.waiting) ? data.waiting : [],
         assigned: Array.isArray(data?.assigned) ? data.assigned : [],
+        rejected: Array.isArray(data?.rejected) ? data.rejected : [],
         all: Array.isArray(data?.all) ? data.all : []
       };
       
@@ -110,6 +112,7 @@ export function useConversations(): UseConversationsReturn {
         const safeData = {
           waiting: Array.isArray(data?.waiting) ? data.waiting : [],
           assigned: Array.isArray(data?.assigned) ? data.assigned : [],
+          rejected: Array.isArray(data?.rejected) ? data.rejected : [],
           all: Array.isArray(data?.all) ? data.all : []
         };
         

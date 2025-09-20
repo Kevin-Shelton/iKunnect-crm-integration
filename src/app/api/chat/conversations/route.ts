@@ -51,15 +51,21 @@ export async function GET() {
 
     // Convert to arrays and sort by most recent
     const allConversations = Array.from(conversationMap.values())
-      .filter(conv => !conv.status?.hidden) // Filter out hidden/rejected conversations
+      .filter(conv => !conv.status?.hidden) // Filter out hidden conversations from 'all'
+      .sort((a, b) => new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime());
+
+    // Get all conversations including rejected ones for the rejected tab
+    const allConversationsIncludingRejected = Array.from(conversationMap.values())
       .sort((a, b) => new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime());
 
     const waiting = allConversations.filter(conv => conv.status === 'waiting');
     const assigned = allConversations.filter(conv => conv.status === 'assigned');
+    const rejected = allConversationsIncludingRejected.filter(conv => conv.status === 'rejected');
 
     console.log('[Conversations] Returning conversations:', {
       waiting: waiting.length,
       assigned: assigned.length,
+      rejected: rejected.length,
       total: allConversations.length,
       sampleLastMessageBody: allConversations[0]?.lastMessageBody || 'none'
     });
@@ -67,6 +73,7 @@ export async function GET() {
     return NextResponse.json({
       waiting,
       assigned,
+      rejected,
       all: allConversations
     });
 
@@ -75,6 +82,7 @@ export async function GET() {
     return NextResponse.json({
       waiting: [],
       assigned: [],
+      rejected: [],
       all: [],
       error: `Server error: ${error instanceof Error ? error.message : 'Unknown error'}`
     }, { status: 500 });
