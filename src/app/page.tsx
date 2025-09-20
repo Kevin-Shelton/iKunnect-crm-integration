@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Header } from '@/components/layout/header';
 import { Sidebar } from '@/components/layout/sidebar';
 import { ChatInterface } from '@/components/chat/chat-interface';
-import { MultiChatInterface } from '@/components/chat/multi-chat-interface';
+import { VerticalMultiChat, useVerticalMultiChat } from '@/components/chat/vertical-multi-chat';
 import { ContactSidebar } from '@/components/layout/contact-sidebar';
 import { NotificationSystem } from '@/components/chat/notification-system';
 import { useConversations } from '@/hooks/use-conversations';
@@ -46,9 +46,9 @@ export default function Home() {
         const conversation = conversations.all?.find((conv: Conversation) => conv.id === conversationId);
         const contactName = conversation?.contactName || `Customer ${conversationId.slice(-4)}`;
         
-        // Add to multi-chat interface
-        if ((window as any).multiChatInterface) {
-          const added = (window as any).multiChatInterface.addChat(conversationId, contactName);
+        // Add to vertical multi-chat interface
+        if ((window as any).verticalMultiChat) {
+          const added = (window as any).verticalMultiChat.addChat(conversationId, contactName);
           if (!added) {
             alert('Cannot add more chats. Maximum of 4 simultaneous chats allowed.');
             return;
@@ -190,10 +190,10 @@ export default function Home() {
             onConversationSelect={(conversationId) => {
               console.log('Conversation selected:', conversationId);
               setSelectedConversationId(conversationId);
-              // Also show in multi-chat if not already there
+              // Also show in vertical multi-chat if not already there
               const conversation = conversations.all?.find((conv: Conversation) => conv.id === conversationId);
-              if (conversation && (window as any).multiChatInterface) {
-                (window as any).multiChatInterface.addChat(conversationId, conversation.contactName);
+              if (conversation && (window as any).verticalMultiChat) {
+                (window as any).verticalMultiChat.addChat(conversationId, conversation.contactName);
               }
             }}
             onConversationClaim={claimChat}
@@ -205,7 +205,7 @@ export default function Home() {
         {/* Chat Interface */}
         <div className="flex-1 flex">
           <div className="flex-1">
-            <MultiChatInterface 
+            <VerticalMultiChat 
               onNewMessage={handleNewMessage}
               onChatClosed={(conversationId) => {
                 // Handle chat closed - could update conversation status

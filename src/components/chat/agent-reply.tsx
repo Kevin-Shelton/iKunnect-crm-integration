@@ -9,11 +9,36 @@ interface AgentReplyProps {
   conversationId: string;
   onMessageSent?: (message: string) => void;
   onRefreshNeeded?: () => void;
+  onTyping?: (isTyping: boolean) => void;
+  compact?: boolean;
 }
 
-export function AgentReply({ conversationId, onMessageSent, onRefreshNeeded }: AgentReplyProps) {
+export function AgentReply({ conversationId, onMessageSent, onRefreshNeeded, onTyping, compact = false }: AgentReplyProps) {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Handle typing indicators
+  const handleTyping = (value: string) => {
+    setMessage(value);
+    
+    if (onTyping) {
+      onTyping(value.length > 0);
+      
+      // Clear existing timeout
+      if (typingTimeout) {
+        clearTimeout(typingTimeout);
+      }
+      
+      // Set new timeout to stop typing indicator
+      if (value.length > 0) {
+        const timeout = setTimeout(() => {
+          onTyping(false);
+        }, 1000);
+        setTypingTimeout(timeout);
+      }
+    }
+  };
 
   const sendMessage = async () => {
     if (!message.trim() || isLoading) return;
@@ -43,16 +68,18 @@ export function AgentReply({ conversationId, onMessageSent, onRefreshNeeded }: A
       console.log('[Agent] API Response:', data); // Debug log
       
       if (response.ok && data.ok) {
-        // API returns { ok: true, counts: { messages: number, suggestions: number } }
-        console.log('[Agent] Message sent successfully:', data);
-        setMessage(''); // Clear input field
+        console.log('Message sent successfully');
+        setMessage(''); // Clear the input field
+        onTyping?.(false); // Clear typing indicator
         onMessageSent?.(message.trim());
-        onRefreshNeeded?.(); // Trigger refresh
+        onRefreshNeeded?.();
       } else {
-        console.error('[Agent] Send failed:', data.error || 'Unknown error');
+        console.error('Failed to send message:', data);
+        alert('Failed to send message. Please try again.');
       }
     } catch (error) {
       console.error('[Agent] Send error:', error);
+      alert('Error sending message. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -66,25 +93,30 @@ export function AgentReply({ conversationId, onMessageSent, onRefreshNeeded }: A
   };
 
   return (
-    <div className="border-t border-gray-200 p-4 bg-white">
-      <div className="flex space-x-2">
+    <div className={`border-t border-gray-200 ${compact ? 'p-2' : 'p-4'} bg-white`}>
+      <div className={`flex ${compact ? 'space-x-1' : 'space-x-2'}`}>
         <Textarea
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => handleTyping(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder="Type your reply... (Enter to send, Shift+Enter for new line)"
-          className="flex-1 min-h-[60px] max-h-[120px] resize-none"
+          placeholder={compact ? "Reply..." : "Type your reply... (Enter to send, Shift+Enter for new line)"}
+          className={`flex-1 resize-none ${
+            compact 
+              ? 'min-h-[40px] max-h-[80px] text-sm' 
+              : 'min-h-[60px] max-h-[120px]'
+          }`}
           disabled={isLoading}
         />
         <Button
           onClick={sendMessage}
           disabled={!message.trim() || isLoading}
           className="self-end"
+          size={compact ? "sm" : "default"}
         >
           {isLoading ? (
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
           ) : (
-            <Send className="w-4 h-4" />
+            <Send className={compact ? "w-3 h-3" : "w-4 h-4"} />
           )}
         </Button>
       </div>

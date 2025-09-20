@@ -16,9 +16,10 @@ interface SimpleMessagesProps {
   conversationId: string;
   className?: string;
   onNewMessage?: (message: Message) => void;
+  compact?: boolean;
 }
 
-export function SimpleMessages({ conversationId, className = '', onNewMessage }: SimpleMessagesProps) {
+export function SimpleMessages({ conversationId, className = '', onNewMessage, compact = false }: SimpleMessagesProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -181,16 +182,16 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage }:
   }
 
   return (
-    <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${className}`}>
+    <div className={`flex-1 overflow-y-auto ${compact ? 'p-2 space-y-2' : 'p-4 space-y-4'} ${className}`}>
       {messages.map((message) => (
         <div
           key={message.id}
           className={`flex ${message.sender === 'agent' ? 'justify-end' : 'justify-start'}`}
         >
-          <div className={`flex items-start space-x-2 max-w-xs lg:max-w-md ${
+          <div className={`flex items-start ${compact ? 'space-x-1 max-w-xs' : 'space-x-2 max-w-xs lg:max-w-md'} ${
             message.sender === 'agent' ? 'flex-row-reverse space-x-reverse' : ''
           }`}>
-            <Avatar className="w-8 h-8">
+            <Avatar className={compact ? "w-6 h-6" : "w-8 h-8"}>
               <AvatarFallback className={
                 message.sender === 'agent' 
                   ? 'bg-blue-100 text-blue-600' 
@@ -199,17 +200,19 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage }:
                 {message.sender === 'agent' ? 'A' : 'C'}
               </AvatarFallback>
             </Avatar>
-            <div className={`rounded-lg px-3 py-2 ${
+            <div className={`rounded-lg ${compact ? 'px-2 py-1' : 'px-3 py-2'} ${
               message.sender === 'agent'
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 text-gray-900'
             }`}>
-              <p className="text-sm">{message.text}</p>
-              <p className={`text-xs mt-1 ${
-                message.sender === 'agent' ? 'text-blue-100' : 'text-gray-500'
-              }`}>
-                {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
-              </p>
+              <p className={compact ? "text-xs" : "text-sm"}>{message.text}</p>
+              {!compact && (
+                <p className={`text-xs mt-1 ${
+                  message.sender === 'agent' ? 'text-blue-100' : 'text-gray-500'
+                }`}>
+                  {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
+                </p>
+              )}
             </div>
           </div>
         </div>
