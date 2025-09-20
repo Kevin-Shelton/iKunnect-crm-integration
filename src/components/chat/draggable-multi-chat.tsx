@@ -289,11 +289,10 @@ export function DraggableMultiChat({
 
   // Handle agent typing
   const handleAgentTyping = (conversationId: string, isTyping: boolean) => {
-    if (isTyping) {
-      sendTypingStart(conversationId, 'agent');
-    } else {
-      sendTypingStop(conversationId, 'agent');
+    if (sseService && isTyping) {
+      sseService.sendTyping(conversationId, 'agent');
     }
+    // Note: SSE service doesn't have a stop typing method, it auto-expires
   };
 
   // Expose functions globally
