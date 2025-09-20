@@ -266,11 +266,9 @@ export function DraggableMultiChat({
       ));
     };
 
-    sseService.addEventListener('typing_indicator', handleTypingIndicator);
+    const unsubscribe = sseService.subscribe('typing', handleTypingIndicator);
 
-    return () => {
-      sseService.removeEventListener('typing_indicator', handleTypingIndicator);
-    };
+    return unsubscribe;
   }, [sseService]);
 
   // Handle new messages
