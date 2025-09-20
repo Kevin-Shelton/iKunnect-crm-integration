@@ -18,7 +18,7 @@ export default function Home() {
 
   // Use conversations hook with safe defaults
   const {
-    conversations = { waiting: [], assigned: [], all: [] } as ConversationQueue,
+    conversations = { waiting: [], assigned: [], rejected: [], all: [] } as ConversationQueue,
     queueStats = { waiting: 0, assigned: 0, total: 0 },
     isLoading = false,
     error = null,
