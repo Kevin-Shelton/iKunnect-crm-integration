@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     
     // Handle suggestions from n8n Agent Assist
     if (payloadObj.type === 'suggestions' || payloadObj.type === 'agent_assist') {
-      const suggestions = payloadObj.data?.suggestions || payloadObj.suggestions || [];
+      const suggestions = (payloadObj.data as any)?.suggestions || (payloadObj as any).suggestions || [];
       
       if (suggestions.length > 0) {
         console.log('[Chat Events] Storing Agent Assist suggestions:', {
