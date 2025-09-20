@@ -1,4 +1,5 @@
-// In-memory storage for development/testing when Supabase is not configured
+// /lib/memory-storage.ts
+// In-memory storage fallback for development and testing
 // This allows the chat system to work without external dependencies
 
 interface StoredMessage {
@@ -11,15 +12,29 @@ interface StoredMessage {
   created_at: string;
 }
 
+interface ConversationStatus {
+  id: string;
+  status: 'waiting' | 'assigned' | 'closed';
+  agentId?: string;
+  claimedAt?: string;
+  lastActivity: string;
+}
+
 // Use global scope to persist across requests in development
 declare global {
   var __messageStore: Map<string, StoredMessage[]> | undefined;
+  var __conversationStatusStore: Map<string, ConversationStatus> | undefined;
 }
 
 // In-memory storage that persists across requests
 const messageStore = globalThis.__messageStore ?? new Map<string, StoredMessage[]>();
+const conversationStatusStore = globalThis.__conversationStatusStore ?? new Map<string, ConversationStatus>();
+
 if (!globalThis.__messageStore) {
   globalThis.__messageStore = messageStore;
+}
+if (!globalThis.__conversationStatusStore) {
+  globalThis.__conversationStatusStore = conversationStatusStore;
 }
 
 export function storeMessage(message: Omit<StoredMessage, 'id' | 'created_at'>): StoredMessage {
@@ -32,6 +47,21 @@ export function storeMessage(message: Omit<StoredMessage, 'id' | 'created_at'>):
   const conversationMessages = messageStore.get(message.conversation_id) || [];
   conversationMessages.push(storedMessage);
   messageStore.set(message.conversation_id, conversationMessages);
+
+  // Update conversation status - new customer messages create waiting conversations
+  if (message.type === 'inbound') {
+    const existingStatus = conversationStatusStore.get(message.conversation_id);
+    if (!existingStatus) {
+      conversationStatusStore.set(message.conversation_id, {
+        id: message.conversation_id,
+        status: 'waiting',
+        lastActivity: storedMessage.created_at
+      });
+    } else {
+      // Update last activity
+      existingStatus.lastActivity = storedMessage.created_at;
+    }
+  }
 
   console.log('[Memory Storage] Stored message:', {
     conversationId: message.conversation_id,
@@ -53,49 +83,67 @@ export function getMessages(conversationId: string, limit = 20): StoredMessage[]
     limit
   });
 
-  // Return messages sorted by creation time, limited
+  // Return most recent messages first, then reverse for chronological order
   return messages
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
     .slice(-limit);
 }
 
-export function getAllConversations(): Array<{ id: string; messageCount: number; lastMessage?: StoredMessage }> {
-  const conversations: Array<{ id: string; messageCount: number; lastMessage?: StoredMessage }> = [];
+// Conversation status management
+export function claimConversation(conversationId: string, agentId: string): boolean {
+  const status = conversationStatusStore.get(conversationId);
+  if (status && status.status === 'waiting') {
+    status.status = 'assigned';
+    status.agentId = agentId;
+    status.claimedAt = new Date().toISOString();
+    status.lastActivity = new Date().toISOString();
+    
+    console.log('[Memory Storage] Claimed conversation:', {
+      conversationId,
+      agentId,
+      claimedAt: status.claimedAt
+    });
+    
+    return true;
+  }
+  return false;
+}
+
+export function getConversationStatus(conversationId: string): ConversationStatus | null {
+  return conversationStatusStore.get(conversationId) || null;
+}
+
+export function getAllConversations(): Array<{ id: string; messageCount: number; lastMessage?: StoredMessage; status: ConversationStatus }> {
+  const conversations: Array<{ id: string; messageCount: number; lastMessage?: StoredMessage; status: ConversationStatus }> = [];
   
   for (const [conversationId, messages] of messageStore.entries()) {
     const lastMessage = messages[messages.length - 1];
+    const status = conversationStatusStore.get(conversationId) || {
+      id: conversationId,
+      status: 'waiting' as const,
+      lastActivity: lastMessage?.created_at || new Date().toISOString()
+    };
+    
     conversations.push({
       id: conversationId,
       messageCount: messages.length,
-      lastMessage
+      lastMessage,
+      status
     });
   }
 
   console.log('[Memory Storage] Retrieved conversations:', {
     conversationCount: conversations.length,
-    conversations: conversations.map(c => ({ id: c.id, messageCount: c.messageCount }))
+    conversations: conversations.slice(0, 3).map(c => ({ 
+      id: c.id, 
+      messageCount: c.messageCount,
+      status: c.status.status
+    }))
   });
 
   return conversations.sort((a, b) => {
-    const aTime = a.lastMessage ? new Date(a.lastMessage.created_at).getTime() : 0;
-    const bTime = b.lastMessage ? new Date(b.lastMessage.created_at).getTime() : 0;
-    return bTime - aTime; // Most recent first
-  });
-}
-
-export function clearAllMessages(): void {
-  messageStore.clear();
-  console.log('[Memory Storage] Cleared all messages');
-}
-
-// Debug function to inspect current state
-export function debugStorage(): void {
-  console.log('[Memory Storage Debug]', {
-    conversationCount: messageStore.size,
-    conversations: Array.from(messageStore.entries()).map(([id, messages]) => ({
-      id,
-      messageCount: messages.length,
-      messages: messages.map(m => ({ id: m.id, text: m.text?.substring(0, 30), type: m.type }))
-    }))
+    const aTime = a.lastMessage?.created_at || '';
+    const bTime = b.lastMessage?.created_at || '';
+    return bTime.localeCompare(aTime); // Most recent first
   });
 }

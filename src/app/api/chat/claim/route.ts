@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConversation, updateConversationStatus } from '@/lib/unifiedStorage';
+import { claimConversation, getConversationStatus } from '@/lib/memory-storage';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,26 +14,37 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Claim] Attempting to claim conversation ${conversationId} for agent ${agentId}`);
 
-    // Get the conversation from unified storage
-    const conversation = await getConversation(conversationId);
-    if (!conversation) {
-      console.log(`[Claim] Conversation ${conversationId} not found in unified storage`);
+    // Check if conversation exists
+    const status = getConversationStatus(conversationId);
+    if (!status) {
+      console.log(`[Claim] Conversation ${conversationId} not found`);
       return NextResponse.json(
         { success: false, error: 'Conversation not found' },
         { status: 404 }
       );
     }
 
-    // Update conversation status to assigned
-    const updatedConversation = await updateConversationStatus(conversationId, 'assigned', agentId);
+    // Attempt to claim the conversation
+    const success = claimConversation(conversationId, agentId);
 
-    console.log(`[Claim] Conversation ${conversationId} claimed by ${agentId} via unified storage`);
-
-    return NextResponse.json({
-      success: true,
-      conversation: updatedConversation,
-      message: 'Conversation claimed successfully'
-    });
+    if (success) {
+      console.log(`[Claim] Conversation ${conversationId} claimed by ${agentId}`);
+      
+      return NextResponse.json({
+        success: true,
+        conversationId,
+        agentId,
+        claimedAt: new Date().toISOString(),
+        message: 'Conversation claimed successfully'
+      });
+    } else {
+      console.log(`[Claim] Failed to claim conversation ${conversationId} - may already be assigned`);
+      
+      return NextResponse.json(
+        { success: false, error: 'Conversation may already be assigned' },
+        { status: 409 }
+      );
+    }
 
   } catch (error) {
     console.error('[Claim] Error:', error);

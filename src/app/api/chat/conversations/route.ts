@@ -40,7 +40,9 @@ export async function GET() {
         lastMessageBody: conv.lastMessage?.text || '', // Direct text mapping
         lastMessageDate: conv.lastMessage?.created_at || new Date().toISOString(),
         unreadCount: conv.messageCount,
-        status: 'waiting', // Default to waiting, will be updated if agent messages exist
+        status: conv.status?.status || 'waiting', // Use actual status from storage
+        agentId: conv.status?.agentId,
+        claimedAt: conv.status?.claimedAt,
         priority: 'normal',
         tags: [],
         messages: []

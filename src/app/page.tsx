@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Header } from '@/components/layout/header';
 import { Sidebar } from '@/components/layout/sidebar';
 import { ChatInterface } from '@/components/chat/chat-interface';
+import { MultiChatInterface } from '@/components/chat/multi-chat-interface';
 import { ContactSidebar } from '@/components/layout/contact-sidebar';
 import { NotificationSystem } from '@/components/chat/notification-system';
 import { useConversations } from '@/hooks/use-conversations';
@@ -35,8 +36,25 @@ export default function Home() {
       const data = await response.json();
       if (data.success) {
         console.log('Chat claimed successfully');
+        
+        // Find the conversation to get contact name
+        const conversation = conversations.all?.find((conv: Conversation) => conv.id === conversationId);
+        const contactName = conversation?.contactName || `Customer ${conversationId.slice(-4)}`;
+        
+        // Add to multi-chat interface
+        if ((window as any).multiChatInterface) {
+          const added = (window as any).multiChatInterface.addChat(conversationId, contactName);
+          if (!added) {
+            alert('Cannot add more chats. Maximum of 4 simultaneous chats allowed.');
+            return;
+          }
+        }
+        
         refreshConversations(); // Refresh the conversation list
         setSelectedConversationId(conversationId); // Auto-select the claimed conversation
+        
+        // Play new conversation notification
+        handleNewConversation(conversation);
       } else {
         console.error('Failed to claim chat:', data.error);
       }
@@ -48,11 +66,35 @@ export default function Home() {
   // Handle new message notifications
   const handleNewMessage = (message: any) => {
     if (notificationsEnabled && (window as any).notificationSystem) {
-      (window as any).notificationSystem.playSound();
-      (window as any).notificationSystem.showVisual(message.text);
+      (window as any).notificationSystem.playIncomingBeep();
       (window as any).notificationSystem.showNotification(
         'New Message',
-        `${message.contact?.name || 'Customer'}: ${message.text}`
+        `${message.contact?.name || 'Customer'}: ${message.text}`,
+        'incoming'
+      );
+    }
+  };
+
+  // Handle new conversation notifications
+  const handleNewConversation = (conversation: any) => {
+    if (notificationsEnabled && (window as any).notificationSystem) {
+      (window as any).notificationSystem.playNewConversationAlert();
+      (window as any).notificationSystem.showNotification(
+        'New Conversation',
+        `New chat from ${conversation.contactName || 'Customer'}`,
+        'new'
+      );
+    }
+  };
+
+  // Handle dropped chat notifications
+  const handleDroppedChat = (conversation: any) => {
+    if (notificationsEnabled && (window as any).notificationSystem) {
+      (window as any).notificationSystem.playDroppedBuzz();
+      (window as any).notificationSystem.showNotification(
+        'Chat Dropped',
+        `Conversation with ${conversation.contactName || 'Customer'} was dropped`,
+        'dropped'
       );
     }
   };
@@ -117,8 +159,18 @@ export default function Home() {
     <div className="flex h-screen bg-gray-50">
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50">
-        <Header />
+        <Header 
+          queueStats={queueStats}
+          agentName="Agent"
+          agentStatus="available"
+        />
       </div>
+
+      {/* Notification System */}
+      <NotificationSystem 
+        enabled={notificationsEnabled}
+        onToggle={() => setNotificationsEnabled(!notificationsEnabled)}
+      />
 
       {/* Main Content */}
       <div className="flex flex-1 pt-16">
@@ -136,41 +188,14 @@ export default function Home() {
         {/* Chat Interface */}
         <div className="flex-1 flex">
           <div className="flex-1">
-            {selectedConversationId ? (
-              <ChatInterface 
-                conversationId={selectedConversationId}
-                onNewMessage={handleNewMessage}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="text-6xl mb-4">💬</div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                    Agent Chat Desk
-                  </h2>
-                  <p className="text-gray-600 mb-4">
-                    Your n8n to Agent Desk integration is ready! The chat system will receive conversations from your GoHighLevel workflows.
-                  </p>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md mx-auto">
-                    <div className="flex items-center mb-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                      <span className="text-green-800 font-medium">Integration Active</span>
-                    </div>
-                    <p className="text-green-700 text-sm">
-                      Ready to receive messages from n8n workflows
-                    </p>
-                  </div>
-                  <div className="mt-6 text-sm text-gray-500">
-                    <div><strong>API Endpoint:</strong> /api/chat-events</div>
-                    <div><strong>HMAC Secret:</strong> your_shared_hmac_secret_here_change_this_in_production</div>
-                    <div className="flex items-center justify-center mt-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                      <span><strong>Status:</strong> Online</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            <MultiChatInterface 
+              onNewMessage={handleNewMessage}
+              onChatClosed={(conversationId) => {
+                // Handle chat closed - could update conversation status
+                console.log('Chat closed:', conversationId);
+              }}
+              maxChats={4}
+            />
           </div>
 
           {/* Contact Sidebar */}

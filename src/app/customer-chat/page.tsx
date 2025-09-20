@@ -5,8 +5,31 @@ import { Send, MessageCircle } from 'lucide-react';
 
 export default function CustomerChatPage() {
   // Generate consistent session IDs that persist during the chat session
-  const [conversationId] = useState(() => `customer_chat_${Date.now()}`);
-  const [customerId] = useState(() => `customer_${Date.now()}`);
+  const [conversationId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      // Try to get existing conversation ID from session storage
+      let existingId = sessionStorage.getItem('customer_conversation_id');
+      if (!existingId) {
+        // Generate new ID only if none exists
+        existingId = `customer_chat_${Date.now()}`;
+        sessionStorage.setItem('customer_conversation_id', existingId);
+      }
+      return existingId;
+    }
+    return `customer_chat_${Date.now()}`;
+  });
+  
+  const [customerId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      let existingCustomerId = sessionStorage.getItem('customer_id');
+      if (!existingCustomerId) {
+        existingCustomerId = `customer_${Date.now()}`;
+        sessionStorage.setItem('customer_id', existingCustomerId);
+      }
+      return existingCustomerId;
+    }
+    return `customer_${Date.now()}`;
+  });
   
   const [messages, setMessages] = useState([
     {
