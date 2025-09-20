@@ -1,57 +1,63 @@
 import { NextResponse } from 'next/server';
-import { getConversations, getConversationMessages } from '@/lib/unifiedStorage';
+import { getAllConversationsFromStorage } from '@/lib/supabase';
 
 export async function GET() {
   try {
-    console.log('[Debug] Starting conversation debug...');
+    console.log('[DEBUG] Starting conversation ID debug...');
     
-    // Get raw conversations from unified storage
-    const rawConversations = await getConversations();
-    console.log('[Debug] Raw conversations from unified storage:', rawConversations);
+    // Get conversations from storage
+    const conversations = await getAllConversationsFromStorage();
+    console.log('[DEBUG] Raw conversations from storage:', conversations);
     
-    // Get environment info
-    const envInfo = {
-      hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      hasSupabaseServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_TOKEN,
-      hasSupabaseAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_TOKEN,
-      nodeEnv: process.env.NODE_ENV
-    };
-    
-    // Get detailed info for first conversation if exists
-    let firstConversationDetails = null;
-    if (rawConversations.length > 0) {
-      const firstConv = rawConversations[0];
-      try {
-        const { messages, contact } = await getConversationMessages(firstConv.id, 5);
-        firstConversationDetails = {
-          conversation: firstConv,
-          messages: messages,
-          contact: contact
-        };
-      } catch (error) {
-        firstConversationDetails = {
-          error: `Failed to get messages: ${error}`,
-          conversation: firstConv
-        };
-      }
-    }
-    
-    return NextResponse.json({
-      timestamp: new Date().toISOString(),
-      environment: envInfo,
-      conversationCount: rawConversations.length,
-      rawConversations: rawConversations,
-      firstConversationDetails: firstConversationDetails,
-      debug: {
-        message: 'This endpoint shows the actual data structure being returned by unified storage',
-        purpose: 'To debug why production conversations show timestamps instead of message content'
-      }
+    // Analyze conversation ID patterns
+    const idAnalysis = conversations.map(conv => {
+      const displayId = `Customer ${conv.id.slice(-4)}`;
+      return {
+        actualId: conv.id,
+        displayId: displayId,
+        status: conv.status,
+        contactName: conv.contactName,
+        lastMessage: conv.lastMessageBody,
+        messageCount: conv.messageCount || 0
+      };
     });
     
+    // Get conversation counts by status
+    const waiting = conversations.filter(c => c.status === 'waiting');
+    const assigned = conversations.filter(c => c.status === 'assigned');
+    const rejected = conversations.filter(c => c.status === 'rejected');
+    
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      purpose: 'Debug conversation ID matching between UI and storage',
+      totalConversations: conversations.length,
+      conversationsByStatus: {
+        waiting: waiting.length,
+        assigned: assigned.length,
+        rejected: rejected.length
+      },
+      idMappingAnalysis: idAnalysis,
+      sampleConversation: conversations.length > 0 ? {
+        fullObject: conversations[0],
+        whatUIShows: `Customer ${conversations[0].id.slice(-4)}`,
+        whatStorageHas: conversations[0].id,
+        match: conversations[0].id === `Customer ${conversations[0].id.slice(-4)}`
+      } : null,
+      environment: {
+        nodeEnv: process.env.NODE_ENV,
+        hasSupabase: !!process.env.NEXT_PUBLIC_SUPABASE_URL
+      }
+    };
+    
+    console.log('[DEBUG] ID Analysis:', debugInfo);
+    
+    return NextResponse.json(debugInfo, { status: 200 });
+    
   } catch (error) {
-    console.error('[Debug] Error in conversation debug:', error);
-    return NextResponse.json({
-      error: `Debug failed: ${error}`,
+    console.error('[DEBUG] Error in conversation debug:', error);
+    return NextResponse.json({ 
+      error: 'Failed to debug conversations',
+      details: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString()
     }, { status: 500 });
   }

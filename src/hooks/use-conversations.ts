@@ -69,11 +69,12 @@ export function useConversations(): UseConversationsReturn {
   // Claim a conversation
   const claimConversation = useCallback(async (conversationId: string) => {
     try {
-      const response = await fetch(`/api/conversations/${conversationId}/claim`, {
+      const response = await fetch(`/api/chat/claim`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ conversationId }),
       });
 
       if (!response.ok) {
