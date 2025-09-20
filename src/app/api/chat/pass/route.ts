@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { 
-  getAllConversations as getAllConversationsPersistent,
-  updateConversationStatus as updateConversationStatusPersistent
-} from '@/lib/persistent-storage';
+  updateConversationStatus,
+  getAllConversationsWithStatus,
+  initializeConversationStatus
+} from '@/lib/supabase-conversations';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,10 +16,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[Pass] Agent ${agentId} passing on conversation ${conversationId}`);
+    console.log(`[Pass] Agent ${agentId} passing on conversation ${conversationId} using Supabase`);
+
+    // Initialize conversation status table if needed
+    await initializeConversationStatus();
 
     // Check if conversation exists
-    const conversations = await getAllConversationsPersistent();
+    const conversations = await getAllConversationsWithStatus();
     const conversation = conversations.find(c => c.id === conversationId);
     
     if (!conversation) {
@@ -28,17 +32,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update conversation status to indicate it was passed
-    const success = await updateConversationStatusPersistent(conversationId, {
-      status: 'waiting',
-      passedBy: agentId,
-      passedAt: new Date().toISOString(),
-      lastActivity: new Date().toISOString(),
-      priority: 'low' // Lower priority since it was passed
+    // Update conversation status to indicate it was passed (back to waiting)
+    const success = await updateConversationStatus(conversationId, 'passed', { 
+      passedBy: agentId 
     });
 
     if (success) {
-      console.log(`[Pass] Conversation ${conversationId} passed by ${agentId}`);
+      console.log(`[Pass] Conversation ${conversationId} passed by ${agentId} in Supabase`);
       
       return NextResponse.json({
         success: true,
@@ -49,17 +49,17 @@ export async function POST(request: NextRequest) {
       });
     } else {
       return NextResponse.json(
-        { success: false, error: 'Failed to pass conversation' },
+        { success: false, error: 'Failed to update conversation status in Supabase' },
         { status: 500 }
       );
     }
 
   } catch (error) {
-    console.error('[Pass] Error:', error);
+    console.error('[Pass] Supabase error:', error);
     return NextResponse.json(
       { 
         success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+        error: `Supabase error: ${error instanceof Error ? error.message : 'Unknown error'}` 
       },
       { status: 500 }
     );

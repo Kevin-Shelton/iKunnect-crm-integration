@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { 
-  getAllConversations as getAllConversationsPersistent,
-  updateConversationStatus as updateConversationStatusPersistent
-} from '@/lib/persistent-storage';
+  updateConversationStatus,
+  getAllConversationsWithStatus,
+  initializeConversationStatus
+} from '@/lib/supabase-conversations';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,10 +16,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[Reject] Agent ${agentId} rejecting conversation ${conversationId} - Reason: ${reason}`);
+    console.log(`[Reject] Agent ${agentId} rejecting conversation ${conversationId} using Supabase - Reason: ${reason}`);
+
+    // Initialize conversation status table if needed
+    await initializeConversationStatus();
 
     // Check if conversation exists
-    const conversations = await getAllConversationsPersistent();
+    const conversations = await getAllConversationsWithStatus();
     const conversation = conversations.find(c => c.id === conversationId);
     
     if (!conversation) {
@@ -28,40 +32,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update conversation status to indicate it was rejected
-    const success = await updateConversationStatusPersistent(conversationId, {
-      status: 'rejected',
+    // Update conversation status to rejected using Supabase
+    const success = await updateConversationStatus(conversationId, 'rejected', { 
       rejectedBy: agentId,
-      rejectedAt: new Date().toISOString(),
-      rejectionReason: reason,
-      lastActivity: new Date().toISOString(),
-      hidden: true // Hide from main queue but keep in system
+      rejectionReason: reason
     });
 
     if (success) {
-      console.log(`[Reject] Conversation ${conversationId} rejected by ${agentId}`);
+      console.log(`[Reject] Conversation ${conversationId} rejected by ${agentId} in Supabase`);
       
       return NextResponse.json({
         success: true,
         conversationId,
         agentId,
         rejectedAt: new Date().toISOString(),
-        reason,
+        rejectionReason: reason,
         message: 'Conversation rejected successfully'
       });
     } else {
       return NextResponse.json(
-        { success: false, error: 'Failed to reject conversation' },
+        { success: false, error: 'Failed to update conversation status in Supabase' },
         { status: 500 }
       );
     }
 
   } catch (error) {
-    console.error('[Reject] Error:', error);
+    console.error('[Reject] Supabase error:', error);
     return NextResponse.json(
       { 
         success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+        error: `Supabase error: ${error instanceof Error ? error.message : 'Unknown error'}` 
       },
       { status: 500 }
     );
