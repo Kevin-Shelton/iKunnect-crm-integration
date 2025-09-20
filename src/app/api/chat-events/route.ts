@@ -86,6 +86,30 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Handle suggestions from n8n Agent Assist
+    if (payloadObj.type === 'suggestions' || payloadObj.type === 'agent_assist') {
+      const suggestions = payloadObj.data?.suggestions || payloadObj.suggestions || [];
+      
+      if (suggestions.length > 0) {
+        console.log('[Chat Events] Storing Agent Assist suggestions:', {
+          conversationId: convId,
+          count: suggestions.length
+        });
+        
+        // Store suggestions using existing chatStorage system
+        const { addSuggestions } = await import('@/lib/chatStorage');
+        addSuggestions(convId, suggestions);
+        
+        tapPush({ 
+          t: nowIso(), 
+          route: '/api/chat-events', 
+          traceId, 
+          note: `conv ${convId} sugg+${suggestions.length}`, 
+          data: { convId, counts: { suggestions: suggestions.length } } 
+        });
+      }
+    }
+
     // Handle direct event format (new format)
     if (payloadObj.type) {
       const eventType = payloadObj.type as string;
