@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SimpleMessages } from './simple-messages';
 import { AgentReply } from './agent-reply';
+import { AgentAssist } from './agent-assist';
 import { X, MessageSquare, Users, Clock, AlertCircle, User, Move, Maximize2, Minimize2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ interface ChatBox {
   isMinimized: boolean;
   zIndex: number;
   isActive: boolean; // New: indicates which chat is currently active for context
+  agentAssistActive: boolean; // New: indicates if Agent Assist is enabled for this chat
 }
 
 interface DraggableMultiChatProps {
@@ -90,7 +92,7 @@ export function DraggableMultiChat({
     }
 
     const newChat: ChatBox = {
-      id: `chat_${Date.now()}`,
+      id: chatId,
       conversationId,
       contactName,
       lastActivity: new Date().toISOString(),
@@ -100,7 +102,8 @@ export function DraggableMultiChat({
       size: { ...defaultSize },
       isMinimized: false,
       zIndex: nextZIndex,
-      isActive: chatBoxes.length === 0 // First chat is automatically active
+      isActive: chatBoxes.length === 0, // First chat is automatically active
+      agentAssistActive: false // Agent Assist starts disabled
     };
 
     setChatBoxes(prev => [...prev, newChat]);
@@ -491,6 +494,24 @@ export function DraggableMultiChat({
                     compact={true}
                   />
                 </div>
+
+                {/* Agent Assist */}
+                <AgentAssist
+                  conversationId={chat.conversationId}
+                  isActive={chat.agentAssistActive}
+                  onSuggestionSelect={(suggestion) => {
+                    // Insert suggestion into the reply field
+                    // This would need to be implemented in AgentReply component
+                    console.log('[Agent Assist] Suggestion selected:', suggestion);
+                  }}
+                  onToggle={() => {
+                    setChatBoxes(prev => prev.map(c => 
+                      c.id === chat.id 
+                        ? { ...c, agentAssistActive: !c.agentAssistActive }
+                        : c
+                    ));
+                  }}
+                />
               </div>
             )}
 
