@@ -1,5 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { claimConversation, getConversationStatus } from '@/lib/memory-storage';
+import { claimConversation, getConversationStatus, getAllConversations } from '@/lib/memory-storage';
+
+async function claimConversationWithStatus(conversationId: string, agentId: string) {
+  const success = claimConversation(conversationId, agentId);
+  
+  if (success) {
+    console.log(`[Claim] Conversation ${conversationId} claimed by ${agentId}`);
+    
+    return NextResponse.json({
+      success: true,
+      conversationId,
+      agentId,
+      claimedAt: new Date().toISOString(),
+      message: 'Conversation claimed successfully'
+    });
+  } else {
+    return NextResponse.json(
+      { success: false, error: 'Failed to claim conversation' },
+      { status: 409 }
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,37 +35,48 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Claim] Attempting to claim conversation ${conversationId} for agent ${agentId}`);
 
+    // Debug: Check what conversations exist in memory
+    const allConversations = getAllConversations();
+    console.log(`[Claim] Available conversations:`, allConversations.map(c => ({ 
+      id: c.id, 
+      status: c.status?.status,
+      messageCount: c.messageCount 
+    })));
+
     // Check if conversation exists
     const status = getConversationStatus(conversationId);
     if (!status) {
-      console.log(`[Claim] Conversation ${conversationId} not found`);
+      console.log(`[Claim] Conversation ${conversationId} not found in status store`);
+      
+      // Check if it exists in message store but not status store
+      const conversations = getAllConversations();
+      const foundInMessages = conversations.find(c => c.id === conversationId);
+      
+      if (foundInMessages) {
+        console.log(`[Claim] Found conversation in messages but not in status store, creating status`);
+        // Create missing status
+        const newStatus = {
+          id: conversationId,
+          status: 'waiting' as const,
+          lastActivity: new Date().toISOString()
+        };
+        
+        // Manually add to status store
+        if (globalThis.__conversationStatusStore) {
+          globalThis.__conversationStatusStore.set(conversationId, newStatus);
+        }
+        
+        return await claimConversationWithStatus(conversationId, agentId);
+      }
+      
       return NextResponse.json(
-        { success: false, error: 'Conversation not found' },
+        { success: false, error: `Conversation not found. Available: ${allConversations.map(c => c.id).join(', ')}` },
         { status: 404 }
       );
     }
 
     // Attempt to claim the conversation
-    const success = claimConversation(conversationId, agentId);
-
-    if (success) {
-      console.log(`[Claim] Conversation ${conversationId} claimed by ${agentId}`);
-      
-      return NextResponse.json({
-        success: true,
-        conversationId,
-        agentId,
-        claimedAt: new Date().toISOString(),
-        message: 'Conversation claimed successfully'
-      });
-    } else {
-      console.log(`[Claim] Failed to claim conversation ${conversationId} - may already be assigned`);
-      
-      return NextResponse.json(
-        { success: false, error: 'Conversation may already be assigned' },
-        { status: 409 }
-      );
-    }
+    return await claimConversationWithStatus(conversationId, agentId);
 
   } catch (error) {
     console.error('[Claim] Error:', error);
