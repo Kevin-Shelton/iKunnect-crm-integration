@@ -204,8 +204,10 @@ export function MultiChatInterface({
         {selectedChat ? (
           <ChatInterface
             conversationId={selectedChat.conversationId}
-            onNewMessage={handleNewMessage}
-            onMessageSent={() => updateChatActivity(selectedChat.conversationId)}
+            onNewMessage={(message) => {
+              handleNewMessage(message);
+              updateChatActivity(selectedChat.conversationId);
+            }}
           />
         ) : (
           <div className="flex items-center justify-center h-full">
