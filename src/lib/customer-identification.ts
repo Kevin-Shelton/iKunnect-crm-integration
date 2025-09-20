@@ -99,7 +99,9 @@ class CustomerIdentificationService {
 
       return {
         shouldRespond: true,
-        response: this.generateWelcomeMessage(identificationResult.contact),
+        response: identificationResult.contact 
+          ? this.generateWelcomeMessage(identificationResult.contact)
+          : "Hi! Great to hear from you. How can I help you today?",
         isComplete: true,
         needsMoreInfo: false
       };
