@@ -1,5 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { storeMessage, getMessages, getAllConversations } from './memory-storage';
+import { 
+  storeMessage as storeMessagePersistent,
+  getConversationMessages as getConversationMessagesPersistent,
+  getAllConversations as getAllConversationsPersistent,
+  updateConversationStatus as updateConversationStatusPersistent,
+  deleteConversation as deleteConversationPersistent
+} from './persistent-storage';
 
 // Use the correct environment variable names from Vercel
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -71,9 +78,9 @@ export async function insertChatEvent(event: ChatEvent) {
       
     if (error) {
       console.error('[Supabase Insert Error]', error);
-      // Fallback to memory storage on error
-      console.log('[Storage] Falling back to memory storage due to Supabase error');
-      const storedMessage = storeMessage({
+      // Fallback to persistent storage on error
+      console.log('[Storage] Falling back to persistent storage due to Supabase error');
+      const storedMessage = await storeMessagePersistent({
         conversation_id: event.conversation_id,
         type: event.type,
         message_id: event.message_id || `msg_${Date.now()}`,
@@ -86,9 +93,9 @@ export async function insertChatEvent(event: ChatEvent) {
     return data;
   } catch (error) {
     console.error('[Supabase Insert Exception]', error);
-    // Fallback to memory storage on exception
-    console.log('[Storage] Falling back to memory storage due to Supabase exception');
-    const storedMessage = storeMessage({
+    // Fallback to persistent storage on exception
+    console.log('[Storage] Falling back to persistent storage due to Supabase exception');
+    const storedMessage = await storeMessagePersistent({
       conversation_id: event.conversation_id,
       type: event.type,
       message_id: event.message_id || `msg_${Date.now()}`,
@@ -101,10 +108,10 @@ export async function insertChatEvent(event: ChatEvent) {
 
 // Helper to get chat history
 export async function getChatHistory(conversationId: string, limit = 20) {
-  // Use memory storage if Supabase is not available
+  // Use persistent storage if Supabase is not available
   if (!supabaseService) {
-    console.log('[Storage] Using memory storage for chat history');
-    return getMessages(conversationId, limit);
+    console.log('[Storage] Using persistent storage for chat history');
+    return await getConversationMessagesPersistent(conversationId, limit);
   }
   
   try {
@@ -117,26 +124,26 @@ export async function getChatHistory(conversationId: string, limit = 20) {
       
     if (error) {
       console.error('[Supabase Query Error]', error);
-      // Fallback to memory storage on error
-      console.log('[Storage] Falling back to memory storage due to Supabase error');
-      return getMessages(conversationId, limit);
+      // Fallback to persistent storage on error
+      console.log('[Storage] Falling back to persistent storage due to Supabase error');
+      return await getConversationMessagesPersistent(conversationId, limit);
     }
     
     return data || [];
   } catch (error) {
     console.error('[Supabase Query Exception]', error);
-    // Fallback to memory storage on exception
-    console.log('[Storage] Falling back to memory storage due to Supabase exception');
-    return getMessages(conversationId, limit);
+    // Fallback to persistent storage on exception
+    console.log('[Storage] Falling back to persistent storage due to Supabase exception');
+    return await getConversationMessagesPersistent(conversationId, limit);
   }
 }
 
 // Helper to get all conversations
 export async function getAllConversationsFromStorage() {
-  // Use memory storage if Supabase is not available
+  // Use persistent storage if Supabase is not available
   if (!supabaseService) {
-    console.log('[Storage] Using memory storage for conversations list');
-    return getAllConversations();
+    console.log('[Storage] Using persistent storage for conversations list');
+    return await getAllConversationsPersistent();
   }
   
   try {
@@ -147,9 +154,9 @@ export async function getAllConversationsFromStorage() {
       
     if (error) {
       console.error('[Supabase Conversations Query Error]', error);
-      // Fallback to memory storage on error
-      console.log('[Storage] Falling back to memory storage due to Supabase error');
-      return getAllConversations();
+      // Fallback to persistent storage on error
+      console.log('[Storage] Falling back to persistent storage due to Supabase error');
+      return await getAllConversationsPersistent();
     }
     
     // Group by conversation and get latest message for each
@@ -169,9 +176,9 @@ export async function getAllConversationsFromStorage() {
     return Array.from(conversationMap.values());
   } catch (error) {
     console.error('[Supabase Conversations Query Exception]', error);
-    // Fallback to memory storage on exception
-    console.log('[Storage] Falling back to memory storage due to Supabase exception');
-    return getAllConversations();
+    // Fallback to persistent storage on exception
+    console.log('[Storage] Falling back to persistent storage due to Supabase exception');
+    return await getAllConversationsPersistent();
   }
 }
 
