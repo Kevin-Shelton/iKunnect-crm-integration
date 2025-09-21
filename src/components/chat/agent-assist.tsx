@@ -81,21 +81,23 @@ export function AgentAssist({
         headers: { 'Content-Type': 'application/json' }
       });
       
-      if (response.ok) {
-        const result = await response.json();
-        console.log('[Agent Assist] n8n suggestion request sent:', result);
-        
-        // Wait for n8n to process and send suggestions back via /api/chat-assist
-        // Then fetch the updated suggestions from storage
-        setTimeout(() => {
-          fetchSuggestions();
-        }, 3000); // Give n8n time to process and respond
-      } else {
-        console.error('[Agent Assist] Failed to request suggestions:', response.status);
-      }
+      // Always treat as success - errors are handled gracefully by the API
+      const result = await response.json();
+      console.log('[Agent Assist] n8n suggestion request result:', result);
+      
+      // Show "No suggestions right now" message initially
+      setSuggestions([]);
+      
+      // Wait for suggestions to arrive via SSE/Desk events
+      // Then fetch the updated suggestions from storage
+      setTimeout(() => {
+        fetchSuggestions();
+      }, 5000); // Give n8n more time to process and send via SSE
       
     } catch (error) {
       console.error('[Agent Assist] Error requesting suggestions from n8n:', error);
+      // Don't show error to user - just show "No suggestions right now"
+      setSuggestions([]);
     } finally {
       setIsLoading(false);
     }
