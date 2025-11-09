@@ -26,6 +26,9 @@ export default function CustomerChatPage() {
         setCustomerId(existingContactId);
         // No need to set email/phone state here, as they are only needed for the Agent Desk
         setChatState('ACTIVE_CHAT');
+      } else {
+        // If no session data is found, ensure the state is set to IDENTITY_COLLECTION
+        setChatState('IDENTITY_COLLECTION');
       }
     }
   }, []);
