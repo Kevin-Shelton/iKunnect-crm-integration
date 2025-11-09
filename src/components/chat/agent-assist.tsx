@@ -1,3 +1,6 @@
+
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +18,7 @@ import {
 
 interface AgentAssistProps {
   conversationId: string;
+  contactId: string; // New prop for the contact ID
   isActive: boolean;
   onSuggestionSelect: (suggestion: string) => void;
   onToggle: () => void;
@@ -30,6 +34,7 @@ interface Suggestion {
 
 export function AgentAssist({ 
   conversationId, 
+  contactId, // Use the new prop
   isActive, 
   onSuggestionSelect, 
   onToggle 
@@ -69,7 +74,7 @@ export function AgentAssist({
 
   // Request new suggestions from n8n workflow
   const requestSuggestions = async () => {
-    if (!conversationId) return;
+    if (!conversationId || !contactId) return; // Check for contactId
     
     setIsLoading(true);
     try {
@@ -78,7 +83,8 @@ export function AgentAssist({
       // Call the API endpoint to trigger n8n suggestion generation
       const response = await fetch(`/api/conversations/${conversationId}/request-suggestions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId }), // Pass contactId in the body
       });
       
       // Always treat as success - errors are handled gracefully by the API

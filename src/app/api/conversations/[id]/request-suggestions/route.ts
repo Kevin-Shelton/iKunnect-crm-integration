@@ -4,6 +4,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { contactId } = await request.json();
+) {
   try {
     const { id: conversationId } = await params;
     
@@ -29,7 +31,7 @@ export async function POST(
         found: true
       },
       contact: {
-        id: conversationId.replace('customer_chat_', 'cnt_').replace('conv_', 'cnt_'),
+        id: contactId,
         name: 'Agent Assist Request',
         email: 'agent@ikunnect.com',
         phone: '+13141236547',
