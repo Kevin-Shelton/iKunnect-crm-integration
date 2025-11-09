@@ -2,7 +2,7 @@
 // Works better with Vercel than WebSocket
 
 interface SSEMessage {
-  type: 'typing' | 'message' | 'status' | 'notification';
+  type: 'typing' | 'message' | 'status' | 'notification' | 'claim';
   conversationId: string;
   data: any;
   timestamp: string;
