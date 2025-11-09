@@ -8,6 +8,7 @@ type ChatState = 'IDENTITY_COLLECTION' | 'LOADING' | 'ACTIVE_CHAT';
 
 export default function CustomerChatPage() {
   const [chatState, setChatState] = useState<ChatState>('IDENTITY_COLLECTION');
+  const [isLoading, setIsLoading] = useState(false);
   // Generate consistent session IDs that persist during the chat session
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState<string | null>(null);
@@ -25,6 +26,7 @@ export default function CustomerChatPage() {
   }, []);
   
   const handleStartChat = useCallback(async (data: { fullName: string; email: string; phone: string }) => {
+    setIsLoading(true);
     setChatState('LOADING');
     try {
       const response = await fetch('/api/chat/start', {
@@ -51,6 +53,8 @@ export default function CustomerChatPage() {
       console.error('Error starting chat:', error);
       setChatState('IDENTITY_COLLECTION');
       alert('Could not start chat. Please check your details and try again.');
+    } finally {
+      setIsLoading(false);
     }
   }, []);
   
@@ -179,11 +183,11 @@ export default function CustomerChatPage() {
   };
 
   if (chatState === 'IDENTITY_COLLECTION') {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <PreChatIdentityForm onStartChat={handleStartChat} />
-      </div>
-    );
+	    return (
+	      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+	        <PreChatIdentityForm onStartChat={handleStartChat} isLoading={isLoading} />
+	      </div>
+	    );
   }
 
   if (chatState === 'LOADING') {
