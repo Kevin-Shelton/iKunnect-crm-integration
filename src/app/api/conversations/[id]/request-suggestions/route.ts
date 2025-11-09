@@ -35,7 +35,7 @@ export async function POST(
     console.log('[Request Suggestions] Triggering n8n suggestion generation for:', conversationId);
 
     // Use n8n inbound webhook (production)
-    const n8nInboundUrl = 'https://invictusbpo.app.n8n.cloud/webhook/ghl-chat-inbound';
+    const n8nInboundUrl = 'https://invictusbpo.app.n8n.cloud/webhook/ghl-chat-inbound'; // Confirmed production URL
 
     // Prepare payload matching n8n workflow expectations
     const n8nPayload = {
