@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ghlIntegration } from '@/lib/ghl-integration';
+
 
 export async function POST(
   request: NextRequest,
@@ -8,7 +8,14 @@ export async function POST(
   const { contactId } = await request.json();
 
   
-  const locationId = ghlIntegration.locationId;
+  const locationId = process.env.GHL_LOCATION_ID;
+
+  if (!locationId) {
+    return NextResponse.json(
+      { error: 'GHL_LOCATION_ID environment variable is not configured' },
+      { status: 500 }
+    );
+  }
 
   try {
     const { id: conversationId } = await params;

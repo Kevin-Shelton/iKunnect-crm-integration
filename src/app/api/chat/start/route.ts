@@ -46,7 +46,14 @@ export async function POST(request: Request) {
     }
 
 
-    const locationId = ghlIntegration.locationId; // Get the configured Location ID
+    const locationId = process.env.GHL_LOCATION_ID; // Get the configured Location ID from env
+
+    if (!locationId) {
+      return NextResponse.json(
+        { error: 'GHL_LOCATION_ID environment variable is not configured' },
+        { status: 500 }
+      );
+    }
 
 
     // 2. Contact Lookup/Creation
