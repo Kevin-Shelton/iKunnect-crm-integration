@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       eventCount++;
 
       // If this is a customer message from the customer chat interface, trigger n8n workflow
-      if (payloadObj.source === 'customer_chat' && messageText && validType === 'inbound') {
+      if ((payloadObj.source === 'customer_chat' || payloadObj.source === 'customer_chat_start') && messageText && validType === 'inbound') {
         try {
           // Use the existing n8n webhook URL (same as ai-draft route)
           const n8nWebhookUrl = 'https://invictusbpo.app.n8n.cloud/webhook';
