@@ -69,11 +69,11 @@ export async function POST(request: Request) {
     if (email === 'test@example.com' || phone === '5555555555') {
         // Simulate finding an existing contact
         contactId = 'contact_existing_123';
-        contactName = fullName || 'Existing Customer';
+        contactName = fullName || `Customer ${Math.floor(Math.random() * 10000)}`; // Use a random name if fullName is empty
     } else {
         // Simulate creating a new contact
         contactId = `contact_new_${Date.now()}`;
-        contactName = fullName || 'New Customer';
+        contactName = fullName || `Customer ${Math.floor(Math.random() * 10000)}`; // Use a random name if fullName is empty
     }
     
     if (!contactId) {
