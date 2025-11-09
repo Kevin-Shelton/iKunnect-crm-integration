@@ -18,11 +18,53 @@ export default function CustomerChatPage() {
       const existingContactId = sessionStorage.getItem('customer_contact_id');
       const existingContactEmail = sessionStorage.getItem('customer_contact_email');
       const existingContactPhone = sessionStorage.getItem('customer_contact_phone');
+      const existingContactName = sessionStorage.getItem('customer_contact_name');
       
-      if (existingConvId && existingContactId && existingContactEmail && existingContactPhone) {
+      // Check if we have enough information to resume an active chat
+      if (existingConvId && existingContactId && (existingContactEmail || existingContactPhone)) {
         setConversationId(existingConvId);
         setCustomerId(existingContactId);
         // No need to set email/phone state here, as they are only needed for the Agent Desk
+        setChatState('ACTIVE_CHAT');
+      }
+    }
+  }, []);
+  
+  const handleStartChat = useCallback(async (data: { fullName: string; email: string; phone: string }) => {
+    setIsLoading(true);
+    setChatState('LOADING');
+    try {
+      const response = await fetch('/api/chat/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to start chat: ' + response.statusText);
+      }
+
+      const result = await response.json();
+      
+      // Store IDs and contact details in session storage for persistence
+      sessionStorage.setItem('customer_conversation_id', result.conversationId);
+      sessionStorage.setItem('customer_contact_id', result.contactId);
+      sessionStorage.setItem('customer_contact_email', result.contactEmail || '');
+      sessionStorage.setItem('customer_contact_phone', result.contactPhone || '');
+      sessionStorage.setItem('customer_contact_name', result.contactName || ''); // Store contact name
+      
+      setConversationId(result.conversationId);
+      setCustomerId(result.contactId);
+      setChatState('ACTIVE_CHAT');
+
+    } catch (error) {
+      console.error('Error starting chat:', error);
+      setChatState('IDENTITY_COLLECTION');
+      alert('Could not start chat. Please check your details and try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
         setChatState('ACTIVE_CHAT');
         setChatState('ACTIVE_CHAT');
       }

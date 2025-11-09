@@ -10,7 +10,7 @@ interface StartChatRequestBody {
 }
 
 // Helper function to find the most recent open conversation
-async function findOrCreateConversation(contactId: string): Promise<{ conversationId: string, contactName: string }> {
+async function findOrCreateConversation(contactId: string): Promise<{ conversationId: string }> {
   // In a real-world scenario, this would query GHL/MCP for open conversations
   // For this implementation, we will simulate the logic:
   
@@ -19,9 +19,8 @@ async function findOrCreateConversation(contactId: string): Promise<{ conversati
   const existingConversationId = null; // Assume no existing open conversation for simplicity
 
   if (existingConversationId) {
-    // Placeholder for getting the contact's name from the existing conversation
-    const contactName = 'Existing Customer'; 
-    return { conversationId: existingConversationId, contactName };
+    // Placeholder for getting the contact's name from the existing conversation 
+    return { conversationId: existingConversationId };
   }
 
   // 2. If no open conversation is found, create a new one
@@ -30,9 +29,9 @@ async function findOrCreateConversation(contactId: string): Promise<{ conversati
   const newConversationId = `conv_${contactId}_${Date.now()}`;
   
   // Placeholder for getting the contact's name (which was set during contact creation/lookup)
-  const contactName = 'New Customer'; 
+  // The actual contactName is determined in the POST function. 
 
-  return { conversationId: newConversationId, contactName };
+  return { conversationId: newConversationId };
 }
 
 export async function POST(request: Request) {
@@ -83,13 +82,13 @@ export async function POST(request: Request) {
     // --------------------------------------------------------------
 
     // 3. Conversation Lookup/Creation
-    const { conversationId, contactName: finalContactName } = await findOrCreateConversation(contactId);
+    const { conversationId } = await findOrCreateConversation(contactId);
 
     // 4. Response
     return NextResponse.json({
       contactId,
       conversationId,
-      contactName: finalContactName,
+  contactName,
       contactEmail: email,
       contactPhone: phone
     });
