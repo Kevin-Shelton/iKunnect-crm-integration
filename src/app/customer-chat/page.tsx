@@ -143,7 +143,10 @@ export default function CustomerChatPage() {
             id: conversationId // Now correctly uses state
           },
           contact: {
-            id: customerId // Now correctly uses state
+            id: customerId, // Now correctly uses state
+            name: sessionStorage.getItem('customer_contact_name') || undefined,
+            email: sessionStorage.getItem('customer_contact_email') || undefined,
+            phone: sessionStorage.getItem('customer_contact_phone') || undefined,
           },
           timestamp: new Date().toISOString(),
           source: 'customer_chat'
