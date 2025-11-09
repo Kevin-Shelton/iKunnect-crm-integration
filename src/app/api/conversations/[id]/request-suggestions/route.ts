@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGHLIntegration } from '@/lib/ghl-integration';
+import { ghlIntegration } from '@/lib/ghl-integration';
 
 export async function POST(
   request: NextRequest,
@@ -7,7 +7,7 @@ export async function POST(
 ) {
   const { contactId } = await request.json();
 
-  const ghlIntegration = getGHLIntegration();
+  
   const locationId = ghlIntegration.locationId;
 
   try {

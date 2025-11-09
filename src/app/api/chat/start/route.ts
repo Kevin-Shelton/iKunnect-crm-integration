@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getMCPClient } from '@/lib/mcp-client';
-import { getGHLIntegration } from '@/lib/ghl-integration';
+
+import { ghlIntegration } from '@/lib/ghl-integration';
 
 // Define the expected request body structure
 interface StartChatRequestBody {
@@ -10,7 +10,7 @@ interface StartChatRequestBody {
 }
 
 // Helper function to find the most recent open conversation
-async function findOrCreateConversation(mcpClient: any, contactId: string, locationId: string): Promise<{ conversationId: string, contactName: string }> {
+async function findOrCreateConversation(contactId: string): Promise<{ conversationId: string, contactName: string }> {
   // In a real-world scenario, this would query GHL/MCP for open conversations
   // For this implementation, we will simulate the logic:
   
@@ -45,9 +45,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email or phone number is required.' }, { status: 400 });
     }
 
-    const ghlIntegration = getGHLIntegration();
+
     const locationId = ghlIntegration.locationId; // Get the configured Location ID
-    const mcpClient = getMCPClient(locationId);
+
 
     // 2. Contact Lookup/Creation
     let contactId: string | null = null;
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     // --------------------------------------------------------------
 
     // 3. Conversation Lookup/Creation
-    const { conversationId, contactName: finalContactName } = await findOrCreateConversation(mcpClient, contactId, locationId);
+    const { conversationId, contactName: finalContactName } = await findOrCreateConversation(contactId);
 
     // 4. Response
     return NextResponse.json({ 

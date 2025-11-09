@@ -24,8 +24,9 @@ const nextConfig = {
   
   // Ensure serverless functions can access environment variables
   experimental: {
+    serverComponentsExternalPackages: ['@supabase/supabase-js'],
     // This helps with environment variable access in serverless functions
-    serverComponentsExternalPackages: ['@supabase/supabase-js']
+    serverExternalPackages: ['@supabase/supabase-js']
   }
 };
 
