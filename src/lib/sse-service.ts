@@ -48,6 +48,13 @@ class SSEService {
           if (convListeners) {
             convListeners.forEach(callback => callback(message));
           }
+
+          // Special handling for 'claim' event to dispatch browser event
+          if (message.type === 'claim' && typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('claimChat', {
+              detail: message.data
+            }));
+          }
         } catch (error) {
           console.error('[SSE] Error parsing message:', error);
         }
