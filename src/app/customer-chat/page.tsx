@@ -65,11 +65,7 @@ export default function CustomerChatPage() {
       setIsLoading(false);
     }
   }, []);
-        setChatState('ACTIVE_CHAT');
-        setChatState('ACTIVE_CHAT');
-      }
-    }
-  }, []);
+
   
   const handleStartChat = useCallback(async (data: { fullName: string; email: string; phone: string }) => {
     setIsLoading(true);
