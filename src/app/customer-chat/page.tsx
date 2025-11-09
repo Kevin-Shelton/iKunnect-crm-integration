@@ -33,6 +33,12 @@ export default function CustomerChatPage() {
   const handleStartChat = useCallback(async (data: { fullName: string; email: string; phone: string }) => {
     setIsLoading(true);
     setChatState('LOADING');
+    
+    // --- DEBUG LOGS ---
+    console.log('[handleStartChat] Data received from form:', data);
+    console.log('[handleStartChat] JSON payload being sent:', JSON.stringify(data));
+    // --- END DEBUG LOGS ---
+    
     try {
       const response = await fetch('/api/chat/start', {
         method: 'POST',
