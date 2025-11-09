@@ -1,35 +1,58 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { PreChatIdentityForm } from '@/components/chat/pre-chat-identity-form';
 import { Send, MessageCircle } from 'lucide-react';
 
+type ChatState = 'IDENTITY_COLLECTION' | 'LOADING' | 'ACTIVE_CHAT';
+
 export default function CustomerChatPage() {
+  const [chatState, setChatState] = useState<ChatState>('IDENTITY_COLLECTION');
   // Generate consistent session IDs that persist during the chat session
-  const [conversationId] = useState(() => {
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Try to get existing conversation ID from session storage
-      let existingId = sessionStorage.getItem('customer_conversation_id');
-      if (!existingId) {
-        // Generate new ID only if none exists
-        existingId = `customer_chat_${Date.now()}`;
-        sessionStorage.setItem('customer_conversation_id', existingId);
+      const existingConvId = sessionStorage.getItem('customer_conversation_id');
+      const existingContactId = sessionStorage.getItem('customer_contact_id');
+      
+      if (existingConvId && existingContactId) {
+        setConversationId(existingConvId);
+        setCustomerId(existingContactId);
+        setChatState('ACTIVE_CHAT');
       }
-      return existingId;
     }
-    return `customer_chat_${Date.now()}`;
-  });
+  }, []);
   
-  const [customerId] = useState(() => {
-    if (typeof window !== 'undefined') {
-      let existingCustomerId = sessionStorage.getItem('customer_id');
-      if (!existingCustomerId) {
-        existingCustomerId = `customer_${Date.now()}`;
-        sessionStorage.setItem('customer_id', existingCustomerId);
+  const handleStartChat = useCallback(async (data: { fullName: string; email: string; phone: string }) => {
+    setChatState('LOADING');
+    try {
+      const response = await fetch('/api/chat/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to start chat: ' + response.statusText);
       }
-      return existingCustomerId;
+
+      const result = await response.json();
+      
+      // Store IDs in session storage for persistence
+      sessionStorage.setItem('customer_conversation_id', result.conversationId);
+      sessionStorage.setItem('customer_contact_id', result.contactId);
+      
+      setConversationId(result.conversationId);
+      setCustomerId(result.contactId);
+      setChatState('ACTIVE_CHAT');
+
+    } catch (error) {
+      console.error('Error starting chat:', error);
+      setChatState('IDENTITY_COLLECTION');
+      alert('Could not start chat. Please check your details and try again.');
     }
-    return `customer_${Date.now()}`;
-  });
+  }, []);
   
   const [messages, setMessages] = useState([
     {
@@ -44,7 +67,7 @@ export default function CustomerChatPage() {
 
   // Load initial messages and poll for updates (client-side only)
   useEffect(() => {
-    if (typeof window === 'undefined') return; // Prevent SSR issues
+    if (chatState !== 'ACTIVE_CHAT' || !conversationId || typeof window === 'undefined') return; // Only run when active
     
     const loadMessages = async () => {
       try {
@@ -75,10 +98,10 @@ export default function CustomerChatPage() {
     const interval = setInterval(loadMessages, 5000);
     
     return () => clearInterval(interval);
-  }, [conversationId]);
+  }, [chatState, conversationId]);
 
   const sendMessage = async () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || chatState !== 'ACTIVE_CHAT' || !conversationId || !customerId) return;
 
     const message = {
       id: Date.now().toString(),
@@ -103,10 +126,10 @@ export default function CustomerChatPage() {
           type: 'inbound',
           channel: 'webchat',
           conversation: {
-            id: conversationId
+            id: conversationId // Now correctly uses state
           },
           contact: {
-            id: customerId
+            id: customerId // Now correctly uses state
           },
           timestamp: new Date().toISOString(),
           source: 'customer_chat'
@@ -154,6 +177,22 @@ export default function CustomerChatPage() {
       sendMessage();
     }
   };
+
+  if (chatState === 'IDENTITY_COLLECTION') {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <PreChatIdentityForm onStartChat={handleStartChat} />
+      </div>
+    );
+  }
+
+  if (chatState === 'LOADING') {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-lg font-semibold text-blue-600">Starting Conversation...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">

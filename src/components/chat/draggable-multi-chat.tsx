@@ -8,10 +8,10 @@ import { X, MessageSquare, Users, Clock, AlertCircle, User, Move, Maximize2, Min
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { getSSEService } from '@/lib/sse-service';
-import { PreChatIdentityForm } from './pre-chat-identity-form';
+
 
 // Define the new state for the chat desk
-type ChatDeskState = 'LOADING' | 'IDENTITY_COLLECTION' | 'ACTIVE_CHAT_DESK';
+type ChatDeskState = 'LOADING' | 'ACTIVE_CHAT_DESK';
 
 interface ChatBox {
   contactId: string; // Add contactId to ChatBox interface
@@ -43,7 +43,7 @@ export function DraggableMultiChat({
   onActiveChanged,
   maxChats = 4 
 }: DraggableMultiChatProps) {
-  const [chatDeskState, setChatDeskState] = useState<ChatDeskState>('IDENTITY_COLLECTION');
+  const [chatDeskState, setChatDeskState] = useState<ChatDeskState>('ACTIVE_CHAT_DESK');
   const [chatBoxes, setChatBoxes] = useState<ChatBox[]>([]);
   const [dragState, setDragState] = useState<{
     isDragging: boolean;
@@ -61,33 +61,7 @@ export function DraggableMultiChat({
 
   const sseService = getSSEService();
 
-  // New function to handle form submission
-  const handleIdentitySubmit = async (data: { email: string; phone: string; fullName: string }) => {
-    setChatDeskState('LOADING');
-    try {
-      const response = await fetch('/api/chat/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
 
-      if (!response.ok) {
-        throw new Error('Failed to identify contact or start conversation.');
-      }
-
-      const result = await response.json();
-      const { conversationId, contactName, contactId } = result;
-
-      // Add the new chat box and transition to active state
-      addChat(conversationId, contactName, contactId);
-      setChatDeskState('ACTIVE_CHAT_DESK');
-
-    } catch (error) {
-      console.error('Identity submission error:', error);
-      alert('Error starting chat. Please check your network or contact info.');
-      setChatDeskState('IDENTITY_COLLECTION'); // Go back to form on error
-    }
-  };
 
   // Expose methods globally for external access
   useEffect(() => {
@@ -380,15 +354,7 @@ export function DraggableMultiChat({
     };
   }, [chatBoxes, maxChats, activeChatId]);
 
-  // New identity collection flow rendering
-  if (chatDeskState === 'IDENTITY_COLLECTION' || chatDeskState === 'LOADING') {
-    return (
-      <PreChatIdentityForm 
-        onSubmit={handleIdentitySubmit} 
-        isLoading={chatDeskState === 'LOADING'} 
-      />
-    );
-  }
+
 
   // Original rendering logic for when chatBoxes.length === 0 is now inside the ACTIVE_CHAT_DESK state
   if (chatBoxes.length === 0) {
