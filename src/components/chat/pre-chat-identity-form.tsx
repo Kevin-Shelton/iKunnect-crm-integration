@@ -7,11 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 
 interface PreChatIdentityFormProps {
-  onSubmit: (data: { email: string; phone: string; fullName: string }) => void;
+  onStartChat: (data: { fullName: string; email: string; phone: string }) => Promise<void>;
   isLoading: boolean;
 }
 
-export function PreChatIdentityForm({ onSubmit, isLoading }: PreChatIdentityFormProps) {
+export function PreChatIdentityForm({ onStartChat, isLoading }: PreChatIdentityFormProps) {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [fullName, setFullName] = useState('');
@@ -30,7 +30,7 @@ export function PreChatIdentityForm({ onSubmit, isLoading }: PreChatIdentityForm
       return;
     }
 
-    onSubmit({ email: trimmedEmail, phone: trimmedPhone, fullName: trimmedFullName });
+    onStartChat({ email: trimmedEmail, phone: trimmedPhone, fullName: trimmedFullName });
   };
 
   return (
