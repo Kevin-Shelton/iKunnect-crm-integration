@@ -90,13 +90,13 @@ export function AgentAssist({
       const response = await fetch(`/api/conversations/${conversationId}/request-suggestions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+       body: JSON.stringify({ 
           contactId, 
           contactName, 
           contactEmail, 
           contactPhone 
-        });
-      
+        })
+      });
       // Always treat as success - errors are handled gracefully by the API
       const result = await response.json();
       console.log('[Agent Assist] n8n suggestion request result:', result);
