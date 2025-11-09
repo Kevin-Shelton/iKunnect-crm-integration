@@ -160,9 +160,11 @@ export async function POST(request: NextRequest) {
               },
               contact: {
                 id: (payloadObj.contact as any)?.id || convId.replace('conv_', 'customer_'),
-                name: (payloadObj.contact as any)?.name || `Customer ${convId.slice(-4)}`
+                name: (payloadObj.contact as any)?.name || `Customer ${convId.slice(-4)}`,
+                email: (payloadObj.contact as any)?.email,
+                phone: (payloadObj.contact as any)?.phone,
               },
-              locationId: 'DKs2AdSvw0MGWJYyXwk1',
+              locationId: process.env.GHL_LOCATION_ID || 'DKs2AdSvw0MGWJYyXwk1',
               channel: 'webchat',
               timestamp: payloadObj.timestamp || new Date().toISOString(),
               source: 'customer_chat_interface'
