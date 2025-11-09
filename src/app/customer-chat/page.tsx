@@ -66,41 +66,7 @@ export default function CustomerChatPage() {
     }
   }, []);
 
-  
-  const handleStartChat = useCallback(async (data: { fullName: string; email: string; phone: string }) => {
-    setIsLoading(true);
-    setChatState('LOADING');
-    try {
-      const response = await fetch('/api/chat/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
 
-      if (!response.ok) {
-        throw new Error('Failed to start chat: ' + response.statusText);
-      }
-
-      const result = await response.json();
-      
-      // Store IDs and contact details in session storage for persistence
-      sessionStorage.setItem('customer_conversation_id', result.conversationId);
-      sessionStorage.setItem('customer_contact_id', result.contactId);
-      sessionStorage.setItem('customer_contact_email', result.contactEmail || '');
-      sessionStorage.setItem('customer_contact_phone', result.contactPhone || '');
-      
-      setConversationId(result.conversationId);
-      setCustomerId(result.contactId);
-      setChatState('ACTIVE_CHAT');
-
-    } catch (error) {
-      console.error('Error starting chat:', error);
-      setChatState('IDENTITY_COLLECTION');
-      alert('Could not start chat. Please check your details and try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
   
   const [messages, setMessages] = useState([
     {
