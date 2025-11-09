@@ -5,7 +5,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { contactId } = await request.json();
+  const { contactId, contactName, contactEmail, contactPhone } = await request.json() as {
+    contactId: string;
+    contactName?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+  };
 
   
   const locationId = process.env.GHL_LOCATION_ID;
@@ -42,10 +47,10 @@ export async function POST(
         found: true
       },
       contact: {
-        id: conversationId.replace('customer_chat_', 'cnt_').replace('conv_', 'cnt_'),
-        name: 'Agent Assist Request',
-        email: 'agent@ikunnect.com',
-        phone: '+13141236547',
+        id: contactId,
+        name: contactName || 'Agent Assist Request',
+        email: contactEmail,
+        phone: contactPhone,
         created: false
       },
       message: {

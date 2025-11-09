@@ -86,10 +86,12 @@ export async function POST(request: Request) {
     const { conversationId, contactName: finalContactName } = await findOrCreateConversation(contactId);
 
     // 4. Response
-    return NextResponse.json({ 
-      contactId, 
-      conversationId, 
-      contactName: finalContactName 
+    return NextResponse.json({
+      contactId,
+      conversationId,
+      contactName: finalContactName,
+      contactEmail: email,
+      contactPhone: phone
     });
 
   } catch (error) {

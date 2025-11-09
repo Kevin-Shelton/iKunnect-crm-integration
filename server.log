@@ -1,0 +1,144 @@
+
+> agent-chat-desk@2.5.3 dev
+> next dev --turbopack
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'serverComponentsExternalPackages', 'serverExternalPackages' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+ ⚠ `experimental.serverComponentsExternalPackages` has been moved to `serverExternalPackages`. Please update your next.config.js file accordingly.
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /home/ubuntu/package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * /home/ubuntu/iKunnect-crm-integration/package-lock.json
+
+ ⚠ Port 3000 is in use by an unknown process, using available port 3004 instead.
+   ▲ Next.js 15.5.3 (Turbopack)
+   - Local:        http://localhost:3004
+   - Network:      http://169.254.0.21:3004
+   - Experiments (use with caution):
+     · serverExternalPackages
+     · serverComponentsExternalPackages
+
+ ✓ Starting...
+ ✓ Ready in 1504ms
+ ○ Compiling /customer-chat ...
+ ✓ Compiled /customer-chat in 4.6s
+ GET /customer-chat 200 in 5380ms
+ ○ Compiling /favicon.ico ...
+ ⚠ Cross origin request detected from 3004-ioki2ygvx4urkwmi9g4pt-f38a9319.manusvm.computer to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+ ✓ Compiled /favicon.ico in 2.1s
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 2764ms
+ ○ Compiling /api/chat/start ...
+ ✓ Compiled /api/chat/start in 563ms
+ POST /api/chat/start 200 in 918ms
+ ✓ Compiled /api/conversations/[id]/messages in 403ms
+[Supabase] Using memory storage fallback - Supabase not configured or using placeholder values
+[Supabase] To use Supabase, set valid values for: SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_TOKEN, SUPABASE_SERVICE_ROLE_TOKEN
+(node:10241) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[Supabase] Using memory storage fallback - Supabase not configured or using placeholder values
+[Supabase] To use Supabase, set valid values for: SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_TOKEN, SUPABASE_SERVICE_ROLE_TOKEN
+[Messages API] Fetching messages for conversation: conv_contact_new_1762668025196_1762668025196 { limit: 25 }
+[Storage] Using persistent storage for chat history
+(node:10456) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[PersistentStorage] No existing messages file, starting fresh
+[PersistentStorage] Retrieved messages: {
+  conversationId: 'conv_contact_new_1762668025196_1762668025196',
+  messageCount: 0,
+  limit: 25
+}
+[Messages API] Found chat events: 0
+[Messages API] No chat events found for conversation: conv_contact_new_1762668025196_1762668025196
+ GET /api/conversations/conv_contact_new_1762668025196_1762668025196/messages 200 in 2176ms
+[Messages API] Fetching messages for conversation: conv_contact_new_1762668025196_1762668025196 { limit: 25 }
+[Storage] Using persistent storage for chat history
+[PersistentStorage] Retrieved messages: {
+  conversationId: 'conv_contact_new_1762668025196_1762668025196',
+  messageCount: 0,
+  limit: 25
+}
+[Messages API] Found chat events: 0
+[Messages API] No chat events found for conversation: conv_contact_new_1762668025196_1762668025196
+ GET /api/conversations/conv_contact_new_1762668025196_1762668025196/messages 200 in 464ms
+[Supabase] Using memory storage fallback - Supabase not configured or using placeholder values
+[Supabase] To use Supabase, set valid values for: SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_TOKEN, SUPABASE_SERVICE_ROLE_TOKEN
+(node:10469) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[Messages API] Fetching messages for conversation: conv_contact_new_1762668025196_1762668025196 { limit: 25 }
+[Storage] Using persistent storage for chat history
+[PersistentStorage] Retrieved messages: {
+  conversationId: 'conv_contact_new_1762668025196_1762668025196',
+  messageCount: 0,
+  limit: 25
+}
+[Messages API] Found chat events: 0
+[Messages API] No chat events found for conversation: conv_contact_new_1762668025196_1762668025196
+ GET /api/conversations/conv_contact_new_1762668025196_1762668025196/messages 200 in 400ms
+[Supabase] Using memory storage fallback - Supabase not configured or using placeholder values
+[Supabase] To use Supabase, set valid values for: SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_TOKEN, SUPABASE_SERVICE_ROLE_TOKEN
+(node:10476) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[Messages API] Fetching messages for conversation: conv_contact_new_1762668025196_1762668025196 { limit: 25 }
+[Storage] Using persistent storage for chat history
+[PersistentStorage] Retrieved messages: {
+  conversationId: 'conv_contact_new_1762668025196_1762668025196',
+  messageCount: 0,
+  limit: 25
+}
+[Messages API] Found chat events: 0
+[Messages API] No chat events found for conversation: conv_contact_new_1762668025196_1762668025196
+ GET /api/conversations/conv_contact_new_1762668025196_1762668025196/messages 200 in 404ms
+ ○ Compiling /_not-found/page ...
+ ✓ Compiled /_not-found/page in 949ms
+ GET /agent-desk 404 in 1565ms
+[Supabase] Using memory storage fallback - Supabase not configured or using placeholder values
+[Supabase] To use Supabase, set valid values for: SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_TOKEN, SUPABASE_SERVICE_ROLE_TOKEN
+(node:10490) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ GET /agent-desk/chat 404 in 218ms
+ GET /agent-desk 404 in 799ms
+ ○ Compiling / ...
+ GET /agent-desk 404 in 371ms
+ GET /agent-desk 404 in 359ms
+ ✓ Compiled / in 136.3s
+ ⨯ ./iKunnect-crm-integration/src/components/chat/agent-assist.tsx:98:11
+Parsing ecmascript source code failed
+[0m [90m  96 |[39m           contactEmail[33m,[39m 
+ [90m  97 |[39m           contactPhone 
+[31m[1m>[22m[39m[90m  98 |[39m         })[33m;[39m
+ [90m     |[39m           [31m[1m^[22m[39m
+ [90m  99 |[39m       
+ [90m 100 |[39m       [90m// Always treat as success - errors are handled gracefully by the API[39m
+ [90m 101 |[39m       [36mconst[39m result [33m=[39m [36mawait[39m response[33m.[39mjson()[33m;[39m[0m
+
+Expected ',', got ';'
+
+Import traces:
+  Client Component Browser:
+    ./iKunnect-crm-integration/src/components/chat/agent-assist.tsx [Client Component Browser]
+    ./iKunnect-crm-integration/src/components/chat/draggable-multi-chat.tsx [Client Component Browser]
+    ./iKunnect-crm-integration/src/app/page.tsx [Client Component Browser]
+    ./iKunnect-crm-integration/src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./iKunnect-crm-integration/src/components/chat/agent-assist.tsx [Client Component SSR]
+    ./iKunnect-crm-integration/src/components/chat/draggable-multi-chat.tsx [Client Component SSR]
+    ./iKunnect-crm-integration/src/app/page.tsx [Client Component SSR]
+    ./iKunnect-crm-integration/src/app/page.tsx [Server Component]
+
+
+ ○ Compiling /_error ...
+ GET /agent-desk 404 in 12827ms
+ GET /agent-desk 404 in 12857ms
+ GET /agent-desk 404 in 12817ms
+ GET /agent-desk 404 in 12807ms
+ GET /agent-desk 404 in 12799ms
+ GET /agent-desk 404 in 12793ms
+ GET /agent-desk 404 in 12789ms
+ GET /agent-desk 404 in 12785ms
+ GET /agent-desk 404 in 12780ms
+ ✓ Compiled /_error in 71.8s

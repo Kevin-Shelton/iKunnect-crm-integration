@@ -14,6 +14,8 @@ import { getSSEService } from '@/lib/sse-service';
 type ChatDeskState = 'LOADING' | 'ACTIVE_CHAT_DESK';
 
 interface ChatBox {
+  contactEmail?: string;
+  contactPhone?: string;
   contactId: string; // Add contactId to ChatBox interface
   id: string;
   conversationId: string;
@@ -85,7 +87,7 @@ export function DraggableMultiChat({
   };
 
   // Add a new chat box
-  const addChat = (conversationId: string, contactName: string, contactId: string) => {
+  const addChat = (conversationId: string, contactName: string, contactId: string, contactEmail?: string, contactPhone?: string) => {
     if (chatBoxes.length >= maxChats) {
       alert(`Maximum of ${maxChats} chats allowed. Please close a chat first.`);
       return false;
@@ -103,6 +105,8 @@ export function DraggableMultiChat({
     
     const newChat: ChatBox = {
       contactId,
+      contactEmail,
+      contactPhone,
       id: chatId,
       conversationId,
       contactName,
@@ -513,6 +517,9 @@ export function DraggableMultiChat({
                   <AgentAssist
                     contactId={chat.contactId}
                   conversationId={chat.conversationId}
+                  contactName={chat.contactName}
+                  contactEmail={chat.contactEmail}
+                  contactPhone={chat.contactPhone}
                   isActive={chat.agentAssistActive}
                   onSuggestionSelect={(suggestion) => {
                     // Insert suggestion into the reply field

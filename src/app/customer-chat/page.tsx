@@ -16,10 +16,14 @@ export default function CustomerChatPage() {
     if (typeof window !== 'undefined') {
       const existingConvId = sessionStorage.getItem('customer_conversation_id');
       const existingContactId = sessionStorage.getItem('customer_contact_id');
+      const existingContactEmail = sessionStorage.getItem('customer_contact_email');
+      const existingContactPhone = sessionStorage.getItem('customer_contact_phone');
       
-      if (existingConvId && existingContactId) {
+      if (existingConvId && existingContactId && existingContactEmail && existingContactPhone) {
         setConversationId(existingConvId);
         setCustomerId(existingContactId);
+        // No need to set email/phone state here, as they are only needed for the Agent Desk
+        setChatState('ACTIVE_CHAT');
         setChatState('ACTIVE_CHAT');
       }
     }
@@ -41,9 +45,11 @@ export default function CustomerChatPage() {
 
       const result = await response.json();
       
-      // Store IDs in session storage for persistence
+      // Store IDs and contact details in session storage for persistence
       sessionStorage.setItem('customer_conversation_id', result.conversationId);
       sessionStorage.setItem('customer_contact_id', result.contactId);
+      sessionStorage.setItem('customer_contact_email', result.contactEmail || '');
+      sessionStorage.setItem('customer_contact_phone', result.contactPhone || '');
       
       setConversationId(result.conversationId);
       setCustomerId(result.contactId);

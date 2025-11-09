@@ -19,6 +19,9 @@ import {
 interface AgentAssistProps {
   conversationId: string;
   contactId: string; // New prop for the contact ID
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
   isActive: boolean;
   onSuggestionSelect: (suggestion: string) => void;
   onToggle: () => void;
@@ -35,6 +38,9 @@ interface Suggestion {
 export function AgentAssist({ 
   conversationId, 
   contactId, // Use the new prop
+  contactName,
+  contactEmail,
+  contactPhone,
   isActive, 
   onSuggestionSelect, 
   onToggle 
@@ -84,8 +90,12 @@ export function AgentAssist({
       const response = await fetch(`/api/conversations/${conversationId}/request-suggestions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contactId }), // Pass contactId in the body
-      });
+        body: JSON.stringify({ 
+          contactId, 
+          contactName, 
+          contactEmail, 
+          contactPhone 
+        });
       
       // Always treat as success - errors are handled gracefully by the API
       const result = await response.json();
