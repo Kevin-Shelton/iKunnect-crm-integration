@@ -90,7 +90,8 @@ export async function POST(request: Request) {
       conversationId,
   contactName,
       contactEmail: email,
-      contactPhone: phone
+      contactPhone: phone,
+      initialMessage: 'Customer started a new chat.' // Add initial message to trigger webhook
     });
 
   } catch (error) {

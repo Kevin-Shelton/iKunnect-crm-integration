@@ -55,6 +55,30 @@ export default function CustomerChatPage() {
       
       setConversationId(result.conversationId);
       setCustomerId(result.contactId);
+      
+      // --- NEW LOGIC: Send Initial Message to Trigger Webhook ---
+      if (result.initialMessage) {
+        await fetch('/api/chat-events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: result.initialMessage,
+            type: 'inbound',
+            channel: 'webchat',
+            conversation: { id: result.conversationId },
+            contact: { 
+              id: result.contactId,
+              name: result.contactName,
+              email: result.contactEmail,
+              phone: result.contactPhone,
+            },
+            timestamp: new Date().toISOString(),
+            source: 'customer_chat_start'
+          })
+        }).catch(err => console.error('Failed to send initial message to chat-events:', err));
+      }
+      // --- END NEW LOGIC ---
+
       setChatState('ACTIVE_CHAT');
 
     } catch (error) {
