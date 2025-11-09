@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getGHLIntegration } from '@/lib/ghl-integration';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { contactId } = await request.json();
-) {
+
+  const ghlIntegration = getGHLIntegration();
+  const locationId = ghlIntegration.locationId;
+
   try {
     const { id: conversationId } = await params;
     
@@ -25,13 +29,13 @@ export async function POST(
     const n8nPayload = {
       conversationId,
       channel: 'webchat', // Required to trigger suggestion path
-      locationId: 'DKs2AdSvw0MGWJYyXwk1',
+      locationId,
       conversation: {
         id: conversationId,
         found: true
       },
       contact: {
-        id: contactId,
+        id: conversationId.replace('customer_chat_', 'cnt_').replace('conv_', 'cnt_'),
         name: 'Agent Assist Request',
         email: 'agent@ikunnect.com',
         phone: '+13141236547',
