@@ -145,7 +145,10 @@ export async function POST(request: NextRequest) {
       });
       eventCount++;
 
-      // If this is a customer message from the customer chat interface, trigger n8n workflow
+      // N8N webhook integration replaced with direct GHL MCP API integration
+      // Messages are now sent directly to GHL via /api/ghl-send-message
+      // Keeping this code commented for potential rollback
+      /*
       if ((payloadObj.source === 'customer_chat' || payloadObj.source === 'customer_chat_start') && messageText && validType === 'inbound') {
         try {
           // Use the existing n8n webhook URL (same as ai-draft route)
