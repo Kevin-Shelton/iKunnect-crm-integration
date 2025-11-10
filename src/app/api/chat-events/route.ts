@@ -186,6 +186,7 @@ export async function POST(request: NextRequest) {
           console.warn('[Chat Events] Failed to trigger n8n webhook:', error);
         }
       }
+      */
     }
 
     tapPush({ 

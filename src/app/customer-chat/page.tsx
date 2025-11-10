@@ -156,32 +156,21 @@ export default function CustomerChatPage() {
     setNewMessage('');
 
     try {
-      // Store message in database using existing chat-events API (same as n8n does)
-      const response = await fetch('/api/chat-events', {
+      // Send message directly to GHL via MCP API
+      const response = await fetch('/api/ghl-send-message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          text: messageText,
-          type: 'inbound',
-          channel: 'webchat',
-          conversation: {
-            id: conversationId // Now correctly uses state
-          },
-          contact: {
-            id: customerId, // Now correctly uses state
-            name: sessionStorage.getItem('customer_contact_name') || undefined,
-            email: sessionStorage.getItem('customer_contact_email') || undefined,
-            phone: sessionStorage.getItem('customer_contact_phone') || undefined,
-          },
-          timestamp: new Date().toISOString(),
-          source: 'customer_chat'
+          name: sessionStorage.getItem('customer_contact_name') || 'Customer',
+          email: sessionStorage.getItem('customer_contact_email') || '',
+          message: messageText
         })
       });
 
       if (!response.ok) {
-        console.error('Failed to store message:', response.statusText);
+        console.error('Failed to send message:', response.statusText);
         const errorMessage = {
           id: (Date.now() + 1).toString(),
           text: 'Sorry, there was an error sending your message. Please try again.',
@@ -190,18 +179,40 @@ export default function CustomerChatPage() {
         };
         setMessages(prev => [...prev, errorMessage]);
       } else {
-        console.log('Message stored successfully');
-        // Show confirmation - n8n will process and respond via existing webhook
-        const confirmMessage = {
-          id: (Date.now() + 1).toString(),
-          text: 'Message sent. An agent will respond shortly.',
-          sender: 'system',
-          timestamp: new Date().toISOString()
-        };
-        setMessages(prev => [...prev, confirmMessage]);
+        const result = await response.json();
+        console.log('Message sent to GHL successfully:', result);
         
-        // TODO: Add polling or WebSocket to get real-time responses from n8n
-        // For now, customer will see responses when they refresh or via agent interface
+        // Update conversationId if we got a new one from GHL
+        if (result.conversationId && result.conversationId !== conversationId) {
+          setConversationId(result.conversationId);
+          sessionStorage.setItem('customer_conversation_id', result.conversationId);
+        }
+        
+        // Update contactId if we got one from GHL
+        if (result.contactId && result.contactId !== customerId) {
+          setCustomerId(result.contactId);
+          sessionStorage.setItem('customer_contact_id', result.contactId);
+        }
+        
+        // Also store in local database for agent desk visibility
+        await fetch('/api/chat-events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: messageText,
+            type: 'inbound',
+            channel: 'webchat',
+            conversation: { id: result.conversationId || conversationId },
+            contact: {
+              id: result.contactId || customerId,
+              name: sessionStorage.getItem('customer_contact_name') || undefined,
+              email: sessionStorage.getItem('customer_contact_email') || undefined,
+              phone: sessionStorage.getItem('customer_contact_phone') || undefined,
+            },
+            timestamp: new Date().toISOString(),
+            source: 'customer_chat'
+          })
+        }).catch(err => console.warn('Failed to store message locally:', err));
       }
     } catch (error) {
       console.error('Error sending message:', error);
