@@ -30,6 +30,14 @@ export default function Home() {
     try {
       console.log('Attempting to claim conversation:', conversationId);
       
+      // Find the conversation to get contact details BEFORE claiming
+      const conversation = conversations.all?.find((conv: Conversation) => conv.id === conversationId);
+      if (!conversation) {
+        console.error('Conversation not found in local data:', conversationId);
+        alert('Conversation not found. Please refresh and try again.');
+        return;
+      }
+      
       const response = await fetch('/api/chat/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -42,17 +50,31 @@ export default function Home() {
       if (data.success) {
         console.log('Chat claimed successfully');
         
-        // Find the conversation to get contact name
-        const conversation = conversations.all?.find((conv: Conversation) => conv.id === conversationId);
-        const contactName = conversation?.contactName || `Customer ${conversationId.slice(-4)}`;
+        // Extract contact details from conversation
+        const contactName = conversation.contactName || conversation.fullName || `Customer ${conversationId.slice(-4)}`;
+        const contactId = conversation.contactId || conversationId.replace('conv_', 'contact_');
+        const contactEmail = conversation.email;
+        const contactPhone = conversation.phone;
         
-        // Add to draggable multi-chat interface
+        console.log('Adding chat with details:', { conversationId, contactName, contactId, contactEmail, contactPhone });
+        
+        // Add to draggable multi-chat interface with full contact details
         if ((window as any).draggableMultiChat) {
-          const added = (window as any).draggableMultiChat.addChat(conversationId, contactName);
+          const added = (window as any).draggableMultiChat.addChat(
+            conversationId, 
+            contactName, 
+            contactId,
+            contactEmail,
+            contactPhone
+          );
           if (!added) {
             alert('Cannot add more chats. Maximum of 4 simultaneous chats allowed.');
             return;
           }
+          console.log('Chat window added successfully');
+        } else {
+          console.error('DraggableMultiChat not available on window object');
+          alert('Chat interface not ready. Please refresh the page.');
         }
         
         refreshConversations(); // Refresh the conversation list
@@ -225,10 +247,22 @@ export default function Home() {
       
       // Add to draggable multi-chat interface for viewing
       const conversation = conversations.all?.find((conv: Conversation) => conv.id === conversationId);
-      const contactName = conversation?.contactName || `Customer ${conversationId.slice(-4)}`;
+      if (!conversation) {
+        alert('Conversation not found. Please refresh and try again.');
+        return;
+      }
+      
+      const contactName = conversation.contactName || conversation.fullName || `Customer ${conversationId.slice(-4)}`;
+      const contactId = conversation.contactId || conversationId.replace('conv_', 'contact_');
       
       if ((window as any).draggableMultiChat) {
-        const added = (window as any).draggableMultiChat.addChat(conversationId, contactName);
+        const added = (window as any).draggableMultiChat.addChat(
+          conversationId, 
+          contactName,
+          contactId,
+          conversation.email,
+          conversation.phone
+        );
         if (!added) {
           alert('Cannot view chat. Maximum of 4 simultaneous chats allowed. Please close a chat first.');
           return;
@@ -302,11 +336,20 @@ export default function Home() {
     if (conversation) {
       setSelectedContact(contactData);
       
-      // Open in draggable multi-chat interface
-      const contactName = conversation.contactName || `Customer ${conversationId.slice(-4)}`;
+      // Open in draggable multi-chat interface with full contact details
+      const contactName = conversation.contactName || conversation.fullName || `Customer ${conversationId.slice(-4)}`;
+      const contactId = conversation.contactId || conversationId.replace('conv_', 'contact_');
+      const contactEmail = conversation.email;
+      const contactPhone = conversation.phone;
       
       if ((window as any).draggableMultiChat) {
-        const added = (window as any).draggableMultiChat.addChat(conversationId, contactName);
+        const added = (window as any).draggableMultiChat.addChat(
+          conversationId, 
+          contactName,
+          contactId,
+          contactEmail,
+          contactPhone
+        );
         if (!added) {
           alert('Cannot open chat. Maximum of 4 simultaneous chats allowed. Please close a chat first.');
           return;
@@ -387,7 +430,15 @@ export default function Home() {
               // Also show in draggable multi-chat if not already there
               const conversation = conversations.all?.find((conv: Conversation) => conv.id === conversationId);
               if (conversation && (window as any).draggableMultiChat) {
-                (window as any).draggableMultiChat.addChat(conversationId, conversation.contactName);
+                const contactName = conversation.contactName || conversation.fullName || `Customer ${conversationId.slice(-4)}`;
+                const contactId = conversation.contactId || conversationId.replace('conv_', 'contact_');
+                (window as any).draggableMultiChat.addChat(
+                  conversationId, 
+                  contactName,
+                  contactId,
+                  conversation.email,
+                  conversation.phone
+                );
               }
             }}
             onConversationClaim={claimChat}
