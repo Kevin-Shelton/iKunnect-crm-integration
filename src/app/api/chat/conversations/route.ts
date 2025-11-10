@@ -49,13 +49,25 @@ export async function GET() {
 
     // Transform to expected format for the UI
     const transformedConversations = await Promise.all(conversations.map(async (conv) => {
-      // Extract customer name from conversation data using GHL integration
+      // Extract customer name and contact details from conversation data using GHL integration
       const customerName = await extractCustomerNameFromConversation(conv);
+      
+      // Import customer identification service to get full contact details
+      const { customerIdentification } = await import('@/lib/customer-identification');
+      const customerInfo = customerIdentification.getCustomerInfo(conv.id);
+      
+      // Extract email and phone from the contact if available
+      const email = customerInfo.contact?.email;
+      const phone = customerInfo.contact?.phone;
+      const contactId = customerInfo.contact?.id || `contact_${conv.id}`;
       
       return {
         id: conv.id,
-        contactId: `contact_${conv.id}`,
+        contactId: contactId,
         contactName: customerName,
+        fullName: customerName,
+        email: email,
+        phone: phone,
         lastMessageBody: conv.lastMessage?.text || '',
         lastMessageDate: conv.lastMessage?.created_at || new Date().toISOString(),
         unreadCount: conv.messageCount,

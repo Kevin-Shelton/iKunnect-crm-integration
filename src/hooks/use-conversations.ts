@@ -88,7 +88,15 @@ export function useConversations(): UseConversationsReturn {
       setTimeout(() => {
         const conversation = conversations.all.find(c => c.id === conversationId);
         if (conversation && (window as any).draggableMultiChat) {
-          (window as any).draggableMultiChat.addChat(conversationId, conversation.contactName);
+          const contactName = conversation.contactName || conversation.fullName || `Customer ${conversationId.slice(-4)}`;
+          const contactId = conversation.contactId || conversationId.replace('conv_', 'contact_');
+          (window as any).draggableMultiChat.addChat(
+            conversationId,
+            contactName,
+            contactId,
+            conversation.email,
+            conversation.phone
+          );
         }
       }, 500); // Small delay to ensure UI updates
     } catch (err) {
