@@ -67,6 +67,10 @@ export function DraggableMultiChat({
 
   // Expose methods globally for external access
   useEffect(() => {
+    console.log('=== DraggableMultiChat: Registering on window ===');
+    console.log('chatBoxes count:', chatBoxes.length);
+    console.log('activeChatId:', activeChatId);
+    
     (window as any).draggableMultiChat = {
       addChat,
       removeChat,
@@ -74,7 +78,11 @@ export function DraggableMultiChat({
       activeChatId
     };
     
+    console.log('window.draggableMultiChat set:', !!(window as any).draggableMultiChat);
+    console.log('addChat function type:', typeof addChat);
+    
     return () => {
+      console.log('=== DraggableMultiChat: Cleaning up window registration ===');
       delete (window as any).draggableMultiChat;
     };
   }, [chatBoxes, activeChatId]);
@@ -88,13 +96,21 @@ export function DraggableMultiChat({
 
   // Add a new chat box
   const addChat = (conversationId: string, contactName: string, contactId: string, contactEmail?: string, contactPhone?: string) => {
+    console.log('=== addChat CALLED ===');
+    console.log('Parameters:', { conversationId, contactName, contactId, contactEmail, contactPhone });
+    console.log('Current chatBoxes.length:', chatBoxes.length);
+    console.log('maxChats:', maxChats);
+    
     if (chatBoxes.length >= maxChats) {
+      console.log('Max chats reached!');
       alert(`Maximum of ${maxChats} chats allowed. Please close a chat first.`);
       return false;
     }
 
     const existingChat = chatBoxes.find(chat => chat.conversationId === conversationId);
+    console.log('Existing chat found?', !!existingChat);
     if (existingChat) {
+      console.log('Bringing existing chat to front:', existingChat.id);
       // Bring existing chat to front and make it active
       bringToFront(existingChat.id);
       setActiveChatId(existingChat.id);
@@ -121,15 +137,22 @@ export function DraggableMultiChat({
       agentAssistActive: false // Agent Assist starts disabled
     };
 
-    setChatBoxes(prev => [...prev, newChat]);
+    console.log('Creating new chat:', newChat);
+    setChatBoxes(prev => {
+      const updated = [...prev, newChat];
+      console.log('Updated chatBoxes:', updated);
+      return updated;
+    });
     setNextZIndex(prev => prev + 1);
     
     // Set as active chat if it's the first one
     if (chatBoxes.length === 0) {
+      console.log('Setting as active chat (first chat)');
       setActiveChatId(newChat.id);
       onActiveChanged?.(conversationId);
     }
 
+    console.log('=== addChat COMPLETE - returning true ===');
     return true;
   };
 

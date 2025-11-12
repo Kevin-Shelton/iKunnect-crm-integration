@@ -28,7 +28,10 @@ export default function Home() {
   // Claim chat functionality
   const claimChat = async (conversationId: string) => {
     try {
+      console.log('=== CLAIM CHAT DEBUG START ===');
       console.log('Attempting to claim conversation:', conversationId);
+      console.log('window.draggableMultiChat exists?', !!(window as any).draggableMultiChat);
+      console.log('window.draggableMultiChat value:', (window as any).draggableMultiChat);
       
       // Find the conversation to get contact details BEFORE claiming
       const conversation = conversations.all?.find((conv: Conversation) => conv.id === conversationId);
@@ -37,6 +40,7 @@ export default function Home() {
         alert('Conversation not found. Please refresh and try again.');
         return;
       }
+      console.log('Found conversation:', conversation);
       
       const response = await fetch('/api/chat/claim', {
         method: 'POST',
@@ -59,7 +63,11 @@ export default function Home() {
         console.log('Adding chat with details:', { conversationId, contactName, contactId, contactEmail, contactPhone });
         
         // Add to draggable multi-chat interface with full contact details
+        console.log('Checking for draggableMultiChat...');
         if ((window as any).draggableMultiChat) {
+          console.log('draggableMultiChat found! Calling addChat...');
+          console.log('Parameters:', { conversationId, contactName, contactId, contactEmail, contactPhone });
+          
           const added = (window as any).draggableMultiChat.addChat(
             conversationId, 
             contactName, 
@@ -67,6 +75,10 @@ export default function Home() {
             contactEmail,
             contactPhone
           );
+          
+          console.log('addChat returned:', added);
+          console.log('Current chatBoxes:', (window as any).draggableMultiChat.chatBoxes);
+          
           if (!added) {
             alert('Cannot add more chats. Maximum of 4 simultaneous chats allowed.');
             return;
@@ -74,8 +86,10 @@ export default function Home() {
           console.log('Chat window added successfully');
         } else {
           console.error('DraggableMultiChat not available on window object');
+          console.error('window keys:', Object.keys(window));
           alert('Chat interface not ready. Please refresh the page.');
         }
+        console.log('=== CLAIM CHAT DEBUG END ===');
         
         refreshConversations(); // Refresh the conversation list
         setSelectedConversationId(conversationId); // Auto-select the claimed conversation
