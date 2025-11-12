@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SimpleMessages } from './simple-messages';
 import { AgentReply } from './agent-reply';
 import { AgentAssist } from './agent-assist';
@@ -63,30 +63,6 @@ export function DraggableMultiChat({
 
   const sseService = getSSEService();
 
-
-
-  // Expose methods globally for external access
-  useEffect(() => {
-    console.log('=== DraggableMultiChat: Registering on window ===');
-    console.log('chatBoxes count:', chatBoxes.length);
-    console.log('activeChatId:', activeChatId);
-    
-    (window as any).draggableMultiChat = {
-      addChat,
-      removeChat,
-      chatBoxes,
-      activeChatId
-    };
-    
-    console.log('window.draggableMultiChat set:', !!(window as any).draggableMultiChat);
-    console.log('addChat function type:', typeof addChat);
-    
-    return () => {
-      console.log('=== DraggableMultiChat: Cleaning up window registration ===');
-      delete (window as any).draggableMultiChat;
-    };
-  }, [chatBoxes, activeChatId]);
-
   // Default chat box size and positions
   const defaultSize = { width: 400, height: 500 };
   const getDefaultPosition = (index: number) => {
@@ -94,8 +70,18 @@ export function DraggableMultiChat({
     return { x: 100 + offset, y: 100 + offset };
   };
 
-  // Add a new chat box
-  const addChat = (conversationId: string, contactName: string, contactId: string, contactEmail?: string, contactPhone?: string) => {
+  // Bring chat to front - wrapped in useCallback
+  const bringToFront = useCallback((chatId: string) => {
+    setChatBoxes(prev => prev.map(chat => 
+      chat.id === chatId 
+        ? { ...chat, zIndex: nextZIndex }
+        : chat
+    ));
+    setNextZIndex(prev => prev + 1);
+  }, [nextZIndex]);
+
+  // Add a new chat box - wrapped in useCallback to prevent stale closures
+  const addChat = useCallback((conversationId: string, contactName: string, contactId: string, contactEmail?: string, contactPhone?: string) => {
     console.log('=== addChat CALLED ===');
     console.log('Parameters:', { conversationId, contactName, contactId, contactEmail, contactPhone });
     console.log('Current chatBoxes.length:', chatBoxes.length);
@@ -154,7 +140,7 @@ export function DraggableMultiChat({
 
     console.log('=== addChat COMPLETE - returning true ===');
     return true;
-  };
+  }, [chatBoxes, maxChats, nextZIndex, onActiveChanged, bringToFront, setActiveChatId]);
 
   // Remove a chat box
   const removeChat = (chatId: string) => {
@@ -173,22 +159,12 @@ export function DraggableMultiChat({
           onActiveChanged?.(remainingChats[0].conversationId);
         } else {
           setActiveChatId(null);
+
           onActiveChanged?.(null);
         }
       }
     }
   };
-
-  // Bring chat to front
-  const bringToFront = (chatId: string) => {
-    setChatBoxes(prev => prev.map(chat => 
-      chat.id === chatId 
-        ? { ...chat, zIndex: nextZIndex }
-        : chat
-    ));
-    setNextZIndex(prev => prev + 1);
-  };
-
   // Set active chat
   const setActiveChatHandler = (chatId: string) => {
     const chat = chatBoxes.find(c => c.id === chatId);
@@ -236,6 +212,28 @@ export function DraggableMultiChat({
       }
     }
   };
+
+  // Expose methods globally for external access
+  useEffect(() => {
+    console.log('=== DraggableMultiChat: Registering on window ===');
+    console.log('chatBoxes count:', chatBoxes.length);
+    console.log('activeChatId:', activeChatId);
+    
+    (window as any).draggableMultiChat = {
+      addChat,
+      removeChat,
+      chatBoxes,
+      activeChatId
+    };
+    
+    console.log('window.draggableMultiChat set:', !!(window as any).draggableMultiChat);
+    console.log('addChat function type:', typeof addChat);
+    
+    return () => {
+      console.log('=== DraggableMultiChat: Cleaning up window registration ===');
+      delete (window as any).draggableMultiChat;
+    };
+  }, [chatBoxes, activeChatId, addChat, removeChat]);
 
   // Mouse event handlers for dragging
   const handleMouseDown = (e: React.MouseEvent, chatId: string, action: 'drag' | 'resize') => {
