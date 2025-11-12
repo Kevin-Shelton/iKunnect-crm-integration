@@ -156,16 +156,22 @@ export default function CustomerChatPage() {
     setNewMessage('');
 
     try {
-      // Send message directly to GHL via MCP API
-      const response = await fetch('/api/ghl-send-message', {
+      // Get n8n webhook URL from environment or use production default
+      const n8nWebhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || 'https://invictusbpo.app.n8n.cloud/webhook/ghl-chat-inbound';
+      
+      // Send message directly to n8n webhook
+      const response = await fetch(n8nWebhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: sessionStorage.getItem('customer_contact_name') || 'Customer',
+          fullName: sessionStorage.getItem('customer_contact_name') || 'Customer',
           email: sessionStorage.getItem('customer_contact_email') || '',
-          message: messageText
+          phone: sessionStorage.getItem('customer_contact_phone') || '',
+          message: messageText,
+          source: 'webchat',
+          sessionId: conversationId || `session_${Date.now()}`
         })
       });
 
@@ -180,18 +186,20 @@ export default function CustomerChatPage() {
         setMessages(prev => [...prev, errorMessage]);
       } else {
         const result = await response.json();
-        console.log('Message sent to GHL successfully:', result);
+        console.log('Message sent via n8n successfully:', result);
         
-        // Update conversationId if we got a new one from GHL
-        if (result.conversationId && result.conversationId !== conversationId) {
-          setConversationId(result.conversationId);
-          sessionStorage.setItem('customer_conversation_id', result.conversationId);
-        }
-        
-        // Update contactId if we got one from GHL
-        if (result.contactId && result.contactId !== customerId) {
-          setCustomerId(result.contactId);
-          sessionStorage.setItem('customer_contact_id', result.contactId);
+        // Update conversationId if we got a new one from n8n response
+        if (result.success && result.data) {
+          if (result.data.conversationId && result.data.conversationId !== conversationId) {
+            setConversationId(result.data.conversationId);
+            sessionStorage.setItem('customer_conversation_id', result.data.conversationId);
+          }
+          
+          // Update contactId if we got one from n8n response
+          if (result.data.contactId && result.data.contactId !== customerId) {
+            setCustomerId(result.data.contactId);
+            sessionStorage.setItem('customer_contact_id', result.data.contactId);
+          }
         }
         
         // Also store in local database for agent desk visibility
@@ -202,9 +210,9 @@ export default function CustomerChatPage() {
             text: messageText,
             type: 'inbound',
             channel: 'webchat',
-            conversation: { id: result.conversationId || conversationId },
+            conversation: { id: result.data?.conversationId || conversationId },
             contact: {
-              id: result.contactId || customerId,
+              id: result.data?.contactId || customerId,
               name: sessionStorage.getItem('customer_contact_name') || undefined,
               email: sessionStorage.getItem('customer_contact_email') || undefined,
               phone: sessionStorage.getItem('customer_contact_phone') || undefined,
