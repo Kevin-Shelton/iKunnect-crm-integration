@@ -1,35 +1,11 @@
 import { NextResponse } from 'next/server';
+import { upsertContact, getOrCreateConversation, getDefaultLocationId } from '@/lib/ghl-api-client';
 
 // Define the expected request body structure
 interface StartChatRequestBody {
   email: string;
   phone: string;
   fullName: string;
-}
-
-// Helper function to find the most recent open conversation
-async function findOrCreateConversation(contactId: string): Promise<{ conversationId: string }> {
-  // In a real-world scenario, this would query GHL/MCP for open conversations
-  // For this implementation, we will simulate the logic:
-  
-  // 1. Attempt to find an existing open conversation for the contact
-  // This is a placeholder for a complex MCP query
-  const existingConversationId = null; // Assume no existing open conversation for simplicity
-
-  if (existingConversationId) {
-    // Placeholder for getting the contact's name from the existing conversation 
-    return { conversationId: existingConversationId };
-  }
-
-  // 2. If no open conversation is found, create a new one
-  // In a real GHL integration, this would be a specific API call.
-  // For now, we will generate a unique ID to simulate a new conversation.
-  const newConversationId = `conv_${contactId}_${Date.now()}`;
-  
-  // Placeholder for getting the contact's name (which was set during contact creation/lookup)
-  // The actual contactName is determined in the POST function. 
-
-  return { conversationId: newConversationId };
 }
 
 export async function POST(request: Request) {
@@ -42,58 +18,46 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email or phone number is required.' }, { status: 400 });
     }
 
+    console.log('[Chat Start] Starting chat for:', { phone, email, fullName });
 
-    const locationId = process.env.GHL_LOCATION_ID; // Get the configured Location ID from env
+    // 2. Get location ID
+    const locationId = await getDefaultLocationId();
+    console.log('[Chat Start] Using location ID:', locationId);
 
-    if (!locationId) {
-      return NextResponse.json(
-        { error: 'GHL_LOCATION_ID environment variable is not configured' },
-        { status: 500 }
-      );
-    }
-
-
-    // 2. Contact Lookup/Creation
-    let contactId: string | null = null;
-    let contactName: string = fullName || 'New Contact';
-
-    // --- Placeholder for actual MCP Contact Search/Create logic ---
-    // In a real app, this would involve a sequence of MCP calls:
-    // 1. Search by email/phone
-    // 2. If found, use existing contactId and name
-    // 3. If not found, create a new contact with provided details and get new contactId
-
-    // SIMULATION:
-    if (email === 'test@example.com' || phone === '5555555555') {
-        // Simulate finding an existing contact
-        contactId = 'contact_existing_123';
-        contactName = fullName || 'New Contact';
-    } else {
-        // Simulate creating a new contact
-        contactId = `contact_new_${Date.now()}`;
-        contactName = fullName || 'New Contact';
-    }
+    // 3. Create or update contact in GHL
+    const { contactId } = await upsertContact({
+      locationId,
+      phone,
+      email,
+      name: fullName,
+    });
     
-    if (!contactId) {
-        return NextResponse.json({ error: 'Failed to create or find contact.' }, { status: 500 });
-    }
-    // --------------------------------------------------------------
+    console.log('[Chat Start] Contact created/updated:', contactId);
 
-    // 3. Conversation Lookup/Creation
-    const { conversationId } = await findOrCreateConversation(contactId);
+    // 4. Create or get existing conversation in GHL
+    const { conversationId } = await getOrCreateConversation({
+      locationId,
+      contactId,
+    });
+    
+    console.log('[Chat Start] Conversation created/found:', conversationId);
 
-    // 4. Response
+    // 5. Response with real GHL IDs
     return NextResponse.json({
       contactId,
       conversationId,
-  contactName,
+      contactName: fullName || 'New Contact',
       contactEmail: email,
       contactPhone: phone,
-      initialMessage: 'Customer started a new chat.' // Add initial message to trigger webhook
+      initialMessage: 'Customer started a new chat.'
     });
 
   } catch (error) {
-    console.error('Error in /api/chat/start:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error('[Chat Start] Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ 
+      error: 'Failed to start chat',
+      details: errorMessage 
+    }, { status: 500 });
   }
 }
