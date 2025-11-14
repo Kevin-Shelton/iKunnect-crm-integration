@@ -122,9 +122,21 @@ export async function POST(request: NextRequest) {
 
     // Save to Supabase chat_events table
     try {
+      // Determine event type based on sender
+      let dbType: 'inbound' | 'agent_send' | 'ai_agent_send' | 'human_agent_send';
+      if (sender === 'contact') {
+        dbType = 'inbound';
+      } else if (sender === 'ai_agent') {
+        dbType = 'ai_agent_send';
+      } else if (sender === 'human_agent') {
+        dbType = 'human_agent_send';
+      } else {
+        dbType = 'agent_send'; // fallback
+      }
+
       const chatEvent = {
         conversation_id: finalConversationId,
-        type: sender === 'contact' ? 'inbound' as const : 'agent_send' as const,
+        type: dbType,
         message_id: messageId,
         text: messageText,
         payload: {

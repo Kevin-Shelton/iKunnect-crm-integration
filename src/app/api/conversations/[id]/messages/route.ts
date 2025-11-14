@@ -37,15 +37,34 @@ export async function GET(
 
     // Transform chat events to messages - DIRECT MAPPING
     const messages = chatEvents
-      .filter((event: any) => event.type === 'inbound' || event.type === 'agent_send')
-      .map((event: any) => ({
-        id: event.message_id || event.id,
-        text: event.text || '', // DIRECT MAPPING - THIS IS THE KEY FIX
-        sender: event.type === 'inbound' ? 'customer' : 'agent',
-        timestamp: event.created_at,
-        type: event.type === 'inbound' ? 'inbound' : 'outbound',
-        contactId: conversationId
-      }));
+      .filter((event: any) => 
+        event.type === 'inbound' || 
+        event.type === 'agent_send' || 
+        event.type === 'ai_agent_send' || 
+        event.type === 'human_agent_send'
+      )
+      .map((event: any) => {
+        // Determine sender type
+        let sender: 'customer' | 'agent' | 'ai_agent' | 'human_agent';
+        if (event.type === 'inbound') {
+          sender = 'customer';
+        } else if (event.type === 'ai_agent_send') {
+          sender = 'ai_agent';
+        } else if (event.type === 'human_agent_send') {
+          sender = 'human_agent';
+        } else {
+          sender = 'agent'; // fallback for legacy 'agent_send' type
+        }
+
+        return {
+          id: event.message_id || event.id,
+          text: event.text || '',
+          sender: sender,
+          timestamp: event.created_at,
+          type: event.type === 'inbound' ? 'inbound' : 'outbound',
+          contactId: conversationId
+        };
+      });
 
     console.log('[Messages API Secure] Transformed messages:', {
       messageCount: messages.length,

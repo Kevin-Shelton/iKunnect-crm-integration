@@ -8,7 +8,7 @@ import { AlertCircle, Database, Settings } from 'lucide-react';
 interface Message {
   id: string;
   text: string;
-  sender: 'customer' | 'agent';
+  sender: 'customer' | 'agent' | 'ai_agent' | 'human_agent';
   timestamp: string;
 }
 
@@ -61,10 +61,24 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
         }
         
         console.log(`[SimpleMessages] Loaded ${data.messages.length} messages`);
-        const newMessages = (data.messages || []).map((msg: any) => ({
-          ...msg,
-          sender: msg.sender === 'contact' ? 'customer' : msg.sender === 'human_agent' ? 'agent' : msg.sender
-        }));
+        const newMessages = (data.messages || []).map((msg: any) => {
+          // Map sender types for display
+          let displaySender: 'customer' | 'agent' | 'ai_agent' | 'human_agent';
+          if (msg.sender === 'contact' || msg.sender === 'customer') {
+            displaySender = 'customer';
+          } else if (msg.sender === 'ai_agent') {
+            displaySender = 'ai_agent';
+          } else if (msg.sender === 'human_agent') {
+            displaySender = 'human_agent';
+          } else {
+            displaySender = 'agent'; // fallback for legacy 'agent' type
+          }
+          
+          return {
+            ...msg,
+            sender: displaySender
+          };
+        });
         
         // Check if data actually changed (compare by content, not reference)
         const messagesChanged = JSON.stringify(newMessages) !== JSON.stringify(messages);
@@ -183,32 +197,38 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
 
   return (
     <div className={`flex-1 overflow-y-auto ${compact ? 'p-2 space-y-2' : 'p-4 space-y-4'} ${className}`}>
-      {messages.map((message) => (
+      {messages.map((message) => {
+        // Determine if message is from any agent type
+        const isAgent = message.sender === 'agent' || message.sender === 'ai_agent' || message.sender === 'human_agent';
+        const isAI = message.sender === 'ai_agent';
+        const isHuman = message.sender === 'human_agent';
+        
+        return (
         <div
           key={message.id}
-          className={`flex ${message.sender === 'agent' ? 'justify-end' : 'justify-start'}`}
+          className={`flex ${isAgent ? 'justify-end' : 'justify-start'}`}
         >
           <div className={`flex items-start ${compact ? 'space-x-1 max-w-xs' : 'space-x-2 max-w-xs lg:max-w-md'} ${
-            message.sender === 'agent' ? 'flex-row-reverse space-x-reverse' : ''
+            isAgent ? 'flex-row-reverse space-x-reverse' : ''
           }`}>
             <Avatar className={compact ? "w-6 h-6" : "w-8 h-8"}>
               <AvatarFallback className={
-                message.sender === 'agent' 
+                isAgent
                   ? 'bg-blue-100 text-blue-600' 
                   : 'bg-gray-100 text-gray-600'
               }>
-                {message.sender === 'agent' ? 'A' : 'C'}
+                {isAI ? '🤖' : isHuman ? 'H' : isAgent ? 'A' : 'C'}
               </AvatarFallback>
             </Avatar>
             <div className={`rounded-lg ${compact ? 'px-2 py-1' : 'px-3 py-2'} ${
-              message.sender === 'agent'
+              isAgent
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 text-gray-900'
             }`}>
               <p className={compact ? "text-xs" : "text-sm"}>{message.text}</p>
               {!compact && (
                 <p className={`text-xs mt-1 ${
-                  message.sender === 'agent' ? 'text-blue-100' : 'text-gray-500'
+                  isAgent ? 'text-blue-100' : 'text-gray-500'
                 }`}>
                   {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
                 </p>
@@ -216,7 +236,8 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
