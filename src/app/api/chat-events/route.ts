@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     // Extract conversation ID with proper type handling
     const payloadObj = payload as Record<string, unknown>;
     const conversation = payloadObj?.conversation as Record<string, unknown> | undefined;
-    let convId = conversation?.id as string;
+    let convId: string | null = conversation?.id as string;
     
     // If conversation ID is missing or "unknown", try to generate one from contact info
     if (!convId || convId === 'unknown') {
