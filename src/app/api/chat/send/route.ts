@@ -103,10 +103,30 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // For agent messages, we might want to send to customer via webhook or API
+    // For agent messages, send to customer via GHL API
     if (messageData.sender === 'human_agent') {
-      console.log('[Chat Send] Agent message stored, should be sent to customer via webhook/API');
-      // TODO: Implement customer notification system here
+      console.log('[Chat Send] Agent message - sending to customer via GHL API');
+      
+      try {
+        // Import GHL API client
+        const { sendMessage, getDefaultLocationId } = await import('@/lib/ghl-api-client');
+        
+        // Get location ID
+        const locationId = await getDefaultLocationId();
+        
+        // Send message via GHL API
+        await sendMessage({
+          locationId,
+          conversationId: body.conversationId,
+          message: messageData.text,
+          type: 'SMS', // Default to SMS, can be made configurable
+        });
+        
+        console.log('[Chat Send] Agent message sent to customer via GHL API');
+      } catch (error) {
+        console.error('[Chat Send] Failed to send agent message via GHL API:', error);
+        // Don't fail the whole request - message is still stored locally
+      }
     }
     
     return NextResponse.json({

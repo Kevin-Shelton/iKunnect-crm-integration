@@ -156,17 +156,23 @@ export default function CustomerChatPage() {
     setNewMessage('');
 
     try {
-      // Use the new GHL API 2.0 message sending route
-      const response = await fetch('/api/ghl-api-2.0-send-message', {
+      // Get customer details from session storage
+      const customerPhone = sessionStorage.getItem('customer_contact_phone') || '';
+      const customerEmail = sessionStorage.getItem('customer_contact_email') || '';
+      const customerName = sessionStorage.getItem('customer_contact_name') || '';
+      
+      // Use the new GHL API route that uses OAuth tokens
+      const response = await fetch('/api/chat/send-ghl', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          contactId: customerId, // Use the existing customerId (which is the GHL contactId)
+          phone: customerPhone,
           message: messageText,
-          type: 'Webchat', // GHL API 2.0 type for webchat
-          locationId: process.env.NEXT_PUBLIC_GHL_LOCATION_ID || 'DEFAULT_LOCATION_ID', // Placeholder for locationId
+          email: customerEmail,
+          name: customerName,
+          conversationId: conversationId,
         })
       });
 
