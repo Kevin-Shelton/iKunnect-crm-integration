@@ -17,7 +17,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('[Send GHL] ========================================');
     console.log('[Send GHL] Received message request:', { phone, conversationId, message: message.substring(0, 50) + '...' });
+    console.log('[Send GHL] conversationId provided?', !!conversationId);
+    console.log('[Send GHL] conversationId value:', conversationId);
 
     // Get the location ID (in a multi-location setup, this would come from the user's context)
     const locationId = await getDefaultLocationId();
@@ -26,6 +29,7 @@ export async function POST(request: NextRequest) {
     let result;
     
     // If conversationId is provided, reuse it (subsequent messages)
+    console.log('[Send GHL] Checking if conversationId exists:', conversationId);
     if (conversationId) {
       console.log('[Send GHL] Reusing existing conversation:', conversationId);
       
@@ -53,7 +57,8 @@ export async function POST(request: NextRequest) {
       };
     } else {
       // First message - create contact and conversation
-      console.log('[Send GHL] Creating new conversation');
+      console.log('[Send GHL] ⚠️ NO conversationId - Creating NEW conversation');
+      console.log('[Send GHL] This should only happen on first message!');
       result = await sendMessageToContact({
         locationId,
         phone,

@@ -7,13 +7,14 @@ import { Send } from 'lucide-react';
 
 interface AgentReplyProps {
   conversationId: string;
+  contactId?: string;
   onMessageSent?: (message: string) => void;
   onRefreshNeeded?: () => void;
   onTyping?: (isTyping: boolean) => void;
   compact?: boolean;
 }
 
-export function AgentReply({ conversationId, onMessageSent, onRefreshNeeded, onTyping, compact = false }: AgentReplyProps) {
+export function AgentReply({ conversationId, contactId, onMessageSent, onRefreshNeeded, onTyping, compact = false }: AgentReplyProps) {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -44,13 +45,16 @@ export function AgentReply({ conversationId, onMessageSent, onRefreshNeeded, onT
     if (!message.trim() || isLoading) return;
 
     setIsLoading(true);
+    const messageText = message.trim();
+    
     try {
-      const response = await fetch('/api/chat-events', {
+      // Step 1: Store message in local database (Supabase)
+      const chatEventsResponse = await fetch('/api/chat-events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: message.trim(),
-          type: 'agent_send', // Fixed: Use 'agent_send' instead of 'outbound'
+          text: messageText,
+          type: 'agent_send',
           channel: 'webchat',
           conversation: {
             id: conversationId
@@ -64,19 +68,48 @@ export function AgentReply({ conversationId, onMessageSent, onRefreshNeeded, onT
         })
       });
 
-      const data = await response.json();
-      console.log('[Agent] API Response:', data); // Debug log
+      const chatEventsData = await chatEventsResponse.json();
+      console.log('[Agent] Chat events response:', chatEventsData);
       
-      if (response.ok && data.ok) {
-        console.log('Message sent successfully');
-        setMessage(''); // Clear the input field
-        onTyping?.(false); // Clear typing indicator
-        onMessageSent?.(message.trim());
-        onRefreshNeeded?.();
-      } else {
-        console.error('Failed to send message:', data);
+      if (!chatEventsResponse.ok || !chatEventsData.ok) {
+        console.error('Failed to store message locally:', chatEventsData);
         alert('Failed to send message. Please try again.');
+        return;
       }
+
+      // Step 2: Send message to GHL (only if contactId is available)
+      if (contactId) {
+        const ghlResponse = await fetch('/api/agent/send-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversationId,
+            contactId,
+            message: messageText,
+          })
+        });
+
+        const ghlData = await ghlResponse.json();
+        console.log('[Agent] GHL send response:', ghlData);
+        
+        if (!ghlResponse.ok || !ghlData.success) {
+          console.error('Failed to send message to GHL:', ghlData);
+          alert('Message saved locally but failed to send to GHL. Please try again.');
+          return;
+        }
+        
+        console.log('[Agent] Message sent successfully to GHL');
+      } else {
+        console.warn('[Agent] No contactId available, message only saved locally');
+      }
+
+      // Success!
+      console.log('[Agent] Message sent successfully');
+      setMessage(''); // Clear the input field
+      onTyping?.(false); // Clear typing indicator
+      onMessageSent?.(messageText);
+      onRefreshNeeded?.();
+      
     } catch (error) {
       console.error('[Agent] Send error:', error);
       alert('Error sending message. Please try again.');

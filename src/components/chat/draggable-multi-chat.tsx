@@ -522,6 +522,7 @@ export function DraggableMultiChat({
                 <div className="border-t border-gray-200">
                   <AgentReply
                     conversationId={chat.conversationId}
+                    contactId={chat.contactId}
                     onMessageSent={() => {
                       setChatBoxes(prev => prev.map(c => 
                         c.id === chat.id 
