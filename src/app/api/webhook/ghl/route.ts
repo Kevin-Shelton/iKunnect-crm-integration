@@ -43,11 +43,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'ignored', reason: 'missing message text' });
     }
 
-    // If conversationId is missing, look it up by contactId
+    // ALWAYS look up conversation by contactId first to ensure message grouping
+    // GHL may send different conversationIds for customer messages vs AI responses
     let finalConversationId = conversationId;
     
-    if (!finalConversationId && contactId) {
-      console.log('[GHL Webhook] ⚠️ No conversationId provided, looking up by contactId:', contactId);
+    if (contactId) {
+      console.log('[GHL Webhook] 🔍 Looking up existing conversation by contactId:', contactId);
       
       try {
         // Query Supabase for the most recent conversation for this contact
@@ -61,17 +62,25 @@ export async function POST(request: NextRequest) {
 
         if (error) {
           console.error('[GHL Webhook] Error querying conversation:', error);
+          // Fall back to provided conversationId or contactId
+          finalConversationId = conversationId || contactId;
         } else if (data?.conversation_id) {
           finalConversationId = data.conversation_id;
           console.log('[GHL Webhook] ✅ Found existing conversation:', finalConversationId);
+          if (conversationId && conversationId !== finalConversationId) {
+            console.log('[GHL Webhook] ⚠️ GHL provided different conversationId:', conversationId, '- using existing:', finalConversationId);
+          }
         } else {
-          console.log('[GHL Webhook] ⚠️ No existing conversation found, using contactId as fallback');
-          finalConversationId = contactId;
+          // No existing conversation, use provided conversationId or contactId
+          finalConversationId = conversationId || contactId;
+          console.log('[GHL Webhook] 🆕 No existing conversation found, creating new with ID:', finalConversationId);
         }
       } catch (error) {
         console.error('[GHL Webhook] Error during conversation lookup:', error);
-        finalConversationId = contactId; // Fallback
+        finalConversationId = conversationId || contactId; // Fallback
       }
+    } else if (!finalConversationId) {
+      console.log('[GHL Webhook] ⚠️ No contactId or conversationId provided');
     }
 
     if (!finalConversationId) {
