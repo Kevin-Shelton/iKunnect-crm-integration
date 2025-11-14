@@ -1,10 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 // Use service role key for server-side operations
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Only initialize if both URL and key are present
+let supabase: ReturnType<typeof createClient> | null = null;
+
+if (supabaseUrl && supabaseServiceKey) {
+  supabase = createClient(supabaseUrl, supabaseServiceKey);
+} else {
+  console.warn('[Token Storage] Supabase credentials not configured. Token storage will be disabled.');
+}
 
 export interface GHLTokenData {
   locationId: string;
@@ -21,6 +28,11 @@ export interface GHLTokenData {
  * Save or update GHL OAuth tokens in Supabase
  */
 export async function saveTokens(data: GHLTokenData): Promise<void> {
+  if (!supabase) {
+    console.warn('[Token Storage] Supabase not initialized. Cannot save tokens.');
+    return;
+  }
+  
   const { error } = await supabase
     .from('ghl_oauth_tokens')
     .upsert({
@@ -49,6 +61,11 @@ export async function saveTokens(data: GHLTokenData): Promise<void> {
  * Retrieve GHL OAuth tokens from Supabase by location ID
  */
 export async function getTokens(locationId: string): Promise<GHLTokenData | null> {
+  if (!supabase) {
+    console.warn('[Token Storage] Supabase not initialized. Cannot retrieve tokens.');
+    return null;
+  }
+  
   const { data, error } = await supabase
     .from('ghl_oauth_tokens')
     .select('*')
@@ -81,6 +98,11 @@ export async function getTokens(locationId: string): Promise<GHLTokenData | null
  * Delete GHL OAuth tokens from Supabase
  */
 export async function deleteTokens(locationId: string): Promise<void> {
+  if (!supabase) {
+    console.warn('[Token Storage] Supabase not initialized. Cannot delete tokens.');
+    return;
+  }
+  
   const { error } = await supabase
     .from('ghl_oauth_tokens')
     .delete()
@@ -98,6 +120,11 @@ export async function deleteTokens(locationId: string): Promise<void> {
  * Get all stored tokens (for admin purposes)
  */
 export async function getAllTokens(): Promise<GHLTokenData[]> {
+  if (!supabase) {
+    console.warn('[Token Storage] Supabase not initialized. Cannot retrieve tokens.');
+    return [];
+  }
+  
   const { data, error } = await supabase
     .from('ghl_oauth_tokens')
     .select('*')
