@@ -132,7 +132,7 @@ export async function getAllConversationsWithStatus() {
     // Get all chat events to build conversation list
     const { data: events, error: eventsError } = await supabaseService
       .from('chat_events')
-      .select('conversation_id, created_at, type, text, message_id')
+      .select('conversation_id, created_at, type, text, message_id, payload')
       .order('created_at', { ascending: false });
 
     if (eventsError) {
@@ -144,10 +144,20 @@ export async function getAllConversationsWithStatus() {
     const conversationMap = new Map();
     (events || []).forEach(event => {
       if (!conversationMap.has(event.conversation_id)) {
+        // Extract contact info from payload
+        const payload = event.payload as any;
+        const contact = payload?.contact || {};
+        const contactName = contact?.name || null;
+        const contactEmail = contact?.email || null;
+        const contactPhone = contact?.phone || null;
+        
         conversationMap.set(event.conversation_id, {
           id: event.conversation_id,
           messageCount: 1,
-          lastMessage: event
+          lastMessage: event,
+          customer_name: contactName,
+          customer_email: contactEmail,
+          customer_phone: contactPhone
         });
       } else {
         conversationMap.get(event.conversation_id).messageCount++;
