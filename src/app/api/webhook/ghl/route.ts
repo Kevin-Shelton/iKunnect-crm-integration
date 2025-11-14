@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
     let sender = 'customer';
     let eventType = 'inbound';
     
+    // If direction is provided, use it
     if (direction === 'outbound') {
       // Outbound messages could be from AI agent or human agent
       if (userId) {
@@ -65,6 +66,19 @@ export async function POST(request: NextRequest) {
         // No userId means it's from AI agent
         sender = 'bot';
         eventType = 'outbound';
+      }
+    } else if (direction === 'inbound') {
+      sender = 'customer';
+      eventType = 'inbound';
+    } else {
+      // If direction is missing, assume it's from customer (workflow default)
+      // Unless there's a userId, which means it's from an agent
+      if (userId) {
+        sender = 'agent';
+        eventType = 'outbound';
+      } else {
+        sender = 'customer';
+        eventType = 'inbound';
       }
     }
 
