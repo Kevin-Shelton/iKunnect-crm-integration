@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sendMessageToContact, getDefaultLocationId } from '@/lib/ghl-api-client';
+import { sendMessageToContact, sendMessage, upsertContact, getDefaultLocationId } from '@/lib/ghl-api-client';
 
 /**
  * API route for sending messages via GHL API (replaces n8n webhook)
@@ -17,21 +17,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[Send GHL] Received message request:', { phone, message: message.substring(0, 50) + '...' });
+    console.log('[Send GHL] Received message request:', { phone, conversationId, message: message.substring(0, 50) + '...' });
 
     // Get the location ID (in a multi-location setup, this would come from the user's context)
     const locationId = await getDefaultLocationId();
     console.log('[Send GHL] Using location ID:', locationId);
 
-    // Send message using GHL API
-    const result = await sendMessageToContact({
-      locationId,
-      phone,
-      message,
-      email,
-      name,
-      type: 'SMS', // Default to SMS, can be made configurable
-    });
+    let result;
+    
+    // If conversationId is provided, reuse it (subsequent messages)
+    if (conversationId) {
+      console.log('[Send GHL] Reusing existing conversation:', conversationId);
+      
+      // Get or create contact (to ensure we have contactId)
+      const { contactId } = await upsertContact({
+        locationId,
+        phone,
+        email,
+        name,
+      });
+      
+      // Send message directly to existing conversation
+      const { messageId } = await sendMessage({
+        locationId,
+        conversationId,
+        contactId,
+        message,
+        type: 'SMS',
+      });
+      
+      result = {
+        contactId,
+        conversationId,
+        messageId,
+      };
+    } else {
+      // First message - create contact and conversation
+      console.log('[Send GHL] Creating new conversation');
+      result = await sendMessageToContact({
+        locationId,
+        phone,
+        message,
+        email,
+        name,
+        type: 'SMS',
+      });
+    }
 
     console.log('[Send GHL] Message sent successfully:', result);
 
