@@ -5,7 +5,7 @@ const GHL_CLIENT_SECRET = env.GHL_CLIENT_SECRET;
 const GHL_API_BASE = 'https://services.leadconnectorhq.com';
 const GHL_OAUTH_AUTHORIZE_BASE = 'https://marketplace.gohighlevel.com';
 const GHL_OAUTH_TOKEN_BASE = 'https://services.leadconnectorhq.com';
-const REDIRECT_URI = 'https://i-kunnect-crm-int.vercel.app/api/ghl-oauth-callback';
+const REDIRECT_URI = 'https://i-kunnect-crm-int.vercel.app/api/oauth/callback';
 
 // NOTE: In a real application, tokens would be stored in a secure database (e.g., Supabase)
 // For this project, we will use a simple in-memory store for demonstration purposes.
