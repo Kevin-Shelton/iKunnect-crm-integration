@@ -156,22 +156,17 @@ export default function CustomerChatPage() {
     setNewMessage('');
 
     try {
-      // Get n8n webhook URL from environment or use production default
-      const n8nWebhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || 'https://invictusbpo.app.n8n.cloud/webhook/ghl-chat-inbound';
-      
-      // Send message directly to n8n webhook
-      const response = await fetch(n8nWebhookUrl, {
+      // Use the new GHL API 2.0 message sending route
+      const response = await fetch('/api/ghl-api-2.0-send-message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          fullName: sessionStorage.getItem('customer_contact_name') || 'Customer',
-          email: sessionStorage.getItem('customer_contact_email') || '',
-          phone: sessionStorage.getItem('customer_contact_phone') || '',
+          contactId: customerId, // Use the existing customerId (which is the GHL contactId)
           message: messageText,
-          source: 'webchat',
-          sessionId: conversationId || `session_${Date.now()}`
+          type: 'Webchat', // GHL API 2.0 type for webchat
+          locationId: process.env.NEXT_PUBLIC_GHL_LOCATION_ID || 'DEFAULT_LOCATION_ID', // Placeholder for locationId
         })
       });
 
@@ -186,16 +181,16 @@ export default function CustomerChatPage() {
         setMessages(prev => [...prev, errorMessage]);
       } else {
         const result = await response.json();
-        console.log('Message sent via n8n successfully:', result);
+        console.log('Message sent via GHL API 2.0 successfully:', result);
         
-        // Update conversationId if we got a new one from n8n response
+        // Update conversationId if we got a new one from GHL API 2.0 response
         if (result.success && result.data) {
           if (result.data.conversationId && result.data.conversationId !== conversationId) {
             setConversationId(result.data.conversationId);
             sessionStorage.setItem('customer_conversation_id', result.data.conversationId);
           }
           
-          // Update contactId if we got one from n8n response
+          // The contactId should already be set, but we can update if the API returns a new one
           if (result.data.contactId && result.data.contactId !== customerId) {
             setCustomerId(result.data.contactId);
             sessionStorage.setItem('customer_contact_id', result.data.contactId);

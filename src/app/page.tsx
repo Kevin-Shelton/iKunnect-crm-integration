@@ -8,6 +8,7 @@ import { DraggableMultiChat } from '@/components/chat/draggable-multi-chat';
 import { ContactSidebar } from '@/components/layout/contact-sidebar';
 import { NotificationSystem } from '@/components/chat/notification-system';
 import { useConversations } from '@/hooks/use-conversations';
+import { tokenStore } from '@/lib/ghl-api-2.0';
 import { Conversation, ConversationQueue } from '@/lib/types';
 
 export default function Home() {
@@ -15,6 +16,14 @@ export default function Home() {
   const [selectedContact, setSelectedContact] = useState<any>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState<'waiting' | 'assigned' | 'all' | 'rejected'>('waiting');
+  const [isAuthorized, setIsAuthorized] = useState(false);
+
+  // Check authorization status on load
+  useEffect(() => {
+    if (tokenStore.getAccessToken()) {
+      setIsAuthorized(true);
+    }
+  }, []);
 
   // Use conversations hook with safe defaults
   const {
@@ -408,6 +417,28 @@ export default function Home() {
               Retry Connection
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  const handleAuthorize = () => {
+    window.location.href = '/api/ghl-oauth-init';
+  };
+
+  if (!isAuthorized) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-100">
+        <div className="text-center p-10 bg-white rounded-xl shadow-2xl">
+          <h1 className="text-3xl font-bold text-gray-800 mb-4">GoHighLevel Authorization Required</h1>
+          <p className="text-lg text-gray-600 mb-8">Please authorize the application to access your GHL account to proceed.</p>
+          <button 
+            onClick={handleAuthorize} 
+            className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition duration-200"
+          >
+            Authorize with GoHighLevel
+          </button>
+          <p className="text-sm text-gray-400 mt-4">Note: This will redirect you to the GHL login page.</p>
         </div>
       </div>
     );

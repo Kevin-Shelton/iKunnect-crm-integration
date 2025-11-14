@@ -1,7 +1,7 @@
 // Customer identification and verification service
 // Handles the conversation flow for identifying unknown customers while protecting PII
 
-import { ghlIntegration, type GHLContact, type ContactIdentificationResult } from './ghl-integration';
+import { GHLContact, ContactIdentificationResult } from './ghl-api-2.0-integration';
 
 interface IdentificationSession {
   conversationId: string;
