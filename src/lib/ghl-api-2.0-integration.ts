@@ -62,7 +62,8 @@ export async function identifyContact(identifier: string): Promise<ContactIdenti
     return { exists: false, confidence: 'low' };
 
   } catch (error) {
-    console.warn('Simulated GHL Contact Identification Failed:', error.message);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.warn('Simulated GHL Contact Identification Failed:', errorMessage);
     // Fallback for simulation
     return { exists: false, confidence: 'low' };
   }
@@ -96,7 +97,8 @@ export async function getConversationDetails(conversationId: string): Promise<an
     throw new Error('Conversation not found');
 
   } catch (error) {
-    console.warn('Simulated GHL Conversation Retrieval Failed:', error.message);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.warn('Simulated GHL Conversation Retrieval Failed:', errorMessage);
     throw error;
   }
 }

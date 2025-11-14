@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
 
-import { ghlIntegration } from '@/lib/ghl-integration';
-
 // Define the expected request body structure
 interface StartChatRequestBody {
   email: string;

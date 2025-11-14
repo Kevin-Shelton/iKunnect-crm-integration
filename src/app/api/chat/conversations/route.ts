@@ -1,24 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAllConversationsWithStatus, initializeConversationStatus } from '@/lib/supabase-conversations';
 
-// Extract customer name from conversation data using GHL integration
-async function extractCustomerNameFromConversation(conv: any): Promise<string> {
-  try {
-    // Import customer identification service
-    const { customerIdentification } = await import('@/lib/customer-identification');
-    
-    // Get customer info from GHL integration
-    const customerInfo = customerIdentification.getCustomerInfo(conv.id);
-    
-    return customerInfo.name;
-  } catch (error) {
-    console.error('[Conversations] Error getting customer name:', error);
-    
-    // Fallback to visitor pattern with last 4 digits
-    return `Visitor ${conv.id.slice(-4)}`;
-  }
-}
-
 function capitalizeWords(str: string): string {
   return str
     .toLowerCase()
@@ -48,26 +30,18 @@ export async function GET() {
     });
 
     // Transform to expected format for the UI
-    const transformedConversations = await Promise.all(conversations.map(async (conv) => {
-      // Extract customer name and contact details from conversation data using GHL integration
-      const customerName = await extractCustomerNameFromConversation(conv);
-      
-      // Import customer identification service to get full contact details
-      const { customerIdentification } = await import('@/lib/customer-identification');
-      const customerInfo = customerIdentification.getCustomerInfo(conv.id);
-      
-      // Extract email and phone from the contact if available
-      const email = customerInfo.contact?.email;
-      const phone = customerInfo.contact?.phone;
-      const contactId = customerInfo.contact?.id || `contact_${conv.id}`;
+    const transformedConversations = conversations.map((conv) => {
+      // Use customer_name from conversation or generate visitor name
+      const customerName = conv.customer_name || `Visitor ${conv.id.slice(-4)}`;
+      const contactId = `contact_${conv.id}`;
       
       return {
         id: conv.id,
         contactId: contactId,
         contactName: customerName,
         fullName: customerName,
-        email: email,
-        phone: phone,
+        email: undefined,
+        phone: undefined,
         lastMessageBody: conv.lastMessage?.text || '',
         lastMessageDate: conv.lastMessage?.created_at || new Date().toISOString(),
         unreadCount: conv.messageCount,
@@ -85,7 +59,7 @@ export async function GET() {
         tags: [],
         messages: []
       };
-    }));
+    });
 
     // Sort by most recent
     const sortedConversations = transformedConversations

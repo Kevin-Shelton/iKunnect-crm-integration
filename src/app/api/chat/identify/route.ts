@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { customerIdentification } from '@/lib/customer-identification';
+import { customerIdentificationService } from '@/lib/customer-identification';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,15 +12,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[Customer Identify] Processing ${action} for conversation ${conversationId}`);
-
     let result;
 
     switch (action) {
       case 'process_new_conversation':
         // Process a new conversation to determine if identification is needed
         const messages = request.body ? JSON.parse(await request.text()).messages || [] : [];
-        result = await customerIdentification.processNewConversation(conversationId, messages);
+        result = await customerIdentificationService.processNewConversation(conversationId, messages);
         break;
 
       case 'process_message':
@@ -31,32 +29,23 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        result = await customerIdentification.processIdentificationMessage(conversationId, messageText);
+        result = await customerIdentificationService.processMessage(conversationId, messageText);
         break;
 
-      case 'handle_pii_request':
-        // Handle PII-related questions with privacy-compliant responses
-        if (!messageText) {
-          return NextResponse.json(
-            { success: false, error: 'Message text is required for handle_pii_request action' },
-            { status: 400 }
-          );
-        }
-        const piiResponse = customerIdentification.handlePIIRequest(messageText);
-        result = {
-          shouldRespond: !!piiResponse,
-          response: piiResponse,
-          isComplete: true,
-          needsMoreInfo: false
-        };
-        break;
-
-      case 'get_customer_info':
-        // Get customer information for display
-        const customerInfo = customerIdentification.getCustomerInfo(conversationId);
+      case 'get_session':
+        // Get identification session information
+        const session = customerIdentificationService.getSession(conversationId);
         return NextResponse.json({
           success: true,
-          customerInfo
+          session
+        });
+
+      case 'clear_session':
+        // Clear identification session
+        customerIdentificationService.clearSession(conversationId);
+        return NextResponse.json({
+          success: true,
+          message: 'Session cleared'
         });
 
       default:
@@ -66,35 +55,17 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    console.log(`[Customer Identify] Result:`, {
-      shouldRespond: result.shouldRespond,
-      isComplete: result.isComplete,
-      needsMoreInfo: result.needsMoreInfo,
-      hasResponse: !!result.response
-    });
-
     return NextResponse.json({
       success: true,
       result
     });
 
   } catch (error) {
-    console.error('[Customer Identify] Error:', error);
+    console.error('[Identify API] Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      },
+      { success: false, error: 'Internal server error', details: errorMessage },
       { status: 500 }
     );
   }
-}
-
-// Handle GET requests for health check
-export async function GET() {
-  return NextResponse.json({
-    status: 'healthy',
-    service: 'Customer Identification API',
-    timestamp: new Date().toISOString()
-  });
 }

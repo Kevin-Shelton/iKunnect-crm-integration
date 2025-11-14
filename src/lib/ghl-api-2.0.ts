@@ -3,7 +3,8 @@ import { env } from 'process';
 const GHL_CLIENT_ID = env.GHL_CLIENT_ID;
 const GHL_CLIENT_SECRET = env.GHL_CLIENT_SECRET;
 const GHL_API_BASE = 'https://services.leadconnectorhq.com';
-const GHL_OAUTH_BASE = 'https://marketplace.gohighlevel.com';
+const GHL_OAUTH_BASE = 'https://services.leadconnectorhq.com';
+const REDIRECT_URI = 'https://i-kunnect-crm-int.vercel.app/api/ghl-oauth-callback';
 
 // NOTE: In a real application, tokens would be stored in a secure database (e.g., Supabase)
 // For this project, we will use a simple in-memory store for demonstration purposes.
@@ -11,18 +12,22 @@ const GHL_OAUTH_BASE = 'https://marketplace.gohighlevel.com';
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
 let tokenExpiry: number = 0;
+let locationId: string | null = null;
+let companyId: string | null = null;
+let userId: string | null = null;
+let userType: string | null = null;
 
 // 1. OAuth Authorization URL
-export function getAuthorizationUrl(redirectUri: string, state: string): string {
+export function getAuthorizationUrl(state: string): string {
   if (!GHL_CLIENT_ID) {
     throw new Error('GHL_CLIENT_ID is not set');
   }
-  const scope = 'conversations/message.write contacts/write'; // Minimal scope for chat
-  return `${GHL_OAUTH_BASE}/oauth/chooselocation?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${GHL_CLIENT_ID}&scope=${encodeURIComponent(scope)}&state=${state}`;
+  const scope = 'conversations/message.write conversations/message.readonly contacts.write contacts.readonly';
+  return `${GHL_OAUTH_BASE}/oauth/chooselocation?response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_id=${GHL_CLIENT_ID}&scope=${encodeURIComponent(scope)}&state=${state}&user_type=Location`;
 }
 
 // 2. Get Access Token from Authorization Code
-export async function getAccessToken(code: string, redirectUri: string): Promise<{ accessToken: string, refreshToken: string, expires_in: number }> {
+export async function getAccessToken(code: string): Promise<any> {
   if (!GHL_CLIENT_ID || !GHL_CLIENT_SECRET) {
     throw new Error('GHL_CLIENT_ID or GHL_CLIENT_SECRET is not set');
   }
@@ -38,28 +43,38 @@ export async function getAccessToken(code: string, redirectUri: string): Promise
       client_secret: GHL_CLIENT_SECRET,
       grant_type: 'authorization_code',
       code: code,
-      redirect_uri: redirectUri,
+      redirect_uri: REDIRECT_URI,
+      user_type: 'Location', // Request location-level token
     }).toString(),
   });
 
   if (!response.ok) {
     const error = await response.json();
-    console.error('GHL Token Error:', error);
+    console.error('[GHL OAuth] Token Error:', error);
     throw new Error(`Failed to get access token: ${error.error_description || response.statusText}`);
   }
 
   const data = await response.json();
   
-  // Store tokens in memory (INSECURE for production)
+  // Store tokens and metadata in memory (INSECURE for production)
   accessToken = data.access_token;
   refreshToken = data.refresh_token;
   tokenExpiry = Date.now() + (data.expires_in * 1000) - 60000; // 1 minute buffer
+  locationId = data.locationId || null;
+  companyId = data.companyId || null;
+  userId = data.userId || null;
+  userType = data.userType || null;
+
+  console.log('[GHL OAuth] Token obtained successfully');
+  console.log('[GHL OAuth] Location ID:', locationId);
+  console.log('[GHL OAuth] Company ID:', companyId);
+  console.log('[GHL OAuth] User Type:', userType);
 
   return data;
 }
 
 // 3. Refresh Access Token
-export async function refreshAccessToken(currentRefreshToken: string): Promise<{ accessToken: string, refreshToken: string, expires_in: number }> {
+export async function refreshAccessToken(currentRefreshToken: string): Promise<any> {
   if (!GHL_CLIENT_ID || !GHL_CLIENT_SECRET) {
     throw new Error('GHL_CLIENT_ID or GHL_CLIENT_SECRET is not set');
   }
@@ -75,21 +90,28 @@ export async function refreshAccessToken(currentRefreshToken: string): Promise<{
       client_secret: GHL_CLIENT_SECRET,
       grant_type: 'refresh_token',
       refresh_token: currentRefreshToken,
+      user_type: 'Location', // Request location-level token
     }).toString(),
   });
 
   if (!response.ok) {
     const error = await response.json();
-    console.error('GHL Refresh Token Error:', error);
+    console.error('[GHL OAuth] Refresh Token Error:', error);
     throw new Error(`Failed to refresh access token: ${error.error_description || response.statusText}`);
   }
 
   const data = await response.json();
   
-  // Store tokens in memory (INSECURE for production)
+  // Store tokens and metadata in memory (INSECURE for production)
   accessToken = data.access_token;
   refreshToken = data.refresh_token;
   tokenExpiry = Date.now() + (data.expires_in * 1000) - 60000; // 1 minute buffer
+  locationId = data.locationId || null;
+  companyId = data.companyId || null;
+  userId = data.userId || null;
+  userType = data.userType || null;
+
+  console.log('[GHL OAuth] Token refreshed successfully');
 
   return data;
 }
@@ -100,7 +122,7 @@ export async function getValidAccessToken(): Promise<string> {
     if (!refreshToken) {
       throw new Error('No valid access token or refresh token available. Please re-authorize.');
     }
-    console.log('Access token expired or missing. Attempting to refresh...');
+    console.log('[GHL OAuth] Access token expired or missing. Attempting to refresh...');
     await refreshAccessToken(refreshToken);
   }
   if (!accessToken) {
@@ -109,48 +131,46 @@ export async function getValidAccessToken(): Promise<string> {
   return accessToken;
 }
 
-// 5. Send Message API Call (Example)
-interface SendMessagePayload {
-  contactId: string;
-  message: string;
-  type: 'SMS' | 'Email' | 'Webchat'; // GHL API 2.0 uses different types
+// 5. Get the current location ID
+export function getLocationId(): string | null {
+  return locationId;
 }
 
-export async function sendMessage(payload: SendMessagePayload): Promise<any> {
-  const token = await getValidAccessToken();
-  const url = `${GHL_API_BASE}/conversations/messages`; // Placeholder URL, need to confirm actual endpoint
+// 6. Get the current company ID
+export function getCompanyId(): string | null {
+  return companyId;
+}
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      'Version': '2021-07-28', // Recommended API version
-    },
-    body: JSON.stringify({
-      contactId: payload.contactId,
-      message: payload.message,
-      type: payload.type,
-      // Additional fields like locationId might be required
-    }),
-  });
+// 7. Get the current user ID
+export function getUserId(): string | null {
+  return userId;
+}
 
-  if (!response.ok) {
-    const error = await response.json();
-    console.error('GHL Send Message Error:', error);
-    throw new Error(`Failed to send message: ${error.message || response.statusText}`);
-  }
+// 8. Get the current user type
+export function getUserType(): string | null {
+  return userType;
+}
 
-  return response.json();
+// 9. Check if tokens are available
+export function hasValidTokens(): boolean {
+  return accessToken !== null && refreshToken !== null;
 }
 
 // Export the in-memory store for initial setup (INSECURE)
 export const tokenStore = {
     getAccessToken: () => accessToken,
     getRefreshToken: () => refreshToken,
-    setTokens: (access: string, refresh: string, expiry: number) => {
+    getLocationId: () => locationId,
+    getCompanyId: () => companyId,
+    getUserId: () => userId,
+    getUserType: () => userType,
+    setTokens: (access: string, refresh: string, expiry: number, loc?: string, comp?: string, user?: string, type?: string) => {
         accessToken = access;
         refreshToken = refresh;
         tokenExpiry = expiry;
+        locationId = loc || null;
+        companyId = comp || null;
+        userId = user || null;
+        userType = type || null;
     }
 };
