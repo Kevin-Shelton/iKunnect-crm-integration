@@ -82,15 +82,20 @@ export async function getTokens(locationId: string): Promise<GHLTokenData | null
     throw new Error(`Failed to retrieve tokens: ${error.message}`);
   }
 
+  if (!data) {
+    return null;
+  }
+
+  const row = data as any;
   return {
-    locationId: data.location_id,
-    companyId: data.company_id,
-    userId: data.user_id,
-    userType: data.user_type,
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-    tokenExpiry: new Date(data.token_expiry),
-    scope: data.scope,
+    locationId: row.location_id,
+    companyId: row.company_id,
+    userId: row.user_id,
+    userType: row.user_type,
+    accessToken: row.access_token,
+    refreshToken: row.refresh_token,
+    tokenExpiry: new Date(row.token_expiry),
+    scope: row.scope,
   };
 }
 
@@ -135,7 +140,11 @@ export async function getAllTokens(): Promise<GHLTokenData[]> {
     throw new Error(`Failed to retrieve all tokens: ${error.message}`);
   }
 
-  return data.map(row => ({
+  if (!data) {
+    return [];
+  }
+
+  return (data as any[]).map((row: any) => ({
     locationId: row.location_id,
     companyId: row.company_id,
     userId: row.user_id,
