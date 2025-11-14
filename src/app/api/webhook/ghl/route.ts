@@ -38,13 +38,50 @@ export async function POST(request: NextRequest) {
 
     const messageText = messageBody || message || '';
 
-    if (!messageText || !conversationId) {
-      console.log('[GHL Webhook] Skipping - no message text or conversationId');
-      return NextResponse.json({ status: 'ignored', reason: 'missing required fields' });
+    if (!messageText) {
+      console.log('[GHL Webhook] Skipping - no message text');
+      return NextResponse.json({ status: 'ignored', reason: 'missing message text' });
+    }
+
+    // If conversationId is missing, look it up by contactId
+    let finalConversationId = conversationId;
+    
+    if (!finalConversationId && contactId) {
+      console.log('[GHL Webhook] ⚠️ No conversationId provided, looking up by contactId:', contactId);
+      
+      try {
+        // Query Supabase for the most recent conversation for this contact
+        const { data, error } = await supabase
+          .from('chat_events')
+          .select('conversation_id, payload')
+          .or(`payload->>contactId.eq.${contactId},payload->contact->>id.eq.${contactId}`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) {
+          console.error('[GHL Webhook] Error querying conversation:', error);
+        } else if (data?.conversation_id) {
+          finalConversationId = data.conversation_id;
+          console.log('[GHL Webhook] ✅ Found existing conversation:', finalConversationId);
+        } else {
+          console.log('[GHL Webhook] ⚠️ No existing conversation found, using contactId as fallback');
+          finalConversationId = contactId;
+        }
+      } catch (error) {
+        console.error('[GHL Webhook] Error during conversation lookup:', error);
+        finalConversationId = contactId; // Fallback
+      }
+    }
+
+    if (!finalConversationId) {
+      console.log('[GHL Webhook] Skipping - no conversationId or contactId');
+      return NextResponse.json({ status: 'ignored', reason: 'missing conversation identifier' });
     }
 
     console.log('[GHL Webhook] Processing message:', {
-      conversationId,
+      originalConversationId: conversationId,
+      finalConversationId,
       contactId,
       direction,
       type,
@@ -86,13 +123,13 @@ export async function POST(request: NextRequest) {
     // Save to Supabase chat_events table
     try {
       const chatEvent = {
-        conversation_id: conversationId,
+        conversation_id: finalConversationId,
         event_type: eventType,
         payload: {
           text: messageText,
           type: eventType,
           channel: 'Live_Chat',
-          conversation: { id: conversationId },
+          conversation: { id: finalConversationId },
           contact: { id: contactId },
           timestamp: dateAdded || new Date().toISOString(),
           source: 'ghl_webhook',
@@ -122,12 +159,12 @@ export async function POST(request: NextRequest) {
 
     // Add to in-memory chat storage for real-time updates
     try {
-      upsertMessages(conversationId, [{
+      upsertMessages(finalConversationId, [{
         id: messageId || Date.now().toString(),
         text: messageText,
         sender: sender,
         createdAt: dateAdded || new Date().toISOString(),
-        conversationId: conversationId,
+        conversationId: finalConversationId,
         direction: direction || 'inbound',
         category: 'chat',
         raw: payload as any
@@ -140,9 +177,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       status: 'processed',
       messageId,
-      conversationId,
+      conversationId: finalConversationId,
+      originalConversationId: conversationId,
       sender,
-      synced: true
+      synced: true,
+      lookedUp: conversationId !== finalConversationId
     });
 
   } catch (error) {
