@@ -43,15 +43,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'ignored', reason: 'missing message text' });
     }
 
-    // ALWAYS look up conversation by contactId first to ensure message grouping
-    // GHL may send different conversationIds for customer messages vs AI responses
+    // Generate a fallback message ID if not provided by GHL
+    const effectiveMessageId = messageId || `msg_${contactId}_${Date.now()}_${messageText.substring(0, 20).replace(/\s/g, '_')}`;
+    console.log('[GHL Webhook] Message ID:', effectiveMessageId, '(original:', messageId, ')');
+
+    // ALWAYS look up existing conversation to ensure message grouping
+    // Strategy: Try contactId first, then GHL conversationId, then create new
     let finalConversationId = conversationId;
+    let foundExisting = false;
     
+    // Strategy 1: Look up by contactId (most reliable for grouping)
     if (contactId) {
       console.log('[GHL Webhook] 🔍 Looking up existing conversation by contactId:', contactId);
       
       try {
-        // Query Supabase for the most recent conversation for this contact
         const { data, error } = await supabase
           .from('chat_events')
           .select('conversation_id, payload')
@@ -60,31 +65,54 @@ export async function POST(request: NextRequest) {
           .limit(1)
           .maybeSingle();
 
-        if (error) {
-          console.error('[GHL Webhook] Error querying conversation:', error);
-          // Fall back to provided conversationId or contactId
-          finalConversationId = conversationId || contactId;
-        } else if (data?.conversation_id) {
+        if (!error && data?.conversation_id) {
           finalConversationId = data.conversation_id;
-          console.log('[GHL Webhook] ✅ Found existing conversation:', finalConversationId);
+          foundExisting = true;
+          console.log('[GHL Webhook] ✅ Found existing conversation by contactId:', finalConversationId);
           if (conversationId && conversationId !== finalConversationId) {
-            console.log('[GHL Webhook] ⚠️ GHL provided different conversationId:', conversationId, '- using existing:', finalConversationId);
+            console.log('[GHL Webhook] ⚠️ GHL conversationId differs:', conversationId, '- using existing:', finalConversationId);
           }
-        } else {
-          // No existing conversation, use provided conversationId or contactId
-          finalConversationId = conversationId || contactId;
-          console.log('[GHL Webhook] 🆕 No existing conversation found, creating new with ID:', finalConversationId);
         }
       } catch (error) {
-        console.error('[GHL Webhook] Error during conversation lookup:', error);
-        finalConversationId = conversationId || contactId; // Fallback
+        console.error('[GHL Webhook] Error querying by contactId:', error);
       }
-    } else if (!finalConversationId) {
-      console.log('[GHL Webhook] ⚠️ No contactId or conversationId provided');
+    }
+    
+    // Strategy 2: If not found by contactId, try looking up by GHL conversationId
+    if (!foundExisting && conversationId) {
+      console.log('[GHL Webhook] 🔍 Looking up existing conversation by GHL conversationId:', conversationId);
+      
+      try {
+        const { data, error } = await supabase
+          .from('chat_events')
+          .select('conversation_id, payload')
+          .or(`conversation_id.eq.${conversationId},payload->conversation->>id.eq.${conversationId}`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && data?.conversation_id) {
+          finalConversationId = data.conversation_id;
+          foundExisting = true;
+          console.log('[GHL Webhook] ✅ Found existing conversation by GHL conversationId:', finalConversationId);
+        }
+      } catch (error) {
+        console.error('[GHL Webhook] Error querying by conversationId:', error);
+      }
+    }
+    
+    // Strategy 3: Create new conversation if nothing found
+    if (!foundExisting) {
+      finalConversationId = conversationId || contactId || `conv_${Date.now()}`;
+      console.log('[GHL Webhook] 🆕 No existing conversation found, creating new with ID:', finalConversationId);
+    }
+    
+    if (!finalConversationId) {
+      console.log('[GHL Webhook] ⚠️ No valid conversation identifier');
     }
 
     if (!finalConversationId) {
-      console.log('[GHL Webhook] Skipping - no conversationId or contactId');
+      console.log('[GHL Webhook] ❌ Skipping - no valid conversation identifier');
       return NextResponse.json({ status: 'ignored', reason: 'missing conversation identifier' });
     }
 
@@ -131,6 +159,24 @@ export async function POST(request: NextRequest) {
 
     // Save to Supabase chat_events table
     try {
+      // Check if this message already exists (deduplication)
+      const { data: existingMessage, error: checkError } = await supabase
+        .from('chat_events')
+        .select('id, message_id')
+        .eq('message_id', effectiveMessageId)
+        .maybeSingle();
+
+      if (existingMessage) {
+        console.log('[GHL Webhook] ⚠️ Message already exists, skipping:', effectiveMessageId);
+        return NextResponse.json({ 
+          status: 'skipped', 
+          reason: 'duplicate message',
+          messageId: effectiveMessageId
+        });
+      }
+      
+      console.log('[GHL Webhook] ✅ Message is new, proceeding with insert');
+
       // Determine event type based on sender
       let dbType: 'inbound' | 'agent_send' | 'ai_agent_send' | 'human_agent_send';
       if (sender === 'contact') {
@@ -146,7 +192,7 @@ export async function POST(request: NextRequest) {
       const chatEvent = {
         conversation_id: finalConversationId,
         type: dbType,
-        message_id: messageId,
+        message_id: effectiveMessageId,
         text: messageText,
         payload: {
           text: messageText,
@@ -157,7 +203,7 @@ export async function POST(request: NextRequest) {
           timestamp: dateAdded || new Date().toISOString(),
           source: 'ghl_webhook',
           sender,
-          messageId,
+          messageId: effectiveMessageId,
           direction,
           contentType,
           attachments,
@@ -183,7 +229,7 @@ export async function POST(request: NextRequest) {
     // Add to in-memory chat storage for real-time updates
     try {
       upsertMessages(finalConversationId, [{
-        id: messageId || Date.now().toString(),
+        id: effectiveMessageId,
         text: messageText,
         sender: sender,
         createdAt: dateAdded || new Date().toISOString(),
