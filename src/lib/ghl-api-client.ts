@@ -221,7 +221,7 @@ export async function sendMessageToContact(params: {
   message: string;
   email?: string;
   name?: string;
-  type?: 'SMS' | 'Email' | 'WhatsApp' | 'GMB' | 'IG' | 'FB';
+  type?: 'SMS' | 'Email' | 'WhatsApp' | 'GMB' | 'IG' | 'FB' | 'Live_Chat';
 }): Promise<{
   contactId: string;
   conversationId: string;
