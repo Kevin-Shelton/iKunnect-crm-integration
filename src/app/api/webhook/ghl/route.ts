@@ -33,8 +33,43 @@ export async function POST(request: NextRequest) {
       contentType,
       attachments,
       userId,
-      dateAdded
+      dateAdded,
+      contact,
+      contactName,
+      fullName,
+      firstName,
+      lastName,
+      email,
+      phone
     } = payload;
+
+    // Extract contact information from various possible payload structures
+    const extractedContact = {
+      id: contactId || contact?.id || null,
+      name: contactName || fullName || contact?.name || contact?.fullName || 
+            (firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName) || 
+            contact?.firstName && contact?.lastName ? `${contact.firstName} ${contact.lastName}` : 
+            contact?.firstName || contact?.lastName || null,
+      email: email || contact?.email || null,
+      phone: phone || contact?.phone || null
+    };
+
+    console.log('[GHL Webhook] Extracted contact info:', extractedContact);
+
+    // Validate minimum required contact data
+    if (!extractedContact.id) {
+      console.log('[GHL Webhook] ❌ Rejecting - no contact ID provided');
+      return NextResponse.json({ 
+        status: 'rejected', 
+        reason: 'missing contact ID',
+        payload: { contactId: extractedContact.id }
+      }, { status: 400 });
+    }
+
+    // Warn if contact name is missing (will create "Visitor XXXX" entries)
+    if (!extractedContact.name) {
+      console.warn('[GHL Webhook] ⚠️ Warning - no contact name provided, will use fallback naming');
+    }
 
     const messageText = messageBody || message || '';
 
@@ -44,7 +79,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate a fallback message ID if not provided by GHL
-    const effectiveMessageId = messageId || `msg_${contactId}_${Date.now()}_${messageText.substring(0, 20).replace(/\s/g, '_')}`;
+    const effectiveMessageId = messageId || `msg_${extractedContact.id}_${Date.now()}_${messageText.substring(0, 20).replace(/\s/g, '_')}`;
     console.log('[GHL Webhook] Message ID:', effectiveMessageId, '(original:', messageId, ')');
 
     // ALWAYS look up existing conversation to ensure message grouping
@@ -53,14 +88,14 @@ export async function POST(request: NextRequest) {
     let foundExisting = false;
     
     // Strategy 1: Look up by contactId (most reliable for grouping)
-    if (contactId) {
-      console.log('[GHL Webhook] 🔍 Looking up existing conversation by contactId:', contactId);
+    if (extractedContact.id) {
+      console.log('[GHL Webhook] 🔍 Looking up existing conversation by contactId:', extractedContact.id);
       
       try {
         const { data, error } = await supabase
           .from('chat_events')
           .select('conversation_id, payload')
-          .or(`payload->>contactId.eq.${contactId},payload->contact->>id.eq.${contactId}`)
+          .or(`payload->>contactId.eq.${extractedContact.id},payload->contact->>id.eq.${extractedContact.id}`)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -103,7 +138,7 @@ export async function POST(request: NextRequest) {
     
     // Strategy 3: Create new conversation if nothing found
     if (!foundExisting) {
-      finalConversationId = conversationId || contactId || `conv_${Date.now()}`;
+      finalConversationId = conversationId || extractedContact.id || `conv_${Date.now()}`;
       console.log('[GHL Webhook] 🆕 No existing conversation found, creating new with ID:', finalConversationId);
     }
     
@@ -119,7 +154,8 @@ export async function POST(request: NextRequest) {
     console.log('[GHL Webhook] Processing message:', {
       originalConversationId: conversationId,
       finalConversationId,
-      contactId,
+      contactId: extractedContact.id,
+      contactName: extractedContact.name,
       direction,
       type,
       messageText: messageText.substring(0, 100) + '...'
@@ -199,7 +235,8 @@ export async function POST(request: NextRequest) {
           type: eventType,
           channel: 'Live_Chat',
           conversation: { id: finalConversationId },
-          contact: { id: contactId },
+          contact: extractedContact,
+          contactId: extractedContact.id,
           timestamp: dateAdded || new Date().toISOString(),
           source: 'ghl_webhook',
           sender,
