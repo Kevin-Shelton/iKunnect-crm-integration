@@ -124,7 +124,9 @@ export async function POST(request: NextRequest) {
     try {
       const chatEvent = {
         conversation_id: finalConversationId,
-        event_type: eventType,
+        type: sender === 'contact' ? 'inbound' as const : 'agent_send' as const,
+        message_id: messageId,
+        text: messageText,
         payload: {
           text: messageText,
           type: eventType,
