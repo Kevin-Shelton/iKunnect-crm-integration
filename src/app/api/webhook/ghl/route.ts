@@ -128,7 +128,6 @@ export async function POST(request: NextRequest) {
         text: messageText,
         sender: sender,
         createdAt: dateAdded || new Date().toISOString(),
-        source: 'ghl_webhook',
         conversationId: conversationId,
         direction: direction || 'inbound',
         category: 'chat',
