@@ -3,7 +3,8 @@ import { env } from 'process';
 const GHL_CLIENT_ID = env.GHL_CLIENT_ID;
 const GHL_CLIENT_SECRET = env.GHL_CLIENT_SECRET;
 const GHL_API_BASE = 'https://services.leadconnectorhq.com';
-const GHL_OAUTH_BASE = 'https://services.leadconnectorhq.com';
+const GHL_OAUTH_AUTHORIZE_BASE = 'https://marketplace.gohighlevel.com';
+const GHL_OAUTH_TOKEN_BASE = 'https://services.leadconnectorhq.com';
 const REDIRECT_URI = 'https://i-kunnect-crm-int.vercel.app/api/ghl-oauth-callback';
 
 // NOTE: In a real application, tokens would be stored in a secure database (e.g., Supabase)
@@ -23,7 +24,7 @@ export function getAuthorizationUrl(state: string): string {
     throw new Error('GHL_CLIENT_ID is not set');
   }
   const scope = 'conversations/message.write conversations/message.readonly contacts.write contacts.readonly';
-  return `${GHL_OAUTH_BASE}/oauth/authorize?response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_id=${GHL_CLIENT_ID}&scope=${encodeURIComponent(scope)}&state=${state}&user_type=Location`;
+  return `${GHL_OAUTH_AUTHORIZE_BASE}/oauth/authorize?response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_id=${GHL_CLIENT_ID}&scope=${encodeURIComponent(scope)}&state=${state}&user_type=Location`;
 }
 
 // 2. Get Access Token from Authorization Code
@@ -32,7 +33,7 @@ export async function getAccessToken(code: string): Promise<any> {
     throw new Error('GHL_CLIENT_ID or GHL_CLIENT_SECRET is not set');
   }
 
-  const url = `${GHL_OAUTH_BASE}/oauth/token`;
+  const url = `${GHL_OAUTH_TOKEN_BASE}/oauth/token`;
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -79,7 +80,7 @@ export async function refreshAccessToken(currentRefreshToken: string): Promise<a
     throw new Error('GHL_CLIENT_ID or GHL_CLIENT_SECRET is not set');
   }
 
-  const url = `${GHL_OAUTH_BASE}/oauth/token`;
+  const url = `${GHL_OAUTH_TOKEN_BASE}/oauth/token`;
   const response = await fetch(url, {
     method: 'POST',
     headers: {
