@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { upsertContact, getOrCreateConversation, getDefaultLocationId } from '@/lib/ghl-api-client';
+import { upsertContact, getOrCreateConversation, getDefaultLocationId, sendMessage } from '@/lib/ghl-api-client';
 
 // Define the expected request body structure
 interface StartChatRequestBody {
@@ -42,7 +42,20 @@ export async function POST(request: Request) {
     
     console.log('[Chat Start] Conversation created/found:', conversationId);
 
-    // 5. Response with real GHL IDs
+    // 5. Send initial Live_Chat message to establish conversation type
+    try {
+      await sendMessage({
+        contactId,
+        message: 'Customer started a new chat.',
+        type: 'Live_Chat',
+      });
+      console.log('[Chat Start] Initial Live_Chat message sent to GHL');
+    } catch (error) {
+      console.error('[Chat Start] Failed to send initial message:', error);
+      // Continue anyway - the conversation is created
+    }
+
+    // 6. Response with real GHL IDs
     return NextResponse.json({
       contactId,
       conversationId,
