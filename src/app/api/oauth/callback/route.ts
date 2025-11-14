@@ -1,6 +1,7 @@
 // OAuth 2.0 Callback Handler for GoHighLevel Integration
 import { NextRequest, NextResponse } from 'next/server';
 import { getAccessToken } from '@/lib/ghl-api-2.0';
+import { saveTokens } from '@/lib/ghl-token-storage';
 
 export async function GET(request: NextRequest) {
   try {
@@ -83,8 +84,31 @@ export async function GET(request: NextRequest) {
     console.log('[OAuth Callback] Access Token:', tokenData.access_token ? 'Present' : 'Missing');
     console.log('[OAuth Callback] Refresh Token:', tokenData.refresh_token ? 'Present' : 'Missing');
 
-    // Return success page with redirect
-    return new NextResponse(
+    // Save tokens to Supabase
+    if (tokenData.locationId && tokenData.access_token && tokenData.refresh_token) {
+      try {
+        const tokenExpiry = new Date(Date.now() + (tokenData.expires_in * 1000));
+        
+        await saveTokens({
+          locationId: tokenData.locationId,
+          companyId: tokenData.companyId,
+          userId: tokenData.userId,
+          userType: tokenData.userType,
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token,
+          tokenExpiry: tokenExpiry,
+          scope: tokenData.scope,
+        });
+
+        console.log('[OAuth Callback] ✅ Tokens saved to Supabase successfully!');
+      } catch (dbError) {
+        console.error('[OAuth Callback] ❌ Failed to save tokens to Supabase:', dbError);
+        // Continue anyway - tokens are still in memory for this session
+      }
+    }
+
+    // Set a cookie to indicate authorization (for client-side check)
+    const response = new NextResponse(
       `
       <!DOCTYPE html>
       <html>
@@ -129,6 +153,11 @@ export async function GET(request: NextRequest) {
             }
             a { color: #0066cc; text-decoration: none; }
           </style>
+          <script>
+            // Store location ID in localStorage for client-side checks
+            localStorage.setItem('ghl_location_id', '${tokenData.locationId || ''}');
+            localStorage.setItem('ghl_authorized', 'true');
+          </script>
         </head>
         <body>
           <div class="success">
@@ -140,7 +169,8 @@ export async function GET(request: NextRequest) {
               🏢 Company ID: ${tokenData.companyId || 'N/A'}<br/>
               👤 User Type: ${tokenData.userType || 'N/A'}<br/>
               🔑 Access Token: ${tokenData.access_token ? '✓ Received' : '✗ Missing'}<br/>
-              🔄 Refresh Token: ${tokenData.refresh_token ? '✓ Received' : '✗ Missing'}
+              🔄 Refresh Token: ${tokenData.refresh_token ? '✓ Received' : '✗ Missing'}<br/>
+              💾 Database: ✓ Tokens saved to Supabase
             </div>
             <div class="spinner"></div>
             <p>Redirecting you to the dashboard in 3 seconds...</p>
@@ -151,6 +181,25 @@ export async function GET(request: NextRequest) {
       `,
       { status: 200, headers: { 'Content-Type': 'text/html' } }
     );
+
+    // Set cookie for authorization status
+    response.cookies.set('ghl_authorized', 'true', {
+      httpOnly: false, // Allow client-side access
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    });
+
+    if (tokenData.locationId) {
+      response.cookies.set('ghl_location_id', tokenData.locationId, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    }
+
+    return response;
 
   } catch (error) {
     console.error('[OAuth Callback] ❌ Error:', error);

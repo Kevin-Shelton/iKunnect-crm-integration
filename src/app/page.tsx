@@ -20,8 +20,16 @@ export default function Home() {
 
   // Check authorization status on load
   useEffect(() => {
-    if (tokenStore.getAccessToken()) {
+    // Check localStorage first (set by OAuth callback)
+    const authorized = localStorage.getItem('ghl_authorized');
+    const locationId = localStorage.getItem('ghl_location_id');
+    
+    if (authorized === 'true' && locationId) {
+      console.log('[Auth Check] User is authorized, location:', locationId);
       setIsAuthorized(true);
+    } else {
+      console.log('[Auth Check] User is not authorized');
+      setIsAuthorized(false);
     }
   }, []);
 
