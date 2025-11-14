@@ -180,7 +180,72 @@ export async function getOrCreateConversation(params: {
 }
 
 /**
- * Send a message to a conversation
+ * Send an inbound message to an existing conversation
+ * This is the CORRECT endpoint that supports conversationId
+ */
+export async function sendInboundMessage(params: {
+  locationId: string;
+  conversationId: string;
+  contactId: string;
+  message: string;
+  type?: 'SMS' | 'Email' | 'WhatsApp' | 'GMB' | 'IG' | 'FB' | 'Custom' | 'WebChat' | 'Live_Chat' | 'Call';
+  conversationProviderId?: string;
+}): Promise<{ messageId: string; conversationId: string }> {
+  const accessToken = await getAccessToken(params.locationId);
+  
+  // Use the inbound message endpoint which supports conversationId
+  const url = `${GHL_API_BASE}/conversations/messages/inbound`;
+  
+  const body: any = {
+    type: params.type || 'Live_Chat',
+    message: params.message,
+    conversationId: params.conversationId, // This is the key parameter!
+    contactId: params.contactId,
+  };
+  
+  // Add conversationProviderId if provided
+  if (params.conversationProviderId) {
+    body.conversationProviderId = params.conversationProviderId;
+  }
+
+  console.log('[GHL API] Sending inbound message:', { 
+    conversationId: params.conversationId,
+    contactId: params.contactId, 
+    type: body.type,
+    hasProviderId: !!params.conversationProviderId
+  });
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'Version': '2021-04-15',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('[GHL API] Inbound message send failed:', error);
+    throw new Error(`Failed to send inbound message: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  console.log('[GHL API] Inbound message sent successfully:', {
+    messageId: data.messageId,
+    conversationId: data.conversationId
+  });
+  
+  return {
+    messageId: data.messageId,
+    conversationId: data.conversationId,
+  };
+}
+
+/**
+ * Send a message to a conversation (OLD METHOD - creates new conversations)
+ * Use sendInboundMessage instead for existing conversations
  */
 export async function sendMessage(params: {
   locationId: string;

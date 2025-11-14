@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sendMessageToContact, sendMessage, upsertContact, getDefaultLocationId } from '@/lib/ghl-api-client';
+import { sendMessageToContact, sendMessage, sendInboundMessage, upsertContact, getDefaultLocationId } from '@/lib/ghl-api-client';
 
 /**
  * API route for sending messages via GHL API (replaces n8n webhook)
@@ -41,13 +41,14 @@ export async function POST(request: NextRequest) {
         name,
       });
       
-      // Send message directly to existing conversation
-      const { messageId } = await sendMessage({
+      // Send message to existing conversation using inbound endpoint
+      const { messageId, conversationId: returnedConvId } = await sendInboundMessage({
         locationId,
         conversationId,
         contactId,
         message,
         type: 'Live_Chat',
+        // conversationProviderId is optional, will try without it first
       });
       
       result = {

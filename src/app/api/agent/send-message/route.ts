@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sendMessage, getDefaultLocationId } from '@/lib/ghl-api-client';
+import { sendMessage, sendInboundMessage, getDefaultLocationId } from '@/lib/ghl-api-client';
 
 /**
  * API route for sending agent messages to GHL
@@ -28,13 +28,14 @@ export async function POST(request: NextRequest) {
     const locationId = await getDefaultLocationId();
     console.log('[Agent Send] Using location ID:', locationId);
 
-    // Send message to GHL with Live_Chat type
-    const { messageId } = await sendMessage({
+    // Send message to GHL using inbound endpoint with Live_Chat type
+    const { messageId } = await sendInboundMessage({
       locationId,
       conversationId,
       contactId,
       message,
       type: 'Live_Chat',
+      // conversationProviderId is optional
     });
 
     console.log('[Agent Send] Message sent successfully to GHL:', messageId);
