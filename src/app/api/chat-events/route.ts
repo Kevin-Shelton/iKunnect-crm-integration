@@ -30,13 +30,15 @@ export async function POST(request: NextRequest) {
 
     // Extract conversation ID with proper type handling
     const payloadObj = payload as Record<string, unknown>;
+    // GHL sends conversationId at root level, not nested in conversation object
     const conversation = payloadObj?.conversation as Record<string, unknown> | undefined;
-    let convId: string | null = conversation?.id as string;
+    let convId: string | null = (payloadObj?.conversationId as string) || (conversation?.id as string) || null;
     
     // If conversation ID is missing or "unknown", try to generate one from contact info
     if (!convId || convId === 'unknown') {
       const contact = payloadObj?.contact as Record<string, unknown> | undefined;
-      const contactId = contact?.id as string;
+      // GHL sends contactId and messageId at root level
+      const contactId = (payloadObj?.contactId as string) || (contact?.id as string);
       const messageId = payloadObj?.messageId as string;
       
       if (contactId && contactId !== 'unknown') {
