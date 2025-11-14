@@ -90,8 +90,22 @@ export async function upsertContact(params: {
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    console.error('[GHL API] Contact upsert failed:', error);
+    const errorText = await response.text();
+    console.error('[GHL API] Contact upsert failed:', errorText);
+    
+    // Handle duplicate contact error - GHL returns the existing contact ID
+    try {
+      const errorData = JSON.parse(errorText);
+      if (errorData.statusCode === 400 && errorData.message?.includes('duplicated contacts') && errorData.meta?.contactId) {
+        console.log('[GHL API] Contact already exists, using existing ID:', errorData.meta.contactId);
+        return {
+          contactId: errorData.meta.contactId,
+        };
+      }
+    } catch (parseError) {
+      // If error parsing fails, continue with original error
+    }
+    
     throw new Error(`Failed to create/update contact: ${response.statusText}`);
   }
 
