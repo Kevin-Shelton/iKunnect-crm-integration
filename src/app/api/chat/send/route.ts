@@ -115,9 +115,11 @@ export async function POST(request: NextRequest) {
         const locationId = await getDefaultLocationId();
         
         // Send message via GHL API
+        // Note: conversationId is used as contactId in our system
         await sendMessage({
           locationId,
           conversationId: body.conversationId,
+          contactId: body.conversationId, // In our system, conversationId = contactId
           message: messageData.text,
           type: 'SMS', // Default to SMS, can be made configurable
         });

@@ -165,19 +165,22 @@ export async function getOrCreateConversation(params: {
 export async function sendMessage(params: {
   locationId: string;
   conversationId: string;
+  contactId: string;
   message: string;
-  type?: 'SMS' | 'Email' | 'WhatsApp' | 'GMB' | 'IG' | 'FB';
+  type?: 'SMS' | 'Email' | 'WhatsApp' | 'GMB' | 'IG' | 'FB' | 'Live_Chat';
 }): Promise<{ messageId: string }> {
   const accessToken = await getAccessToken(params.locationId);
   
-  const url = `${GHL_API_BASE}/conversations/${params.conversationId}/messages`;
+  // Correct endpoint: /conversations/messages (not /conversations/{id}/messages)
+  const url = `${GHL_API_BASE}/conversations/messages`;
   
-  const body = {
+  const body: any = {
     type: params.type || 'SMS',
+    contactId: params.contactId,
     message: params.message,
   };
 
-  console.log('[GHL API] Sending message to conversation:', params.conversationId);
+  console.log('[GHL API] Sending message:', { contactId: params.contactId, type: body.type });
 
   const response = await fetch(url, {
     method: 'POST',
@@ -238,6 +241,7 @@ export async function sendMessageToContact(params: {
   const { messageId } = await sendMessage({
     locationId: params.locationId,
     conversationId,
+    contactId,
     message: params.message,
     type: params.type,
   });
