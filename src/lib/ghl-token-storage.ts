@@ -45,7 +45,7 @@ export async function saveTokens(data: GHLTokenData): Promise<void> {
       token_expiry: data.tokenExpiry.toISOString(),
       scope: data.scope,
       updated_at: new Date().toISOString(),
-    }, {
+    } as any, {
       onConflict: 'location_id', // Update if location_id already exists
     });
 
