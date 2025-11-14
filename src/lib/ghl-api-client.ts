@@ -123,7 +123,7 @@ export async function upsertContact(params: {
 export async function getOrCreateConversation(params: {
   locationId: string;
   contactId: string;
-}): Promise<{ conversationId: string }> {
+}): Promise<{ conversationId: string; conversationProviderId?: string }> {
   const accessToken = await getAccessToken(params.locationId);
   
   // First, try to get existing conversations for this contact
@@ -143,8 +143,14 @@ export async function getOrCreateConversation(params: {
     const searchData = await searchResponse.json();
     if (searchData.conversations && searchData.conversations.length > 0) {
       const existingConversation = searchData.conversations[0];
-      console.log('[GHL API] Found existing conversation:', existingConversation.id);
-      return { conversationId: existingConversation.id };
+      console.log('[GHL API] Found existing conversation:', {
+        id: existingConversation.id,
+        providerId: existingConversation.conversationProviderId
+      });
+      return { 
+        conversationId: existingConversation.id,
+        conversationProviderId: existingConversation.conversationProviderId
+      };
     }
   }
 
@@ -172,10 +178,15 @@ export async function getOrCreateConversation(params: {
   }
 
   const createData = await createResponse.json();
-  console.log('[GHL API] Conversation created:', createData.conversation?.id);
+  const conversation = createData.conversation || createData;
+  console.log('[GHL API] Conversation created:', {
+    id: conversation.id,
+    providerId: conversation.conversationProviderId
+  });
   
   return {
-    conversationId: createData.conversation?.id || createData.id,
+    conversationId: conversation.id,
+    conversationProviderId: conversation.conversationProviderId,
   };
 }
 

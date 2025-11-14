@@ -35,12 +35,15 @@ export async function POST(request: Request) {
     console.log('[Chat Start] Contact created/updated:', contactId);
 
     // 4. Create or get existing conversation in GHL
-    const { conversationId } = await getOrCreateConversation({
+    const { conversationId, conversationProviderId } = await getOrCreateConversation({
       locationId,
       contactId,
     });
     
-    console.log('[Chat Start] Conversation created/found:', conversationId);
+    console.log('[Chat Start] Conversation created/found:', {
+      conversationId,
+      conversationProviderId
+    });
 
     // 5. Send initial Live_Chat message to establish conversation type
     try {
@@ -61,6 +64,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       contactId,
       conversationId,
+      conversationProviderId,
       contactName: fullName || 'New Contact',
       contactEmail: email,
       contactPhone: phone,

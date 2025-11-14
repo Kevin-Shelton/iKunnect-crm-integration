@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createCRMClient } from '@/lib/mcp';
+import { createClient } from '@supabase/supabase-js';
+import { addMessage } from '@/lib/chatStorage';
 
-// GoHighLevel webhook handler
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+/**
+ * GHL Webhook Handler
+ * Receives messages from GHL (customer, AI agent, human agent) and syncs to app
+ */
 export async function POST(request: NextRequest) {
   try {
+    console.log('[GHL Webhook] ========================================');
     console.log('[GHL Webhook] Received webhook call');
     
     // Parse the webhook payload
@@ -17,6 +28,7 @@ export async function POST(request: NextRequest) {
       locationId,
       conversationId,
       messageId,
+      body: messageBody,
       message,
       direction,
       contentType,
@@ -25,127 +37,104 @@ export async function POST(request: NextRequest) {
       dateAdded
     } = payload;
 
-    // Only process incoming messages from customers
-    if (direction !== 'inbound' || !message) {
-      console.log('[GHL Webhook] Skipping non-inbound message or empty message');
-      return NextResponse.json({ status: 'ignored', reason: 'not inbound message' });
+    const messageText = messageBody || message || '';
+
+    if (!messageText || !conversationId) {
+      console.log('[GHL Webhook] Skipping - no message text or conversationId');
+      return NextResponse.json({ status: 'ignored', reason: 'missing required fields' });
     }
 
-    console.log('[GHL Webhook] Processing inbound message:', {
-      contactId,
+    console.log('[GHL Webhook] Processing message:', {
       conversationId,
-      message: message.substring(0, 100) + '...'
+      contactId,
+      direction,
+      type,
+      messageText: messageText.substring(0, 100) + '...'
     });
 
-    // Initialize MCP client
-    const crmClient = createCRMClient({
-      locationId: locationId || process.env.GHL_LOCATION_ID
-    });
-
-    // Get contact information
-    let contact;
-    try {
-      const contactResult = await crmClient.getContact(contactId);
-      if (contactResult.success) {
-        contact = contactResult.data;
-      }
-    } catch (error) {
-      console.error('[GHL Webhook] Error fetching contact:', error);
-    }
-
-    // Process message through OpenAI assistant with MCP
-    try {
-      // Call OpenAI assistant to process the customer message
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4",
-          messages: [
-            {
-              role: "system",
-              content: `You are a customer service assistant for National Lawyers Guild. A customer has sent a message through the chat widget. Use the National_Lawyers tool to process their request and provide appropriate assistance. Customer context: ${contact ? JSON.stringify(contact) : 'No contact info available'}`
-            },
-            {
-              role: "user",
-              content: message
-            }
-          ],
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "National_Lawyers",
-                description: "Access GoHighLevel CRM data and perform operations for National Lawyers Guild",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    action: {
-                      type: "string",
-                      description: "The action to perform (get_contact, search_cases, update_status, etc.)"
-                    },
-                    parameters: {
-                      type: "object",
-                      description: "Parameters for the action"
-                    }
-                  },
-                  required: ["action", "parameters"]
-                }
-              }
-            }
-          ],
-          tool_choice: "auto"
-        })
-      });
-
-      if (response.ok) {
-        const aiResponse = await response.json();
-        console.log('[GHL Webhook] OpenAI response received');
-        
-        // Extract the AI's response message
-        let responseMessage = '';
-        if (aiResponse.choices && aiResponse.choices[0] && aiResponse.choices[0].message) {
-          responseMessage = aiResponse.choices[0].message.content || 'I received your message and am processing it.';
-        }
-
-        // Send response back to GoHighLevel (if you have the API to do so)
-        // This would require GHL API integration to send messages back
-        console.log('[GHL Webhook] AI Response:', responseMessage);
-
-        // Store conversation data for agent dashboard
-        // This could be stored in database, cache, or retrieved from GHL later
-        
-        return NextResponse.json({ 
-          status: 'processed',
-          messageId,
-          conversationId,
-          response: responseMessage
-        });
+    // Determine sender type based on direction and userId
+    let sender = 'customer';
+    let eventType = 'inbound';
+    
+    if (direction === 'outbound') {
+      // Outbound messages could be from AI agent or human agent
+      if (userId) {
+        sender = 'agent';
+        eventType = 'outbound';
       } else {
-        console.error('[GHL Webhook] OpenAI API error:', response.status, response.statusText);
-        return NextResponse.json({ 
-          status: 'error', 
-          error: 'Failed to process with OpenAI' 
-        }, { status: 500 });
+        // No userId means it's from AI agent
+        sender = 'bot';
+        eventType = 'outbound';
       }
-
-    } catch (error) {
-      console.error('[GHL Webhook] Error processing message:', error);
-      return NextResponse.json({ 
-        status: 'error', 
-        error: 'Failed to process message' 
-      }, { status: 500 });
     }
+
+    console.log('[GHL Webhook] Determined sender:', sender, 'eventType:', eventType);
+
+    // Save to Supabase chat_events table
+    try {
+      const chatEvent = {
+        conversation_id: conversationId,
+        event_type: eventType,
+        payload: {
+          text: messageText,
+          type: eventType,
+          channel: 'Live_Chat',
+          conversation: { id: conversationId },
+          contact: { id: contactId },
+          timestamp: dateAdded || new Date().toISOString(),
+          source: 'ghl_webhook',
+          sender,
+          messageId,
+          direction,
+          contentType,
+          attachments,
+          userId
+        },
+        created_at: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('chat_events')
+        .insert([chatEvent])
+        .select();
+
+      if (error) {
+        console.error('[GHL Webhook] Supabase insert error:', error);
+      } else {
+        console.log('[GHL Webhook] Message saved to Supabase:', data?.[0]?.id);
+      }
+    } catch (error) {
+      console.error('[GHL Webhook] Error saving to Supabase:', error);
+    }
+
+    // Add to in-memory chat storage for real-time updates
+    try {
+      addMessage(conversationId, {
+        id: messageId || Date.now().toString(),
+        text: messageText,
+        sender: sender === 'customer' ? 'customer' : 'agent',
+        timestamp: dateAdded || new Date().toISOString(),
+        source: 'ghl_webhook'
+      });
+      console.log('[GHL Webhook] Message added to in-memory storage');
+    } catch (error) {
+      console.error('[GHL Webhook] Error adding to in-memory storage:', error);
+    }
+
+    return NextResponse.json({ 
+      status: 'processed',
+      messageId,
+      conversationId,
+      sender,
+      synced: true
+    });
 
   } catch (error) {
-    console.error('[GHL Webhook] Error parsing webhook:', error);
+    console.error('[GHL Webhook] Error processing webhook:', error);
     return NextResponse.json({ 
       status: 'error', 
-      error: 'Invalid webhook payload' 
-    }, { status: 400 });
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
 
@@ -164,4 +153,3 @@ export async function GET(request: NextRequest) {
     timestamp: new Date().toISOString()
   });
 }
-

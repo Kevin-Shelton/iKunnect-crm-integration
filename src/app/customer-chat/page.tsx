@@ -55,6 +55,9 @@ export default function CustomerChatPage() {
       sessionStorage.setItem('customer_contact_email', result.contactEmail || '');
       sessionStorage.setItem('customer_contact_phone', result.contactPhone || '');
       sessionStorage.setItem('customer_contact_name', result.contactName || ''); // Store contact name
+      if (result.conversationProviderId) {
+        sessionStorage.setItem('customer_conversation_provider_id', result.conversationProviderId);
+      }
       
       setConversationId(result.conversationId);
       setCustomerId(result.contactId);
