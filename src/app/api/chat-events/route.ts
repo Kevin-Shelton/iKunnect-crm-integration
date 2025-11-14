@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const conversation = payloadObj?.conversation as Record<string, unknown> | undefined;
     let convId = conversation?.id as string;
     
-    // If conversation ID is missing or "unknown", generate one from contact info
+    // If conversation ID is missing or "unknown", try to generate one from contact info
     if (!convId || convId === 'unknown') {
       const contact = payloadObj?.contact as Record<string, unknown> | undefined;
       const contactId = contact?.id as string;
@@ -41,15 +41,22 @@ export async function POST(request: NextRequest) {
       
       if (contactId && contactId !== 'unknown') {
         convId = `conv_${contactId}`;
+        console.log('[Chat Events] Generated conversation ID from contactId:', convId);
       } else if (messageId) {
         // Extract conversation ID from message ID pattern
         const match = messageId.match(/msg_(\d+)/);
-        convId = match ? `conv_${match[1]}` : `conv_${Date.now()}`;
+        convId = match ? `conv_${match[1]}` : null;
+        console.log('[Chat Events] Generated conversation ID from messageId:', convId);
       } else {
-        convId = `conv_${Date.now()}`;
+        // REJECT: No valid identifiers provided
+        console.error('[Chat Events] ❌ REJECTED - No conversation ID, contact ID, or message ID provided');
+        tapPush({ t: nowIso(), route: '/api/chat-events', traceId, note: 'rejected_no_identifiers', data: { payload } });
+        return NextResponse.json({ 
+          error: 'missing required identifiers',
+          details: 'Must provide conversation.id, contact.id, or messageId',
+          status: 'rejected'
+        }, { status: 400 });
       }
-      
-      console.log('[Chat Events] Generated conversation ID:', convId, 'from:', { contactId, messageId });
     }
     
     if (!convId) {
