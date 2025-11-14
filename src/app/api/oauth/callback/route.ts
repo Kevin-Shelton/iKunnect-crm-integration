@@ -1,3 +1,4 @@
+// OAuth 2.0 Callback Handler for GoHighLevel Integration
 import { NextRequest, NextResponse } from 'next/server';
 import { getAccessToken } from '@/lib/ghl-api-2.0';
 
