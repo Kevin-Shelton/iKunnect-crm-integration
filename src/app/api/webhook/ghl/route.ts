@@ -55,6 +55,8 @@ export async function POST(request: NextRequest) {
     };
 
     console.log('[GHL Webhook] Extracted contact info:', extractedContact);
+    console.log('[GHL Webhook] Raw contactId from payload:', contactId);
+    console.log('[GHL Webhook] Contact object from payload:', contact);
 
     // Validate minimum required contact data
     if (!extractedContact.id) {
