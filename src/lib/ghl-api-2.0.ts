@@ -23,7 +23,7 @@ export function getAuthorizationUrl(state: string): string {
     throw new Error('GHL_CLIENT_ID is not set');
   }
   const scope = 'conversations/message.write conversations/message.readonly contacts.write contacts.readonly';
-  return `${GHL_OAUTH_BASE}/oauth/chooselocation?response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_id=${GHL_CLIENT_ID}&scope=${encodeURIComponent(scope)}&state=${state}&user_type=Location`;
+  return `${GHL_OAUTH_BASE}/oauth/authorize?response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_id=${GHL_CLIENT_ID}&scope=${encodeURIComponent(scope)}&state=${state}&user_type=Location`;
 }
 
 // 2. Get Access Token from Authorization Code
