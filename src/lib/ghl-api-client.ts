@@ -198,6 +198,7 @@ export async function sendMessage(params: {
     type: params.type || 'SMS',
     contactId: params.contactId,
     message: params.message,
+    status: 'delivered', // Required by GHL API
   };
 
   console.log('[GHL API] Sending message:', { contactId: params.contactId, type: body.type });
