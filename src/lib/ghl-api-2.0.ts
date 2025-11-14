@@ -2,6 +2,7 @@ import { env } from 'process';
 
 const GHL_CLIENT_ID = env.GHL_CLIENT_ID;
 const GHL_CLIENT_SECRET = env.GHL_CLIENT_SECRET;
+const GHL_VERSION_ID = '6916604cff708f28783f34b1'; // App version ID from GHL marketplace
 const GHL_API_BASE = 'https://services.leadconnectorhq.com';
 const GHL_OAUTH_AUTHORIZE_BASE = 'https://marketplace.gohighlevel.com';
 const GHL_OAUTH_TOKEN_BASE = 'https://services.leadconnectorhq.com';
@@ -42,7 +43,7 @@ export function getAuthorizationUrl(state: string): string {
     'agent-studio.readonly',
     'agent-studio.write'
   ].join(' ');
-  return `${GHL_OAUTH_AUTHORIZE_BASE}/oauth/authorize?response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_id=${GHL_CLIENT_ID}&scope=${encodeURIComponent(scope)}&state=${state}&user_type=Location`;
+  return `${GHL_OAUTH_AUTHORIZE_BASE}/oauth/chooselocation?response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_id=${GHL_CLIENT_ID}&scope=${encodeURIComponent(scope)}&version_id=${GHL_VERSION_ID}`;
 }
 
 // 2. Get Access Token from Authorization Code
