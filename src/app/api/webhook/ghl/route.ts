@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
       id: contactId || contact?.id || null,
       name: contactName || fullName || contact?.name || contact?.fullName || 
             (firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName) || 
-            contact?.firstName && contact?.lastName ? `${contact.firstName} ${contact.lastName}` : 
-            contact?.firstName || contact?.lastName || null,
+            (contact?.firstName && contact?.lastName ? `${contact.firstName} ${contact.lastName}` : 
+            contact?.firstName || contact?.lastName) || null,
       email: email || contact?.email || null,
       phone: phone || contact?.phone || null
     };
