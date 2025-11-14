@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
         conversationId,
         contactId,
         message,
-        type: 'SMS',
+        type: 'Live_Chat',
       });
       
       result = {
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         message,
         email,
         name,
-        type: 'SMS',
+        type: 'Live_Chat',
       });
     }
 

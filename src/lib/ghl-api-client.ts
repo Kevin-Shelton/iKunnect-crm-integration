@@ -71,7 +71,13 @@ export async function upsertContact(params: {
     }
   }
 
-  console.log('[GHL API] Creating/updating contact:', { phone: params.phone, locationId: params.locationId });
+  console.log('[GHL API] Creating/updating contact:', { 
+    phone: params.phone, 
+    locationId: params.locationId,
+    firstName: body.firstName,
+    lastName: body.lastName,
+    email: body.email
+  });
 
   const response = await fetch(url, {
     method: 'POST',

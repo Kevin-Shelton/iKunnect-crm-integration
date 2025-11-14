@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
           conversationId: body.conversationId,
           contactId: body.conversationId, // In our system, conversationId = contactId
           message: messageData.text,
-          type: 'SMS', // Default to SMS, can be made configurable
+          type: 'Live_Chat', // Live Chat type for web chat conversations
         });
         
         console.log('[Chat Send] Agent message sent to customer via GHL API');
