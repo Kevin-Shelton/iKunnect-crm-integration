@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { addMessage } from '@/lib/chatStorage';
+import { upsertMessages } from '@/lib/chatStorage';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -123,13 +123,13 @@ export async function POST(request: NextRequest) {
 
     // Add to in-memory chat storage for real-time updates
     try {
-      addMessage(conversationId, {
+      upsertMessages(conversationId, [{
         id: messageId || Date.now().toString(),
         text: messageText,
         sender: sender === 'customer' ? 'customer' : 'agent',
-        timestamp: dateAdded || new Date().toISOString(),
+        createdAt: dateAdded || new Date().toISOString(),
         source: 'ghl_webhook'
-      });
+      }]);
       console.log('[GHL Webhook] Message added to in-memory storage');
     } catch (error) {
       console.error('[GHL Webhook] Error adding to in-memory storage:', error);
