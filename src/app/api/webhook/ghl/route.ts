@@ -2,17 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { upsertMessages } from '@/lib/chatStorage';
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 /**
  * GHL Webhook Handler
  * Receives messages from GHL (customer, AI agent, human agent) and syncs to app
  */
 export async function POST(request: NextRequest) {
+  // Initialize Supabase client
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
   try {
     console.log('[GHL Webhook] ========================================');
     console.log('[GHL Webhook] Received webhook call');
