@@ -45,6 +45,8 @@ export async function POST(request: Request) {
     // 5. Send initial Live_Chat message to establish conversation type
     try {
       await sendMessage({
+        locationId,
+        conversationId,
         contactId,
         message: 'Customer started a new chat.',
         type: 'Live_Chat',
