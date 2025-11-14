@@ -51,6 +51,11 @@ export function EnhancedWaitingQueue({
 
   // Extract customer name from message content or use fallback
   const getDisplayName = (chat: WaitingChat): string => {
+    // First, check if we have a contact name from the pre-chat form
+    if (chat.contactName && chat.contactName.trim() && !chat.contactName.startsWith('Customer ')) {
+      return chat.contactName.trim();
+    }
+    
     // Try to extract name from message content
     const message = chat.lastMessageBody.toLowerCase();
     

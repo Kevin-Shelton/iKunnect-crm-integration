@@ -84,6 +84,11 @@ export function RejectedChatQueue({
   };
 
   const getDisplayName = (chat: RejectedChat): string => {
+    // First, check if we have a contact name from the pre-chat form
+    if (chat.contactName && chat.contactName.trim() && !chat.contactName.startsWith('Customer ')) {
+      return chat.contactName.trim();
+    }
+    
     // Use the same name extraction logic as the waiting queue
     const message = chat.lastMessageBody.toLowerCase();
     
@@ -106,11 +111,7 @@ export function RejectedChatQueue({
       }
     }
 
-    // Fallback to contact name or visitor ID
-    if (chat.contactName && !chat.contactName.startsWith('Customer ')) {
-      return chat.contactName;
-    }
-
+    // Last resort: use visitor ID
     const timeBasedId = new Date(chat.lastMessageDate).getTime().toString().slice(-4);
     return `Visitor ${timeBasedId}`;
   };
