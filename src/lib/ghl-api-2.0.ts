@@ -23,7 +23,25 @@ export function getAuthorizationUrl(state: string): string {
   if (!GHL_CLIENT_ID) {
     throw new Error('GHL_CLIENT_ID is not set');
   }
-  const scope = 'conversations/message.write conversations/message.readonly contacts.write contacts.readonly';
+  const scope = [
+    'calendars.write',
+    'calendars/events.readonly',
+    'calendars/events.write',
+    'calendars/groups.readonly',
+    'conversations.readonly',
+    'conversations.write',
+    'conversations/message.readonly',
+    'conversations/message.write',
+    'conversations/livechat.write',
+    'contacts.readonly',
+    'contacts.write',
+    'opportunities.readonly',
+    'opportunities.write',
+    'conversation-ai.readonly',
+    'conversation-ai.write',
+    'agent-studio.readonly',
+    'agent-studio.write'
+  ].join(' ');
   return `${GHL_OAUTH_AUTHORIZE_BASE}/oauth/authorize?response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_id=${GHL_CLIENT_ID}&scope=${encodeURIComponent(scope)}&state=${state}&user_type=Location`;
 }
 
