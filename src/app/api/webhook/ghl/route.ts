@@ -53,31 +53,31 @@ export async function POST(request: NextRequest) {
     });
 
     // Determine sender type based on direction and userId
-    let sender = 'customer';
+    let sender: 'contact' | 'human_agent' | 'ai_agent' | 'system' = 'contact';
     let eventType = 'inbound';
     
     // If direction is provided, use it
     if (direction === 'outbound') {
       // Outbound messages could be from AI agent or human agent
       if (userId) {
-        sender = 'agent';
+        sender = 'human_agent';
         eventType = 'outbound';
       } else {
         // No userId means it's from AI agent
-        sender = 'bot';
+        sender = 'ai_agent';
         eventType = 'outbound';
       }
     } else if (direction === 'inbound') {
-      sender = 'customer';
+      sender = 'contact';
       eventType = 'inbound';
     } else {
       // If direction is missing, assume it's from customer (workflow default)
       // Unless there's a userId, which means it's from an agent
       if (userId) {
-        sender = 'agent';
+        sender = 'human_agent';
         eventType = 'outbound';
       } else {
-        sender = 'customer';
+        sender = 'contact';
         eventType = 'inbound';
       }
     }
@@ -126,9 +126,13 @@ export async function POST(request: NextRequest) {
       upsertMessages(conversationId, [{
         id: messageId || Date.now().toString(),
         text: messageText,
-        sender: sender === 'customer' ? 'customer' : 'agent',
+        sender: sender,
         createdAt: dateAdded || new Date().toISOString(),
-        source: 'ghl_webhook'
+        source: 'ghl_webhook',
+        conversationId: conversationId,
+        direction: direction || 'inbound',
+        category: 'chat',
+        raw: payload as any
       }]);
       console.log('[GHL Webhook] Message added to in-memory storage');
     } catch (error) {
