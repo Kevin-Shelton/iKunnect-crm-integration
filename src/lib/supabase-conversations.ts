@@ -147,6 +147,7 @@ export async function getAllConversationsWithStatus() {
         // Extract contact info from payload
         const payload = event.payload as any;
         const contact = payload?.contact || {};
+        const contactId = contact?.id || null;
         const contactName = contact?.name || null;
         const contactEmail = contact?.email || null;
         const contactPhone = contact?.phone || null;
@@ -155,6 +156,7 @@ export async function getAllConversationsWithStatus() {
           id: event.conversation_id,
           messageCount: 1,
           lastMessage: event,
+          contact_id: contactId,
           customer_name: contactName,
           customer_email: contactEmail,
           customer_phone: contactPhone

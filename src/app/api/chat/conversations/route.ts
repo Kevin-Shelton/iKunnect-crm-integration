@@ -33,15 +33,23 @@ export async function GET() {
     const transformedConversations = conversations.map((conv) => {
       // Use customer_name from conversation or generate visitor name
       const customerName = conv.customer_name || `Visitor ${conv.id.slice(-4)}`;
-      const contactId = `contact_${conv.id}`;
+      // Use real contactId from GHL if available, otherwise generate fake one
+      const contactId = conv.contact_id || `contact_${conv.id}`;
+      
+      console.log('[Conversations] Processing conversation:', {
+        conversationId: conv.id,
+        contactId: contactId,
+        isRealContactId: !!conv.contact_id,
+        customerName: customerName
+      });
       
       return {
         id: conv.id,
         contactId: contactId,
         contactName: customerName,
         fullName: customerName,
-        email: undefined,
-        phone: undefined,
+        email: conv.customer_email || undefined,
+        phone: conv.customer_phone || undefined,
         lastMessageBody: conv.lastMessage?.text || '',
         lastMessageDate: conv.lastMessage?.created_at || new Date().toISOString(),
         unreadCount: conv.messageCount,
