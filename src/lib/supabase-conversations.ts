@@ -143,15 +143,15 @@ export async function getAllConversationsWithStatus() {
     // Group by conversation and get latest message for each
     const conversationMap = new Map();
     (events || []).forEach(event => {
+      // Extract contact info from payload
+      const payload = event.payload as any;
+      const contact = payload?.contact || {};
+      const contactId = contact?.id || payload?.contactId || null;
+      const contactName = contact?.name || null;
+      const contactEmail = contact?.email || null;
+      const contactPhone = contact?.phone || null;
+      
       if (!conversationMap.has(event.conversation_id)) {
-        // Extract contact info from payload
-        const payload = event.payload as any;
-        const contact = payload?.contact || {};
-        const contactId = contact?.id || null;
-        const contactName = contact?.name || null;
-        const contactEmail = contact?.email || null;
-        const contactPhone = contact?.phone || null;
-        
         conversationMap.set(event.conversation_id, {
           id: event.conversation_id,
           messageCount: 1,
@@ -162,7 +162,21 @@ export async function getAllConversationsWithStatus() {
           customer_phone: contactPhone
         });
       } else {
-        conversationMap.get(event.conversation_id).messageCount++;
+        const conv = conversationMap.get(event.conversation_id);
+        conv.messageCount++;
+        // Update contact info if this event has it and current doesn't
+        if (contactName && !conv.customer_name) {
+          conv.customer_name = contactName;
+        }
+        if (contactEmail && !conv.customer_email) {
+          conv.customer_email = contactEmail;
+        }
+        if (contactPhone && !conv.customer_phone) {
+          conv.customer_phone = contactPhone;
+        }
+        if (contactId && !conv.contact_id) {
+          conv.contact_id = contactId;
+        }
       }
     });
 
