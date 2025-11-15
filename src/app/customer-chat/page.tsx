@@ -5,7 +5,8 @@ import { PreChatIdentityForm } from '@/components/chat/pre-chat-identity-form';
 import { TypingIndicator } from '@/components/chat/typing-indicator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Bot, User } from 'lucide-react';
-import { Send, MessageCircle } from 'lucide-react';
+import { Send, MessageCircle, Globe } from 'lucide-react';
+import { SUPPORTED_LANGUAGES } from '@/lib/languages';
 
 type ChatState = 'IDENTITY_COLLECTION' | 'LOADING' | 'ACTIVE_CHAT';
 
@@ -147,7 +148,8 @@ export default function CustomerChatPage() {
                   let displayText = msg.text || '';
                   
                   // If message is from agent/AI and customer language is not English, translate it
-                  if ((msg.sender === 'agent' || msg.sender === 'ai_agent' || msg.sender === 'system') && customerLanguage !== 'en' && displayText) {
+                  if ((msg.sender === 'agent' || msg.sender === 'ai_agent' || msg.sender === 'human_agent' || msg.sender === 'system') && customerLanguage !== 'en' && displayText) {
+                    console.log('[Customer Chat] Translating agent message to', customerLanguage, ':', displayText.substring(0, 50));
                     try {
                       const translateResponse = await fetch('/api/verbum/translate', {
                         method: 'POST',
@@ -161,6 +163,9 @@ export default function CustomerChatPage() {
                       if (translateResponse.ok) {
                         const translateData = await translateResponse.json();
                         displayText = translateData.translation || displayText;
+                        console.log('[Customer Chat] Translation successful:', displayText.substring(0, 50));
+                      } else {
+                        console.error('[Customer Chat] Translation API failed:', translateResponse.status);
                       }
                     } catch (err) {
                       console.error('Translation failed for agent message:', err);
@@ -363,16 +368,27 @@ export default function CustomerChatPage() {
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 p-4">
-        <div className="max-w-4xl mx-auto flex items-center space-x-3">
-          <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-            <MessageCircle className="h-6 w-6 text-white" />
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+              <MessageCircle className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900">Customer Support Chat</h1>
+              <p className="text-sm text-gray-500">
+                {isConnected ? 'Connected - Chat with our support team' : 'Connecting...'}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">Customer Support Chat</h1>
-            <p className="text-sm text-gray-500">
-              {isConnected ? 'Connected - Chat with our support team' : 'Connecting...'}
-            </p>
-          </div>
+          {/* Language Indicator */}
+          {typeof window !== 'undefined' && sessionStorage.getItem('customer_language') && (
+            <div className="flex items-center space-x-2 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-200">
+              <Globe className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium text-blue-700">
+                {SUPPORTED_LANGUAGES.find(l => l.code === sessionStorage.getItem('customer_language'))?.name || 'English'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

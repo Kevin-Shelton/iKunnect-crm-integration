@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
 import { AlertCircle, Database, Settings, Globe } from 'lucide-react';
 import { getSentimentDisplay } from '@/lib/translation';
+import { SUPPORTED_LANGUAGES } from '@/lib/languages';
 
 interface Message {
   id: string;
@@ -46,6 +47,7 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
   const [lastFetchTime, setLastFetchTime] = useState<string>('');
   const [configurationIssue, setConfigurationIssue] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState<string>('Customer');
+  const [customerLanguage, setCustomerLanguage] = useState<string>('en');
 
   useEffect(() => {
     if (!conversationId) {
@@ -83,9 +85,12 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
         
         console.log(`[SimpleMessages] Loaded ${data.messages.length} messages`);
         
-        // Extract customer name from response
+        // Extract customer name and language from response
         if (data.contact?.name) {
           setCustomerName(data.contact.name);
+        }
+        if (data.contact?.language) {
+          setCustomerLanguage(data.contact.language);
         }
         
         const newMessages = (data.messages || []).map((msg: any) => {
@@ -246,7 +251,18 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
   }, []);
 
   return (
-    <div className={`flex-1 overflow-y-auto ${compact ? 'p-2 space-y-2' : 'p-4 space-y-4'} ${className}`}>
+    <div className={`flex-1 overflow-y-auto ${className}`}>
+      {/* Language Indicator */}
+      {customerLanguage && customerLanguage !== 'en' && (
+        <div className="sticky top-0 z-10 bg-blue-50 border-b border-blue-200 px-3 py-2 flex items-center justify-center space-x-2">
+          <Globe className="h-4 w-4 text-blue-600" />
+          <span className="text-xs font-medium text-blue-700">
+            Customer Language: {SUPPORTED_LANGUAGES.find(l => l.code === customerLanguage)?.name || customerLanguage.toUpperCase()}
+          </span>
+        </div>
+      )}
+      
+      <div className={`${compact ? 'p-2 space-y-2' : 'p-4 space-y-4'}`}>
       {deduplicatedMessages.map((message) => {
         // Determine if message is from any agent type
         const isAgent = message.sender === 'agent' || message.sender === 'ai_agent' || message.sender === 'human_agent';
@@ -342,6 +358,7 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
         </div>
         );
       })}
+      </div>
     </div>
   );
 }

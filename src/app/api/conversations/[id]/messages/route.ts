@@ -39,6 +39,7 @@ export async function GET(
     let customerName = `Customer ${conversationId.slice(-4)}`;
     let customerEmail = '';
     let customerPhone = '';
+    let customerLanguage = 'en'; // Default to English
     
     for (const event of chatEvents) {
       const payload = event.payload as any;
@@ -47,7 +48,10 @@ export async function GET(
         customerName = contact.name;
         customerEmail = contact.email || customerEmail;
         customerPhone = contact.phone || customerPhone;
-        break;
+      }
+      // Extract customer language from any event that has it
+      if (event.customer_language) {
+        customerLanguage = event.customer_language;
       }
     }
     
@@ -99,7 +103,8 @@ export async function GET(
         name: customerName,
         email: customerEmail,
         phone: customerPhone,
-        locationId: ''
+        locationId: '',
+        language: customerLanguage
       },
       total: messages.length,
       timestamp: new Date().toISOString()
