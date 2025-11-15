@@ -17,21 +17,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[Send GHL] ========================================');
-    console.log('[Send GHL] Received message request:', { phone, conversationId, message: message.substring(0, 50) + '...' });
-    console.log('[Send GHL] conversationId provided?', !!conversationId);
-    console.log('[Send GHL] conversationId value:', conversationId);
+    console.log('[Send iKunnect CRM] ========================================');
+    console.log('[Send iKunnect CRM] Received message request:', { phone, conversationId, message: message.substring(0, 50) + '...' });
+    console.log('[Send iKunnect CRM] conversationId provided?', !!conversationId);
+    console.log('[Send iKunnect CRM] conversationId value:', conversationId);
 
     // Get the location ID (in a multi-location setup, this would come from the user's context)
     const locationId = await getDefaultLocationId();
-    console.log('[Send GHL] Using location ID:', locationId);
+    console.log('[Send iKunnect CRM] Using location ID:', locationId);
 
     let result;
     
     // If conversationId is provided, reuse it (subsequent messages)
-    console.log('[Send GHL] Checking if conversationId exists:', conversationId);
+    console.log('[Send iKunnect CRM] Checking if conversationId exists:', conversationId);
     if (conversationId) {
-      console.log('[Send GHL] Reusing existing conversation:', conversationId);
+      console.log('[Send iKunnect CRM] Reusing existing conversation:', conversationId);
       
       // Get or create contact (to ensure we have contactId)
       const { contactId } = await upsertContact({
@@ -58,8 +58,8 @@ export async function POST(request: NextRequest) {
       };
     } else {
       // First message - create contact and conversation
-      console.log('[Send GHL] ⚠️ NO conversationId - Creating NEW conversation');
-      console.log('[Send GHL] This should only happen on first message!');
+      console.log('[Send iKunnect CRM] ⚠️ NO conversationId - Creating NEW conversation');
+      console.log('[Send iKunnect CRM] This should only happen on first message!');
       result = await sendMessageToContact({
         locationId,
         phone,
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log('[Send GHL] Message sent successfully:', result);
+    console.log('[Send iKunnect CRM] Message sent successfully:', result);
 
     return NextResponse.json({
       success: true,
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('[Send GHL] Error:', error);
+    console.error('[Send iKunnect CRM] Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
     return NextResponse.json(

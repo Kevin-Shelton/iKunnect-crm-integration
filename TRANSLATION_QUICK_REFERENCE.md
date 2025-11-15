@@ -1,7 +1,7 @@
 # Translation System Quick Reference
 
 ## 🎯 Critical Rule
-**ALL communication with GHL must be in English. No exceptions.**
+**ALL communication with iKunnect CRM must be in English. No exceptions.**
 
 ---
 
@@ -15,11 +15,11 @@
 │                          ↓                                  │
 │  Translate to English: "I need help"                       │
 │                          ↓                                  │
-│  Send to GHL (English only)                                │
+│  Send to iKunnect CRM (English only)                                │
 └─────────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────────┐
-│                    GHL / DATABASE                           │
+│                    iKunnect CRM / DATABASE                           │
 ├─────────────────────────────────────────────────────────────┤
 │  Store: "I need help" (English)                            │
 │  Analyze sentiment: 😐 Neutral (85%)                       │
@@ -33,13 +33,13 @@
 │                          ↓                                  │
 │  Agent responds: "How can I help?"                         │
 │                          ↓                                  │
-│  Send to GHL (English)                                     │
+│  Send to iKunnect CRM (English)                                     │
 └─────────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                    CUSTOMER SIDE                            │
 ├─────────────────────────────────────────────────────────────┤
-│  Receive from GHL: "How can I help?"                       │
+│  Receive from iKunnect CRM: "How can I help?"                       │
 │                          ↓                                  │
 │  Translate to Spanish: "¿Cómo puedo ayudar?"              │
 │                          ↓                                  │
@@ -53,8 +53,8 @@
 
 ### Customer Chat (`/customer-chat`)
 - **Language Selector:** 133 languages available
-- **Outgoing Messages:** Translate customer language → English → Send to GHL
-- **Incoming Messages:** Receive from GHL (English) → Translate to customer language → Display
+- **Outgoing Messages:** Translate customer language → English → Send to iKunnect CRM
+- **Incoming Messages:** Receive from iKunnect CRM (English) → Translate to customer language → Display
 - **Display:** Always shows messages in customer's selected language
 
 ### Agent Dashboard (`/agent-dashboard`)
@@ -67,7 +67,7 @@
 - **Sentiment:** `/api/verbum/sentiment`
 - **Language Codes:** 2-letter ISO (en, es, pt, fr, de, etc.)
 
-### GHL Webhook (`/api/webhook/ghl`)
+### iKunnect CRM Webhook (`/api/webhook/ghl`)
 - **Receives:** English messages only
 - **Performs:** Sentiment analysis
 - **Stores:** Metadata in database
@@ -81,7 +81,7 @@
 
 | Field | Description | Example |
 |-------|-------------|---------|
-| `text` | Message text (English from GHL) | "I need help" |
+| `text` | Message text (English from iKunnect CRM) | "I need help" |
 | `original_text` | Original language text | null (client-side) |
 | `translated_text` | Translated text | null (client-side) |
 | `source_lang` | Source language code | "es" |
@@ -153,20 +153,20 @@ See `TRANSLATION_FLOW_TESTING.md` for comprehensive scenarios
 ## 🚨 Troubleshooting
 
 ### Customer messages showing in original language in agent dashboard
-**Problem:** Translation not happening before GHL
+**Problem:** Translation not happening before iKunnect CRM
 **Solution:** Check customer chat translation logic in `sendMessage` function
 
 ### Agent messages showing in English to customer
-**Problem:** Translation not happening after receiving from GHL
+**Problem:** Translation not happening after receiving from iKunnect CRM
 **Solution:** Check customer chat message loading and translation logic
 
 ### No sentiment badges
 **Problem:** Sentiment analysis failing or not displaying
 **Solution:** Check Verbum API key, check agent dashboard UI components
 
-### GHL receiving non-English messages
-**Problem:** Translation not happening before sending to GHL
-**Solution:** Check customer chat `sendMessage` function, ensure translation before GHL API call
+### iKunnect CRM receiving non-English messages
+**Problem:** Translation not happening before sending to iKunnect CRM
+**Solution:** Check customer chat `sendMessage` function, ensure translation before iKunnect CRM API call
 
 ### Translation errors in console
 **Problem:** Verbum API failing
@@ -176,7 +176,7 @@ See `TRANSLATION_FLOW_TESTING.md` for comprehensive scenarios
 
 ## 📝 Code Snippets
 
-### Translate Customer Message to English (Before GHL)
+### Translate Customer Message to English (Before iKunnect CRM)
 
 ```typescript
 // In customer-chat/page.tsx - sendMessage function
@@ -193,12 +193,12 @@ if (customerLanguage !== 'en') {
   
   if (translateResponse.ok) {
     const { translation } = await translateResponse.json();
-    messageToSend = translation; // Send English to GHL
+    messageToSend = translation; // Send English to iKunnect CRM
   }
 }
 ```
 
-### Translate Agent Message to Customer Language (After GHL)
+### Translate Agent Message to Customer Language (After iKunnect CRM)
 
 ```typescript
 // In customer-chat/page.tsx - loadMessages function
@@ -251,8 +251,8 @@ NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_key
-GHL_API_KEY=your_ghl_api_key
-GHL_LOCATION_ID=your_ghl_location_id
+iKunnect CRM_API_KEY=your_ghl_api_key
+iKunnect CRM_LOCATION_ID=your_ghl_location_id
 ```
 
 ---
@@ -271,7 +271,7 @@ GHL_LOCATION_ID=your_ghl_location_id
 
 1. **Always Test Translation Flow**
    - Test with non-English language
-   - Verify GHL receives English
+   - Verify iKunnect CRM receives English
    - Verify agent sees English
    - Verify customer sees their language
 
@@ -285,10 +285,10 @@ GHL_LOCATION_ID=your_ghl_location_id
    - Log errors for monitoring
    - Don't block user communication
 
-4. **Keep GHL English-Only**
-   - Never send non-English to GHL
+4. **Keep iKunnect CRM English-Only**
+   - Never send non-English to iKunnect CRM
    - Translation happens client-side
-   - GHL is the source of truth in English
+   - iKunnect CRM is the source of truth in English
 
 5. **Preserve Audit Trail**
    - Store language metadata

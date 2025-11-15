@@ -153,8 +153,8 @@ All translation and sentiment analysis features have been implemented and deploy
 
 ### Vercel Logs
 ```
-[GHL Webhook] Translated message: es -> en
-[GHL Webhook] Sentiment: positive ( 0.85 )
+[iKunnect CRM Webhook] Translated message: es -> en
+[iKunnect CRM Webhook] Sentiment: positive ( 0.85 )
 ```
 
 ### Supabase Database

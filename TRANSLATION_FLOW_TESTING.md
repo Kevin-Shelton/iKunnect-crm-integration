@@ -2,9 +2,9 @@
 
 ## Overview
 This guide verifies that the corrected translation flow works as expected:
-- Customer messages are translated to English BEFORE sending to GHL
+- Customer messages are translated to English BEFORE sending to iKunnect CRM
 - Agent responses are translated to customer language BEFORE displaying to customer
-- GHL only receives and sends English messages
+- iKunnect CRM only receives and sends English messages
 - Agent dashboard shows English only
 - Customer chat shows messages in customer's selected language
 
@@ -13,13 +13,13 @@ This guide verifies that the corrected translation flow works as expected:
 - VERBUM_API_KEY environment variable set in Vercel
 - Access to customer chat interface
 - Access to agent dashboard
-- Access to GHL conversation view (optional, for verification)
+- Access to iKunnect CRM conversation view (optional, for verification)
 
 ## Test Scenarios
 
 ### Test 1: Spanish Customer → English Agent
 
-**Objective:** Verify Spanish customer messages are translated to English before reaching GHL and agent
+**Objective:** Verify Spanish customer messages are translated to English before reaching iKunnect CRM and agent
 
 **Steps:**
 1. Open customer chat interface
@@ -38,7 +38,7 @@ This guide verifies that the corrected translation flow works as expected:
 - ✅ Agent dashboard displays all customer messages in English
 - ✅ Customer chat displays all agent messages in Spanish
 - ✅ Sentiment badges appear only on customer messages in agent dashboard
-- ✅ GHL receives English messages only (verify in GHL if possible)
+- ✅ iKunnect CRM receives English messages only (verify in iKunnect CRM if possible)
 - ✅ No translation errors in browser console
 - ✅ Messages appear in real-time without delay
 
@@ -161,9 +161,9 @@ This guide verifies that the corrected translation flow works as expected:
 
 ---
 
-### Test 7: GHL Integration Verification
+### Test 7: iKunnect CRM Integration Verification
 
-**Objective:** Verify GHL only receives English messages
+**Objective:** Verify iKunnect CRM only receives English messages
 
 **Steps:**
 1. Complete Test 1 (Spanish conversation)
@@ -174,9 +174,9 @@ This guide verifies that the corrected translation flow works as expected:
 6. Verify all agent messages appear in English
 
 **Expected Results:**
-- ✅ GHL shows only English messages
-- ✅ No Spanish/Portuguese/French text visible in GHL
-- ✅ Conversation flows naturally in English from GHL perspective
+- ✅ iKunnect CRM shows only English messages
+- ✅ No Spanish/Portuguese/French text visible in iKunnect CRM
+- ✅ Conversation flows naturally in English from iKunnect CRM perspective
 
 ---
 
@@ -262,7 +262,7 @@ If tests fail, check:
 3. **Network Tab:**
    - ✅ `/api/verbum/translate` returns translations
    - ✅ `/api/verbum/sentiment` returns sentiment data
-   - ✅ GHL webhook receives English text
+   - ✅ iKunnect CRM webhook receives English text
 
 4. **Database:**
    - ✅ Migration applied successfully
@@ -279,9 +279,9 @@ If tests fail, check:
 ## Success Criteria
 
 All tests pass with:
-- ✅ Customer messages translated to English before GHL
+- ✅ Customer messages translated to English before iKunnect CRM
 - ✅ Agent messages translated to customer language before display
-- ✅ GHL only receives/sends English
+- ✅ iKunnect CRM only receives/sends English
 - ✅ Agent dashboard shows English only
 - ✅ Customer chat shows customer's language only
 - ✅ Sentiment analysis working on customer messages

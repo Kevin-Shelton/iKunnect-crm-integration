@@ -2,9 +2,9 @@
 
 ## Overview
 
-Successfully implemented a comprehensive translation and sentiment analysis system for iKunnect CRM integration with GoHighLevel (GHL). The system provides real-time translation between customers and agents, with sentiment analysis on customer messages.
+Successfully implemented a comprehensive translation and sentiment analysis system for iKunnect CRM integration with GoHighLevel (iKunnect CRM). The system provides real-time translation between customers and agents, with sentiment analysis on customer messages.
 
-**Critical Requirement Met:** ALL communication with GHL is in English, with translation happening transparently in the background.
+**Critical Requirement Met:** ALL communication with iKunnect CRM is in English, with translation happening transparently in the background.
 
 ---
 
@@ -17,7 +17,7 @@ Customer (Spanish) → Customer Chat
                    ↓
             Translate to English
                    ↓
-              Send to GHL (English)
+              Send to iKunnect CRM (English)
                    ↓
          Store in Database (English)
                    ↓
@@ -48,14 +48,14 @@ Customer (Spanish) → Customer Chat
    - `/api/verbum/sentiment`: Sentiment analysis endpoint
    - Uses 2-letter ISO 639-1 language codes
 
-4. **GHL Webhook Handler** (`/api/webhook/ghl`)
-   - Receives English messages from GHL
+4. **iKunnect CRM Webhook Handler** (`/api/webhook/ghl`)
+   - Receives English messages from iKunnect CRM
    - Performs sentiment analysis
    - Stores metadata in database
    - No translation needed (already in English)
 
 5. **Database Schema** (`chat_events` table)
-   - `text`: Message text (always English from GHL)
+   - `text`: Message text (always English from iKunnect CRM)
    - `original_text`: Original language text (client-side translation)
    - `translated_text`: Translated text (client-side translation)
    - `source_lang`: Source language code
@@ -73,8 +73,8 @@ Customer (Spanish) → Customer Chat
 
 1. Customer types message in their language (e.g., Spanish)
 2. Customer chat calls `/api/verbum/translate` to translate to English
-3. English translation sent to GHL via API
-4. GHL webhook receives English message
+3. English translation sent to iKunnect CRM via API
+4. iKunnect CRM webhook receives English message
 5. Webhook performs sentiment analysis on English text
 6. Message stored in database with metadata
 7. Agent dashboard loads message (already in English)
@@ -83,8 +83,8 @@ Customer (Spanish) → Customer Chat
 ### Agent Message Flow
 
 1. Agent types response in English
-2. Agent sends message via GHL API
-3. GHL webhook receives English message
+2. Agent sends message via iKunnect CRM API
+3. iKunnect CRM webhook receives English message
 4. Message stored in database
 5. Customer chat loads new messages
 6. Customer chat calls `/api/verbum/translate` to translate to customer language
@@ -207,8 +207,8 @@ CREATE TABLE chat_events (
 - `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anonymous key
 - `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role key
-- `GHL_API_KEY`: GoHighLevel API key
-- `GHL_LOCATION_ID`: GoHighLevel location ID
+- `iKunnect CRM_API_KEY`: GoHighLevel API key
+- `iKunnect CRM_LOCATION_ID`: GoHighLevel location ID
 
 ### Hardcoded Values
 
@@ -253,7 +253,7 @@ See `TRANSLATION_FLOW_TESTING.md` for comprehensive test scenarios:
 - English customer → English agent (no translation)
 - Sentiment analysis verification
 - Database verification
-- GHL integration verification
+- iKunnect CRM integration verification
 - Error handling
 - Performance testing
 - Multi-language switching
@@ -460,7 +460,7 @@ For issues or questions:
 
 The translation and sentiment analysis system is now fully implemented and deployed. All critical requirements have been met:
 
-✅ ALL communication with GHL is in English
+✅ ALL communication with iKunnect CRM is in English
 ✅ Customer chat displays messages in customer's language
 ✅ Agent dashboard displays messages in English only
 ✅ Translation happens transparently in background

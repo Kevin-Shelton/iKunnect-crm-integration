@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const locationId = await getDefaultLocationId();
     console.log('[Chat Start] Using location ID:', locationId);
 
-    // 3. Create or update contact in GHL
+    // 3. Create or update contact in iKunnect CRM
     const { contactId } = await upsertContact({
       locationId,
       phone,
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     
     console.log('[Chat Start] Contact created/updated:', contactId);
 
-    // 4. Create or get existing conversation in GHL
+    // 4. Create or get existing conversation in iKunnect CRM
     const { conversationId, conversationProviderId } = await getOrCreateConversation({
       locationId,
       contactId,
@@ -54,13 +54,13 @@ export async function POST(request: Request) {
         message: 'initiating chat',
         type: 'Live_Chat',
       });
-      console.log('[Chat Start] Initial inbound message sent to GHL as customer message');
+      console.log('[Chat Start] Initial inbound message sent to iKunnect CRM as customer message');
     } catch (error) {
       console.error('[Chat Start] Failed to send initial message:', error);
       // Continue anyway - the conversation is created
     }
 
-    // 6. Response with real GHL IDs
+    // 6. Response with real iKunnect CRM IDs
     return NextResponse.json({
       contactId,
       conversationId,

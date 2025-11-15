@@ -103,18 +103,18 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // For agent messages, send to customer via GHL API
+    // For agent messages, send to customer via iKunnect CRM API
     if (messageData.sender === 'human_agent') {
-      console.log('[Chat Send] Agent message - sending to customer via GHL API');
+      console.log('[Chat Send] Agent message - sending to customer via iKunnect CRM API');
       
       try {
-        // Import GHL API client
+        // Import iKunnect CRM API client
         const { sendMessage, getDefaultLocationId } = await import('@/lib/ghl-api-client');
         
         // Get location ID
         const locationId = await getDefaultLocationId();
         
-        // Send message via GHL API
+        // Send message via iKunnect CRM API
         // Note: conversationId is used as contactId in our system
         await sendMessage({
           locationId,
@@ -124,9 +124,9 @@ export async function POST(request: NextRequest) {
           type: 'Live_Chat', // Live Chat type for web chat conversations
         });
         
-        console.log('[Chat Send] Agent message sent to customer via GHL API');
+        console.log('[Chat Send] Agent message sent to customer via iKunnect CRM API');
       } catch (error) {
-        console.error('[Chat Send] Failed to send agent message via GHL API:', error);
+        console.error('[Chat Send] Failed to send agent message via iKunnect CRM API:', error);
         // Don't fail the whole request - message is still stored locally
       }
     }

@@ -261,7 +261,7 @@ export default function CustomerChatPage() {
         }
       }
       
-      // Use the new GHL API route that uses OAuth tokens
+      // Use the new iKunnect CRM API route that uses OAuth tokens
       const response = await fetch('/api/chat/send-ghl', {
         method: 'POST',
         headers: {
@@ -269,7 +269,7 @@ export default function CustomerChatPage() {
         },
         body: JSON.stringify({
           phone: customerPhone,
-          message: translatedText, // Send translated English text to GHL
+          message: translatedText, // Send translated English text to iKunnect CRM
           email: customerEmail,
           name: customerName,
           conversationId: conversationId,
@@ -287,9 +287,9 @@ export default function CustomerChatPage() {
         setMessages(prev => [...prev, errorMessage]);
       } else {
         const result = await response.json();
-        console.log('Message sent via GHL API 2.0 successfully:', result);
+        console.log('Message sent via iKunnect CRM API 2.0 successfully:', result);
         
-        // Update conversationId if we got a new one from GHL API 2.0 response
+        // Update conversationId if we got a new one from iKunnect CRM API 2.0 response
         if (result.success && result.data) {
           if (result.data.conversationId && result.data.conversationId !== conversationId) {
             setConversationId(result.data.conversationId);

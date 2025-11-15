@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { upsertMessages } from '@/lib/chatStorage';
 
 /**
- * GHL Webhook Handler
- * Receives messages from GHL (customer, AI agent, human agent) and syncs to app
+ * iKunnect CRM Webhook Handler
+ * Receives messages from iKunnect CRM (customer, AI agent, human agent) and syncs to app
  */
 export async function POST(request: NextRequest) {
   // Initialize Supabase client
@@ -13,12 +13,12 @@ export async function POST(request: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_TOKEN!
   );
   try {
-    console.log('[GHL Webhook] ========================================');
-    console.log('[GHL Webhook] Received webhook call');
+    console.log('[iKunnect CRM Webhook] ========================================');
+    console.log('[iKunnect CRM Webhook] Received webhook call');
     
     // Parse the webhook payload
     const payload = await request.json();
-    console.log('[GHL Webhook] Payload:', JSON.stringify(payload, null, 2));
+    console.log('[iKunnect CRM Webhook] Payload:', JSON.stringify(payload, null, 2));
 
     // Extract relevant data from GoHighLevel webhook
     const {
@@ -54,13 +54,13 @@ export async function POST(request: NextRequest) {
       phone: phone || contact?.phone || null
     };
 
-    console.log('[GHL Webhook] Extracted contact info:', extractedContact);
-    console.log('[GHL Webhook] Raw contactId from payload:', contactId);
-    console.log('[GHL Webhook] Contact object from payload:', contact);
+    console.log('[iKunnect CRM Webhook] Extracted contact info:', extractedContact);
+    console.log('[iKunnect CRM Webhook] Raw contactId from payload:', contactId);
+    console.log('[iKunnect CRM Webhook] Contact object from payload:', contact);
 
     // Validate minimum required contact data
     if (!extractedContact.id) {
-      console.log('[GHL Webhook] ❌ Rejecting - no contact ID provided');
+      console.log('[iKunnect CRM Webhook] ❌ Rejecting - no contact ID provided');
       return NextResponse.json({ 
         status: 'rejected', 
         reason: 'missing contact ID',
@@ -70,17 +70,17 @@ export async function POST(request: NextRequest) {
 
     // Warn if contact name is missing (will create "Visitor XXXX" entries)
     if (!extractedContact.name) {
-      console.warn('[GHL Webhook] ⚠️ Warning - no contact name provided, will use fallback naming');
+      console.warn('[iKunnect CRM Webhook] ⚠️ Warning - no contact name provided, will use fallback naming');
     }
 
     const messageText = messageBody || message || '';
 
     if (!messageText) {
-      console.log('[GHL Webhook] Skipping - no message text');
+      console.log('[iKunnect CRM Webhook] Skipping - no message text');
       return NextResponse.json({ status: 'ignored', reason: 'missing message text' });
     }
 
-    // Filter out GHL system messages that shouldn't be stored
+    // Filter out iKunnect CRM system messages that shouldn't be stored
     // NOTE: "initiating chat" is NOT filtered - it's needed to trigger the workflow
     const systemMessagesToFilter = [
       'Customer started a new chat',
@@ -92,14 +92,14 @@ export async function POST(request: NextRequest) {
     // Allow "initiating chat" through - it triggers the greeting workflow
     if (messageText.toLowerCase() !== 'initiating chat' && 
         systemMessagesToFilter.some(sysMsg => messageText.toLowerCase().includes(sysMsg.toLowerCase()))) {
-      console.log('[GHL Webhook] Skipping system message:', messageText);
+      console.log('[iKunnect CRM Webhook] Skipping system message:', messageText);
       return NextResponse.json({ status: 'ignored', reason: 'system message filtered' });
     }
     
     // Special handling for "initiating chat" - store it but mark it for filtering in UI
     const isInitiatingMessage = messageText.toLowerCase() === 'initiating chat';
     if (isInitiatingMessage) {
-      console.log('[GHL Webhook] Detected initiating chat message - will store but hide from UI');
+      console.log('[iKunnect CRM Webhook] Detected initiating chat message - will store but hide from UI');
     }
 
     // Detect system greeting messages (automated welcome messages)
@@ -112,21 +112,21 @@ export async function POST(request: NextRequest) {
       (direction === 'outbound' && !userId && messageText.length > 50 && messageText.includes('?'));
     
     if (isSystemGreeting) {
-      console.log('[GHL Webhook] Detected system greeting message:', messageText.substring(0, 50));
+      console.log('[iKunnect CRM Webhook] Detected system greeting message:', messageText.substring(0, 50));
     }
 
-    // Generate a fallback message ID if not provided by GHL
+    // Generate a fallback message ID if not provided by iKunnect CRM
     const effectiveMessageId = messageId || `msg_${extractedContact.id}_${Date.now()}_${messageText.substring(0, 20).replace(/\s/g, '_')}`;
-    console.log('[GHL Webhook] Message ID:', effectiveMessageId, '(original:', messageId, ')');
+    console.log('[iKunnect CRM Webhook] Message ID:', effectiveMessageId, '(original:', messageId, ')');
 
     // ALWAYS look up existing conversation to ensure message grouping
-    // Strategy: Try contactId first, then GHL conversationId, then create new
+    // Strategy: Try contactId first, then iKunnect CRM conversationId, then create new
     let finalConversationId = conversationId;
     let foundExisting = false;
     
     // Strategy 1: Look up by contactId (most reliable for grouping)
     if (extractedContact.id) {
-      console.log('[GHL Webhook] 🔍 Looking up existing conversation by contactId:', extractedContact.id);
+      console.log('[iKunnect CRM Webhook] 🔍 Looking up existing conversation by contactId:', extractedContact.id);
       
       try {
         const { data, error } = await supabase
@@ -140,19 +140,19 @@ export async function POST(request: NextRequest) {
         if (!error && data?.conversation_id) {
           finalConversationId = data.conversation_id;
           foundExisting = true;
-          console.log('[GHL Webhook] ✅ Found existing conversation by contactId:', finalConversationId);
+          console.log('[iKunnect CRM Webhook] ✅ Found existing conversation by contactId:', finalConversationId);
           if (conversationId && conversationId !== finalConversationId) {
-            console.log('[GHL Webhook] ⚠️ GHL conversationId differs:', conversationId, '- using existing:', finalConversationId);
+            console.log('[iKunnect CRM Webhook] ⚠️ GHL conversationId differs:', conversationId, '- using existing:', finalConversationId);
           }
         }
       } catch (error) {
-        console.error('[GHL Webhook] Error querying by contactId:', error);
+        console.error('[iKunnect CRM Webhook] Error querying by contactId:', error);
       }
     }
     
-    // Strategy 2: If not found by contactId, try looking up by GHL conversationId
+    // Strategy 2: If not found by contactId, try looking up by iKunnect CRM conversationId
     if (!foundExisting && conversationId) {
-      console.log('[GHL Webhook] 🔍 Looking up existing conversation by GHL conversationId:', conversationId);
+      console.log('[iKunnect CRM Webhook] 🔍 Looking up existing conversation by GHL conversationId:', conversationId);
       
       try {
         const { data, error } = await supabase
@@ -166,29 +166,29 @@ export async function POST(request: NextRequest) {
         if (!error && data?.conversation_id) {
           finalConversationId = data.conversation_id;
           foundExisting = true;
-          console.log('[GHL Webhook] ✅ Found existing conversation by GHL conversationId:', finalConversationId);
+          console.log('[iKunnect CRM Webhook] ✅ Found existing conversation by GHL conversationId:', finalConversationId);
         }
       } catch (error) {
-        console.error('[GHL Webhook] Error querying by conversationId:', error);
+        console.error('[iKunnect CRM Webhook] Error querying by conversationId:', error);
       }
     }
     
     // Strategy 3: Create new conversation if nothing found
     if (!foundExisting) {
       finalConversationId = conversationId || extractedContact.id || `conv_${Date.now()}`;
-      console.log('[GHL Webhook] 🆕 No existing conversation found, creating new with ID:', finalConversationId);
+      console.log('[iKunnect CRM Webhook] 🆕 No existing conversation found, creating new with ID:', finalConversationId);
     }
     
     if (!finalConversationId) {
-      console.log('[GHL Webhook] ⚠️ No valid conversation identifier');
+      console.log('[iKunnect CRM Webhook] ⚠️ No valid conversation identifier');
     }
 
     if (!finalConversationId) {
-      console.log('[GHL Webhook] ❌ Skipping - no valid conversation identifier');
+      console.log('[iKunnect CRM Webhook] ❌ Skipping - no valid conversation identifier');
       return NextResponse.json({ status: 'ignored', reason: 'missing conversation identifier' });
     }
 
-    console.log('[GHL Webhook] Processing message:', {
+    console.log('[iKunnect CRM Webhook] Processing message:', {
       originalConversationId: conversationId,
       finalConversationId,
       contactId: extractedContact.id,
@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log('[GHL Webhook] Determined sender:', sender, 'eventType:', eventType);
+    console.log('[iKunnect CRM Webhook] Determined sender:', sender, 'eventType:', eventType);
 
     // Save to Supabase chat_events table
     try {
@@ -246,7 +246,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
 
       if (existingMessage) {
-        console.log('[GHL Webhook] ⚠️ Message already exists, skipping:', effectiveMessageId);
+        console.log('[iKunnect CRM Webhook] ⚠️ Message already exists, skipping:', effectiveMessageId);
         return NextResponse.json({ 
           status: 'skipped', 
           reason: 'duplicate message',
@@ -254,10 +254,10 @@ export async function POST(request: NextRequest) {
         });
       }
       
-      console.log('[GHL Webhook] ✅ Message is new, proceeding with insert');
+      console.log('[iKunnect CRM Webhook] ✅ Message is new, proceeding with insert');
 
       // Sentiment Analysis for customer messages
-      // Note: GHL already receives English text (translated by customer chat before sending)
+      // Note: iKunnect CRM already receives English text (translated by customer chat before sending)
       // So we don't need to translate here, only analyze sentiment
       let sourceLang = 'en'; // Messages from GHL are already in English
       let targetLang = 'en';
@@ -293,10 +293,10 @@ export async function POST(request: NextRequest) {
             const sentimentData = await sentimentResponse.json();
             sentiment = sentimentData.sentiment || null;
             sentimentConfidence = sentimentData.confidence || null;
-            console.log('[GHL Webhook] Sentiment:', sentiment, '(', sentimentConfidence, ')');
+            console.log('[iKunnect CRM Webhook] Sentiment:', sentiment, '(', sentimentConfidence, ')');
           }
         } catch (err) {
-          console.error('[GHL Webhook] Sentiment error:', err);
+          console.error('[iKunnect CRM Webhook] Sentiment error:', err);
           // Continue without sentiment if analysis fails
         }
       }
@@ -319,8 +319,8 @@ export async function POST(request: NextRequest) {
         conversation_id: finalConversationId,
         type: dbType,
         message_id: effectiveMessageId,
-        text: messageText, // Always English from GHL
-        original_text: null, // Translation happens client-side before reaching GHL
+        text: messageText, // Always English from iKunnect CRM
+        original_text: null, // Translation happens client-side before reaching iKunnect CRM
         translated_text: null,
         source_lang: sender === 'contact' ? sourceLang : 'en',
         target_lang: 'en',
@@ -353,12 +353,12 @@ export async function POST(request: NextRequest) {
         .select();
 
       if (error) {
-        console.error('[GHL Webhook] Supabase insert error:', error);
+        console.error('[iKunnect CRM Webhook] Supabase insert error:', error);
       } else {
-        console.log('[GHL Webhook] Message saved to Supabase:', data?.[0]?.id);
+        console.log('[iKunnect CRM Webhook] Message saved to Supabase:', data?.[0]?.id);
       }
     } catch (error) {
-      console.error('[GHL Webhook] Error saving to Supabase:', error);
+      console.error('[iKunnect CRM Webhook] Error saving to Supabase:', error);
     }
 
     // Add to in-memory chat storage for real-time updates
@@ -373,9 +373,9 @@ export async function POST(request: NextRequest) {
         category: 'chat',
         raw: payload as any
       }]);
-      console.log('[GHL Webhook] Message added to in-memory storage');
+      console.log('[iKunnect CRM Webhook] Message added to in-memory storage');
     } catch (error) {
-      console.error('[GHL Webhook] Error adding to in-memory storage:', error);
+      console.error('[iKunnect CRM Webhook] Error adding to in-memory storage:', error);
     }
 
     return NextResponse.json({ 
@@ -389,7 +389,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('[GHL Webhook] Error processing webhook:', error);
+    console.error('[iKunnect CRM Webhook] Error processing webhook:', error);
     return NextResponse.json({ 
       status: 'error', 
       error: error instanceof Error ? error.message : 'Unknown error'

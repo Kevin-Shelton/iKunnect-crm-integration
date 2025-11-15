@@ -35,14 +35,14 @@ export async function POST(request: NextRequest) {
 
     // Extract conversation ID with proper type handling
     const payloadObj = payload as Record<string, unknown>;
-    // GHL sends conversationId at root level, not nested in conversation object
+    // iKunnect CRM sends conversationId at root level, not nested in conversation object
     const conversation = payloadObj?.conversation as Record<string, unknown> | undefined;
     let convId: string | null = (payloadObj?.conversationId as string) || (conversation?.id as string) || null;
     
     // If conversation ID is missing or "unknown", try to generate one from contact info
     if (!convId || convId === 'unknown') {
       const contact = payloadObj?.contact as Record<string, unknown> | undefined;
-      // GHL sends contactId and messageId at root level
+      // iKunnect CRM sends contactId and messageId at root level
       const contactId = (payloadObj?.contactId as string) || (contact?.id as string);
       const messageId = payloadObj?.messageId as string;
       
@@ -180,8 +180,8 @@ export async function POST(request: NextRequest) {
       });
       eventCount++;
 
-      // N8N webhook integration replaced with direct GHL MCP API integration
-      // Messages are now sent directly to GHL via /api/ghl-send-message
+      // N8N webhook integration replaced with direct iKunnect CRM MCP API integration
+      // Messages are now sent directly to iKunnect CRM via /api/ghl-send-message
       // Keeping this code commented for potential rollback
       /*
       if ((payloadObj.source === 'customer_chat' || payloadObj.source === 'customer_chat_start') && messageText && validType === 'inbound') {

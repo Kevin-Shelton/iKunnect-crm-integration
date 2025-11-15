@@ -33,7 +33,7 @@ export async function GET() {
     const transformedConversations = conversations.map((conv) => {
       // Use customer_name from conversation or generate visitor name
       const customerName = conv.customer_name || `Visitor ${conv.id.slice(-4)}`;
-      // Use real contactId from GHL if available, otherwise generate fake one
+      // Use real contactId from iKunnect CRM if available, otherwise generate fake one
       const contactId = conv.contact_id || `contact_${conv.id}`;
       
       console.log('[Conversations] Processing conversation:', {

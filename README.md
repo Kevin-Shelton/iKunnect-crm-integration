@@ -52,9 +52,9 @@ npm install
 Create `.env.local` file:
 ```env
 # GoHighLevel MCP Configuration
-GHL_MCP_BASE_URL=https://services.leadconnectorhq.com/mcp/
-GHL_PRIVATE_INTEGRATION_TOKEN=your_private_integration_token_here
-GHL_LOCATION_ID=your_location_id_here
+iKunnect CRM_MCP_BASE_URL=https://services.leadconnectorhq.com/mcp/
+iKunnect CRM_PRIVATE_INTEGRATION_TOKEN=your_private_integration_token_here
+iKunnect CRM_LOCATION_ID=your_location_id_here
 
 # Application Configuration
 NEXT_PUBLIC_APP_NAME=iKunnect Agent Chat Desk
@@ -131,9 +131,9 @@ src/
 ## 🔧 Configuration
 
 ### Environment Variables
-- `GHL_MCP_BASE_URL`: GoHighLevel MCP endpoint
-- `GHL_PRIVATE_INTEGRATION_TOKEN`: Your PIT token
-- `GHL_LOCATION_ID`: Your location identifier
+- `iKunnect CRM_MCP_BASE_URL`: GoHighLevel MCP endpoint
+- `iKunnect CRM_PRIVATE_INTEGRATION_TOKEN`: Your PIT token
+- `iKunnect CRM_LOCATION_ID`: Your location identifier
 - `NEXT_PUBLIC_POLLING_INTERVAL`: Auto-refresh interval (ms)
 - `NEXT_PUBLIC_MAX_CHAT_TABS`: Maximum chat tabs
 
