@@ -5,7 +5,7 @@
 interface StoredMessage {
   id: string;
   conversation_id: string;
-  type: 'inbound' | 'agent_send' | 'suggestions' | 'admin';
+  type: 'inbound' | 'agent_send' | 'ai_agent_send' | 'human_agent_send' | 'suggestions' | 'admin';
   message_id: string;
   text: string;
   payload: Record<string, unknown>;
