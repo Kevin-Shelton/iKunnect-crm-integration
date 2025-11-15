@@ -256,19 +256,18 @@ export async function POST(request: NextRequest) {
       
       console.log('[GHL Webhook] ✅ Message is new, proceeding with insert');
 
-      // Translation and Sentiment Analysis for customer messages
-      let translatedText = messageText;
-      let originalText = messageText;
-      let sourceLang = 'en';
+      // Sentiment Analysis for customer messages
+      // Note: GHL already receives English text (translated by customer chat before sending)
+      // So we don't need to translate here, only analyze sentiment
+      let sourceLang = 'en'; // Messages from GHL are already in English
       let targetLang = 'en';
       let sentiment: string | null = null;
       let sentimentConfidence: number | null = null;
-      let isTranslated = false;
 
-      // Only translate and analyze inbound customer messages
+      // Only analyze sentiment for inbound customer messages
       if (sender === 'contact' && !isInitiatingMessage) {
         try {
-          // Get customer's language from recent conversation data
+          // Get customer's language from recent conversation data (for metadata)
           const { data: recentEvent } = await supabase
             .from('chat_events')
             .select('customer_language')
@@ -279,36 +278,14 @@ export async function POST(request: NextRequest) {
             .maybeSingle();
 
           sourceLang = recentEvent?.customer_language || 'en';
-          targetLang = 'en'; // Agent language hardcoded for this phase
 
-          // Translate if languages differ
-          if (sourceLang !== targetLang) {
-            const translateResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/verbum/translate`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                text: messageText,
-                source_lang: sourceLang,
-                target_lang: targetLang,
-              }),
-            });
-
-            if (translateResponse.ok) {
-              const translateData = await translateResponse.json();
-              translatedText = translateData.translation || messageText;
-              originalText = messageText;
-              isTranslated = true;
-              console.log('[GHL Webhook] Translated message:', sourceLang, '->', targetLang);
-            }
-          }
-
-          // Analyze sentiment (on original language)
+          // Analyze sentiment on English text
           const sentimentResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/verbum/sentiment`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               text: messageText,
-              language: sourceLang,
+              language: 'en', // Always English since customer chat translates before sending
             }),
           });
 
@@ -319,8 +296,8 @@ export async function POST(request: NextRequest) {
             console.log('[GHL Webhook] Sentiment:', sentiment, '(', sentimentConfidence, ')');
           }
         } catch (err) {
-          console.error('[GHL Webhook] Translation/Sentiment error:', err);
-          // Continue with original text if translation/sentiment fails
+          console.error('[GHL Webhook] Sentiment error:', err);
+          // Continue without sentiment if analysis fails
         }
       }
 
@@ -342,15 +319,15 @@ export async function POST(request: NextRequest) {
         conversation_id: finalConversationId,
         type: dbType,
         message_id: effectiveMessageId,
-        text: isTranslated ? translatedText : messageText,
-        original_text: isTranslated ? originalText : null,
-        translated_text: isTranslated ? translatedText : null,
-        source_lang: isTranslated ? sourceLang : null,
-        target_lang: isTranslated ? targetLang : null,
+        text: messageText, // Always English from GHL
+        original_text: null, // Translation happens client-side before reaching GHL
+        translated_text: null,
+        source_lang: sender === 'contact' ? sourceLang : 'en',
+        target_lang: 'en',
         sentiment: sentiment,
         sentiment_confidence: sentimentConfidence,
         customer_language: sender === 'contact' ? sourceLang : null,
-        agent_language: sender !== 'contact' ? targetLang : null,
+        agent_language: sender !== 'contact' ? 'en' : null,
         payload: {
           text: messageText,
           type: eventType,

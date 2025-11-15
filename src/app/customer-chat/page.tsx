@@ -136,15 +136,46 @@ export default function CustomerChatPage() {
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.messages && data.messages.length > 0) {
-            const serverMessages = data.messages
-              // Filter out "initiating chat" trigger messages
-              .filter((msg: any) => msg.text.toLowerCase() !== 'initiating chat')
-              .map((msg: any) => ({
-                id: msg.id,
-                text: msg.text || '',
-                sender: msg.sender === 'customer' ? 'customer' : msg.sender,
-                timestamp: msg.timestamp
-              }))
+            const customerLanguage = sessionStorage.getItem('customer_language') || 'en';
+            
+            // Translate agent messages to customer language
+            const serverMessages = await Promise.all(
+              data.messages
+                // Filter out "initiating chat" trigger messages
+                .filter((msg: any) => msg.text.toLowerCase() !== 'initiating chat')
+                .map(async (msg: any) => {
+                  let displayText = msg.text || '';
+                  
+                  // If message is from agent/AI and customer language is not English, translate it
+                  if ((msg.sender === 'agent' || msg.sender === 'ai_agent' || msg.sender === 'system') && customerLanguage !== 'en' && displayText) {
+                    try {
+                      const translateResponse = await fetch('/api/verbum/translate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          text: displayText,
+                          source_lang: 'en',
+                          target_lang: customerLanguage,
+                        }),
+                      });
+                      if (translateResponse.ok) {
+                        const translateData = await translateResponse.json();
+                        displayText = translateData.translation || displayText;
+                      }
+                    } catch (err) {
+                      console.error('Translation failed for agent message:', err);
+                      // Keep original text if translation fails
+                    }
+                  }
+                  
+                  return {
+                    id: msg.id,
+                    text: displayText,
+                    sender: msg.sender === 'customer' ? 'customer' : msg.sender,
+                    timestamp: msg.timestamp
+                  };
+                })
+            )
               // Deduplicate messages by text content and sender
               // If the exact same text from the same sender appears multiple times, only show once
               .filter((msg: any, index: number, self: any[]) => 
@@ -238,7 +269,7 @@ export default function CustomerChatPage() {
         },
         body: JSON.stringify({
           phone: customerPhone,
-          message: messageText,
+          message: translatedText, // Send translated English text to GHL
           email: customerEmail,
           name: customerName,
           conversationId: conversationId,
