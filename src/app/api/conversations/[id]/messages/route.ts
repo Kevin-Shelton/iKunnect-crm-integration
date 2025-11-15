@@ -35,6 +35,22 @@ export async function GET(
       });
     }
 
+    // Extract customer info from first event that has it
+    let customerName = `Customer ${conversationId.slice(-4)}`;
+    let customerEmail = '';
+    let customerPhone = '';
+    
+    for (const event of chatEvents) {
+      const payload = event.payload as any;
+      const contact = payload?.contact;
+      if (contact?.name) {
+        customerName = contact.name;
+        customerEmail = contact.email || customerEmail;
+        customerPhone = contact.phone || customerPhone;
+        break;
+      }
+    }
+    
     // Transform chat events to messages - DIRECT MAPPING
     const messages = chatEvents
       .filter((event: any) => 
@@ -77,9 +93,9 @@ export async function GET(
       messages: messages,
       contact: {
         id: conversationId,
-        name: `Customer ${conversationId.slice(-4)}`,
-        email: '',
-        phone: '',
+        name: customerName,
+        email: customerEmail,
+        phone: customerPhone,
         locationId: ''
       },
       total: messages.length,

@@ -285,18 +285,18 @@ export default function CustomerChatPage() {
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex ${message.sender === 'customer' ? 'justify-end' : 'justify-start'}`}
+              className={`flex ${message.sender === 'customer' ? 'justify-start' : 'justify-end'}`}
             >
               <div
                 className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                   message.sender === 'customer'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-900'
+                    ? 'bg-gray-200 text-gray-900'
+                    : 'bg-blue-600 text-white'
                 }`}
               >
                 <p className="text-sm">{message.text}</p>
                 <p className={`text-xs mt-1 ${
-                  message.sender === 'customer' ? 'text-blue-100' : 'text-gray-500'
+                  message.sender === 'customer' ? 'text-gray-500' : 'text-blue-100'
                 }`}>
                   {new Date(message.timestamp).toLocaleTimeString()}
                 </p>

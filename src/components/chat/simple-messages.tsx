@@ -19,12 +19,25 @@ interface SimpleMessagesProps {
   compact?: boolean;
 }
 
+// Helper function to extract initials from name
+function getInitials(name: string): string {
+  if (!name || name.startsWith('Customer') || name.startsWith('Visitor')) {
+    return 'C';
+  }
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) {
+    return parts[0].substring(0, 2).toUpperCase();
+  }
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export function SimpleMessages({ conversationId, className = '', onNewMessage, compact = false }: SimpleMessagesProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchTime, setLastFetchTime] = useState<string>('');
   const [configurationIssue, setConfigurationIssue] = useState<string | null>(null);
+  const [customerName, setCustomerName] = useState<string>('Customer');
 
   useEffect(() => {
     if (!conversationId) {
@@ -61,6 +74,12 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
         }
         
         console.log(`[SimpleMessages] Loaded ${data.messages.length} messages`);
+        
+        // Extract customer name from response
+        if (data.contact?.name) {
+          setCustomerName(data.contact.name);
+        }
+        
         const newMessages = (data.messages || []).map((msg: any) => {
           // Map sender types for display
           let displaySender: 'customer' | 'agent' | 'ai_agent' | 'human_agent';
@@ -209,7 +228,7 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
           className={`flex ${isAgent ? 'justify-end' : 'justify-start'}`}
         >
           <div className={`flex items-start ${compact ? 'space-x-1 max-w-xs' : 'space-x-2 max-w-xs lg:max-w-md'} ${
-            isAgent ? 'flex-row-reverse space-x-reverse' : ''
+            !isAgent ? 'flex-row-reverse space-x-reverse' : ''
           }`}>
             <Avatar className={compact ? "w-6 h-6" : "w-8 h-8"}>
               <AvatarFallback className={
@@ -217,7 +236,7 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
                   ? 'bg-blue-100 text-blue-600' 
                   : 'bg-gray-100 text-gray-600'
               }>
-                {isAI ? '🤖' : isHuman ? 'H' : isAgent ? 'A' : 'C'}
+                {isAI ? '🤖' : isHuman ? 'HA' : isAgent ? 'A' : getInitials(customerName)}
               </AvatarFallback>
             </Avatar>
             <div className={`rounded-lg ${compact ? 'px-2 py-1' : 'px-3 py-2'} ${
