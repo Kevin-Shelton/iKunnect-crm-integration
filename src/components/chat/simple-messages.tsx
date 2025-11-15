@@ -3,13 +3,21 @@
 import React, { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
-import { AlertCircle, Database, Settings } from 'lucide-react';
+import { AlertCircle, Database, Settings, Globe } from 'lucide-react';
+import { getSentimentDisplay } from '@/lib/translation';
 
 interface Message {
   id: string;
   text: string;
   sender: 'customer' | 'agent' | 'ai_agent' | 'human_agent' | 'system';
   timestamp: string;
+  original_text?: string;
+  translated_text?: string;
+  source_lang?: string;
+  target_lang?: string;
+  sentiment?: 'positive' | 'negative' | 'neutral' | 'mixed';
+  sentiment_confidence?: number;
+  is_translated?: boolean;
 }
 
 interface SimpleMessagesProps {
@@ -279,18 +287,55 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
                 {isAI ? '🤖' : isHuman ? 'HA' : isAgent ? 'A' : getInitials(customerName)}
               </AvatarFallback>
             </Avatar>
-            <div className={`rounded-lg ${compact ? 'px-2 py-1' : 'px-3 py-2'} ${
-              isAgent
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-900'
-            }`}>
-              <p className={compact ? "text-xs" : "text-sm"}>{message.text}</p>
-              {!compact && (
-                <p className={`text-xs mt-1 ${
-                  isAgent ? 'text-blue-100' : 'text-gray-500'
-                }`}>
-                  {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
-                </p>
+            <div className="flex flex-col gap-1">
+              <div className={`rounded-lg ${compact ? 'px-2 py-1' : 'px-3 py-2'} ${
+                isAgent
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-900'
+              }`}>
+                <p className={compact ? "text-xs" : "text-sm"}>{message.text}</p>
+                {!compact && (
+                  <p className={`text-xs mt-1 ${
+                    isAgent ? 'text-blue-100' : 'text-gray-500'
+                  }`}>
+                    {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
+                  </p>
+                )}
+              </div>
+              
+              {/* Sentiment Badge (only for customer messages) */}
+              {!isAgent && message.sentiment && (
+                <div className="flex items-center gap-1">
+                  {(() => {
+                    const sentimentDisplay = getSentimentDisplay(message.sentiment);
+                    return (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${sentimentDisplay.color}`}>
+                        <span>{sentimentDisplay.emoji}</span>
+                        <span>{sentimentDisplay.label}</span>
+                        {message.sentiment_confidence && (
+                          <span className="opacity-75">({Math.round(message.sentiment_confidence * 100)}%)</span>
+                        )}
+                      </span>
+                    );
+                  })()}
+                </div>
+              )}
+              
+              {/* Translation Indicator */}
+              {message.is_translated && message.original_text && message.source_lang && (
+                <div className="flex items-center gap-1 text-xs text-gray-500">
+                  <Globe className="h-3 w-3" />
+                  <span>Translated from {message.source_lang.toUpperCase()}</span>
+                  <button 
+                    onClick={() => {
+                      // Toggle to show original text
+                      alert(`Original: ${message.original_text}`);
+                    }}
+                    className="underline hover:text-gray-700"
+                  >
+                    View original
+                  </button>
+                </div>
               )}
             </div>
           </div>

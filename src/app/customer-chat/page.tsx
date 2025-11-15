@@ -37,7 +37,7 @@ export default function CustomerChatPage() {
     }
   }, []);
   
-  const handleStartChat = useCallback(async (data: { fullName: string; email: string; phone: string }) => {
+  const handleStartChat = useCallback(async (data: { fullName: string; email: string; phone: string; language: string }) => {
     setIsLoading(true);
     setChatState('LOADING');
     try {
@@ -59,6 +59,7 @@ export default function CustomerChatPage() {
       sessionStorage.setItem('customer_contact_email', result.contactEmail || '');
       sessionStorage.setItem('customer_contact_phone', result.contactPhone || '');
       sessionStorage.setItem('customer_contact_name', result.contactName || ''); // Store contact name
+      sessionStorage.setItem('customer_language', data.language || 'en'); // Store customer language
       if (result.conversationProviderId) {
         sessionStorage.setItem('customer_conversation_provider_id', result.conversationProviderId);
       }
@@ -199,10 +200,35 @@ export default function CustomerChatPage() {
     setTimeout(() => setIsAgentTyping(true), 500);
 
     try {
-      // Get customer details from session storage
+      // Get customer details and language from session storage
       const customerPhone = sessionStorage.getItem('customer_contact_phone') || '';
       const customerEmail = sessionStorage.getItem('customer_contact_email') || '';
       const customerName = sessionStorage.getItem('customer_contact_name') || '';
+      const customerLanguage = sessionStorage.getItem('customer_language') || 'en';
+      const agentLanguage = 'en'; // Hardcoded for this phase
+      
+      // Translate message if customer language is different from agent language
+      let translatedText = messageText;
+      if (customerLanguage !== agentLanguage) {
+        try {
+          const translationResponse = await fetch('/api/verbum/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: messageText,
+              source_lang: customerLanguage,
+              target_lang: agentLanguage,
+            }),
+          });
+          if (translationResponse.ok) {
+            const translationData = await translationResponse.json();
+            translatedText = translationData.translation || messageText;
+          }
+        } catch (err) {
+          console.error('Translation failed:', err);
+          // Continue with original text if translation fails
+        }
+      }
       
       // Use the new GHL API route that uses OAuth tokens
       const response = await fetch('/api/chat/send-ghl', {

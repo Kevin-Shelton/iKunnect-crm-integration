@@ -4,10 +4,11 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Globe } from 'lucide-react';
+import { SUPPORTED_LANGUAGES } from '@/lib/languages';
 
 interface PreChatIdentityFormProps {
-  onStartChat: (data: { fullName: string; email: string; phone: string }) => Promise<void>;
+  onStartChat: (data: { fullName: string; email: string; phone: string; language: string }) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -15,6 +16,7 @@ export function PreChatIdentityForm({ onStartChat, isLoading }: PreChatIdentityF
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [fullName, setFullName] = useState('');
+  const [language, setLanguage] = useState('en');
   const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -30,7 +32,7 @@ export function PreChatIdentityForm({ onStartChat, isLoading }: PreChatIdentityF
       return;
     }
 
-    onStartChat({ email: trimmedEmail, phone: trimmedPhone, fullName: trimmedFullName });
+    onStartChat({ email: trimmedEmail, phone: trimmedPhone, fullName: trimmedFullName, language });
   };
 
   return (
@@ -72,6 +74,25 @@ export function PreChatIdentityForm({ onStartChat, isLoading }: PreChatIdentityF
               placeholder="(555) 555-5555"
               disabled={isLoading}
             />
+          </div>
+          <div>
+            <Label htmlFor="language" className="flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              Preferred Language
+            </Label>
+            <select
+              id="language"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              disabled={isLoading}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           {error && (

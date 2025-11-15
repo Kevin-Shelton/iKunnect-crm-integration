@@ -256,6 +256,74 @@ export async function POST(request: NextRequest) {
       
       console.log('[GHL Webhook] ✅ Message is new, proceeding with insert');
 
+      // Translation and Sentiment Analysis for customer messages
+      let translatedText = messageText;
+      let originalText = messageText;
+      let sourceLang = 'en';
+      let targetLang = 'en';
+      let sentiment: string | null = null;
+      let sentimentConfidence: number | null = null;
+      let isTranslated = false;
+
+      // Only translate and analyze inbound customer messages
+      if (sender === 'contact' && !isInitiatingMessage) {
+        try {
+          // Get customer's language from recent conversation data
+          const { data: recentEvent } = await supabase
+            .from('chat_events')
+            .select('customer_language')
+            .eq('conversation_id', finalConversationId)
+            .not('customer_language', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          sourceLang = recentEvent?.customer_language || 'en';
+          targetLang = 'en'; // Agent language hardcoded for this phase
+
+          // Translate if languages differ
+          if (sourceLang !== targetLang) {
+            const translateResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/verbum/translate`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                text: messageText,
+                source_lang: sourceLang,
+                target_lang: targetLang,
+              }),
+            });
+
+            if (translateResponse.ok) {
+              const translateData = await translateResponse.json();
+              translatedText = translateData.translation || messageText;
+              originalText = messageText;
+              isTranslated = true;
+              console.log('[GHL Webhook] Translated message:', sourceLang, '->', targetLang);
+            }
+          }
+
+          // Analyze sentiment (on original language)
+          const sentimentResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/verbum/sentiment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: messageText,
+              language: sourceLang,
+            }),
+          });
+
+          if (sentimentResponse.ok) {
+            const sentimentData = await sentimentResponse.json();
+            sentiment = sentimentData.sentiment || null;
+            sentimentConfidence = sentimentData.confidence || null;
+            console.log('[GHL Webhook] Sentiment:', sentiment, '(', sentimentConfidence, ')');
+          }
+        } catch (err) {
+          console.error('[GHL Webhook] Translation/Sentiment error:', err);
+          // Continue with original text if translation/sentiment fails
+        }
+      }
+
       // Determine event type based on sender
       let dbType: 'inbound' | 'agent_send' | 'ai_agent_send' | 'human_agent_send' | 'admin';
       if (sender === 'contact') {
@@ -274,7 +342,15 @@ export async function POST(request: NextRequest) {
         conversation_id: finalConversationId,
         type: dbType,
         message_id: effectiveMessageId,
-        text: messageText,
+        text: isTranslated ? translatedText : messageText,
+        original_text: isTranslated ? originalText : null,
+        translated_text: isTranslated ? translatedText : null,
+        source_lang: isTranslated ? sourceLang : null,
+        target_lang: isTranslated ? targetLang : null,
+        sentiment: sentiment,
+        sentiment_confidence: sentimentConfidence,
+        customer_language: sender === 'contact' ? sourceLang : null,
+        agent_language: sender !== 'contact' ? targetLang : null,
         payload: {
           text: messageText,
           type: eventType,
