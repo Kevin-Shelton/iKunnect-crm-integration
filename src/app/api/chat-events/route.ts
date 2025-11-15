@@ -127,13 +127,32 @@ export async function POST(request: NextRequest) {
     // Handle direct event format (new format)
     if (payloadObj.type) {
       const eventType = payloadObj.type as string;
+      const direction = payloadObj.direction as string;
+      const source = payloadObj.source as string;
+      
       // Map event types to valid chat event types with proper type checking
-      const validEventTypes = ['inbound', 'agent_send', 'suggestions', 'admin'] as const;
+      const validEventTypes = ['inbound', 'agent_send', 'ai_agent_send', 'human_agent_send', 'suggestions', 'admin'] as const;
       type ValidEventType = typeof validEventTypes[number];
       
-      const validType: ValidEventType = validEventTypes.includes(eventType as ValidEventType) 
-        ? (eventType as ValidEventType)
-        : 'inbound';
+      // Determine the correct type based on event data
+      let validType: ValidEventType;
+      
+      if (eventType === 'inbound' || direction === 'inbound') {
+        validType = 'inbound';
+      } else if (eventType === 'OutboundMessage' || direction === 'outbound') {
+        // Distinguish between AI agent and human agent
+        if (source === 'app' || source === 'workflow' || source === 'ai') {
+          validType = 'ai_agent_send';
+        } else if (source === 'user' || source === 'agent') {
+          validType = 'human_agent_send';
+        } else {
+          validType = 'agent_send'; // fallback for unknown outbound
+        }
+      } else if (validEventTypes.includes(eventType as ValidEventType)) {
+        validType = eventType as ValidEventType;
+      } else {
+        validType = 'inbound'; // default fallback
+      }
       
       // Extract text from multiple possible fields
       let messageText = (payloadObj.text as string) || '';
@@ -144,10 +163,12 @@ export async function POST(request: NextRequest) {
         messageText = payloadObj.body as string;
       }
       
-      console.log('[Chat Events] Extracted text:', messageText, 'from payload fields:', {
-        text: payloadObj.text,
-        messageText: payloadObj.messageText,
-        body: payloadObj.body
+      console.log('[Chat Events] Message type detection:', {
+        eventType,
+        direction,
+        source,
+        detectedType: validType,
+        messageText: messageText.substring(0, 50)
       });
         
       await insertChatEvent({
