@@ -120,26 +120,26 @@ export async function POST(request: NextRequest) {
       if (!response.ok) {
         console.error('n8n approval request failed:', response.status, response.statusText);
         return NextResponse.json(
-          { error: 'Failed to forward approval to n8n' },
+          { error: 'Failed to forward to external service' },
           { status: 502 }
         );
       }
 
       const n8nResponse = await response.text();
-      console.log('✅ Successfully forwarded approval to n8n');
+      console.log('✅ Successfully forward to external service');
 
       return NextResponse.json({
         success: true,
-        message: 'Approval forwarded to n8n',
+        message: 'Approval forward to external service',
         conversationId: approval.conversationId,
         approved: approval.approved,
         correlationId: approval.correlationId
       });
 
     } catch (error) {
-      console.error('Error forwarding to n8n:', error);
+      console.error('Error forward to external service:', error);
       return NextResponse.json(
-        { error: 'Failed to communicate with n8n' },
+        { error: 'Failed to communicate with external services' },
         { status: 502 }
       );
     }

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       .map((msg: any) => `${msg.sender}: ${msg.text}`)
       .join('\n');
     
-    // Prepare payload for the existing n8n workflow
+    // Prepare payload for the existing external workflow
     // The workflow expects a specific format for AI suggestions
     const n8nPayload = {
       type: 'ai_suggestions',
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
         .digest('hex');
     }
 
-    // Send request to n8n workflow
+    // Send request to external workflow
     try {
       const n8nResponse = await fetch(N8N_WEBHOOK_URL, {
         method: 'POST',
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
         });
 
         // Check if the response contains AI suggestions
-        // The n8n workflow might return suggestions in different formats
+        // The external workflow might return suggestions in different formats
         let suggestions = [];
         
         if (n8nData.suggestions && Array.isArray(n8nData.suggestions)) {

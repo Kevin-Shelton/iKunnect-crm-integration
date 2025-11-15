@@ -37,7 +37,7 @@ export async function POST(
     // Use n8n inbound webhook (production)
     const n8nInboundUrl = 'https://invictusbpo.app.n8n.cloud/webhook/ghl-chat-inbound'; // Confirmed production URL
 
-    // Prepare payload matching n8n workflow expectations
+    // Prepare payload matching external workflow expectations
     const n8nPayload = {
       conversationId,
       channel: 'webchat', // Required to trigger suggestion path

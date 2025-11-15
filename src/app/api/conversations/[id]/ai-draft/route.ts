@@ -58,7 +58,7 @@ export async function POST(
       (contact.email ? ` (${contact.email})` : '') +
       (contact.phone ? ` (${contact.phone})` : '') : '';
 
-    // Prepare payload for n8n workflow
+    // Prepare payload for external workflow
     const n8nPayload = {
       type: 'ai_draft',
       provider: 'custom',
@@ -95,7 +95,7 @@ export async function POST(
     }
 
     try {
-      // Call n8n workflow
+      // Call external workflow
       const n8nResponse = await fetch(N8N_WEBHOOK_URL, {
         method: 'POST',
         headers: {
@@ -208,7 +208,7 @@ export async function POST(
       success: true,
       suggestion: fallbackSuggestion,
       confidence: 0.7,
-      reasoning: 'Contextual fallback response (n8n workflow not available)',
+      reasoning: 'Contextual fallback response (external workflow not available)',
       context: {
         conversationId,
         messageCount: messages.length,

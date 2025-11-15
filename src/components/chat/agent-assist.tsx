@@ -78,7 +78,7 @@ export function AgentAssist({
     }
   };
 
-  // Request new suggestions from n8n workflow
+  // Request new suggestions from external workflow
   const requestSuggestions = async () => {
     if (!conversationId || !contactId) return; // Check for contactId
     

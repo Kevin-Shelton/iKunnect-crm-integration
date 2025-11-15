@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       
       if (n8nWebhookUrl && n8nWebhookUrl !== 'your-n8n-webhook-url') {
         try {
-          // Format message for existing n8n workflow (/ghl-chat-inbound)
+          // Format message for existing external workflow (/ghl-chat-inbound)
           const n8nPayload = {
             conversation: { 
               id: body.conversationId 
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
             timestamp: messageData.createdAt
           };
           
-          // Send to n8n workflow (fire and forget)
+          // Send to external workflow (fire and forget)
           fetch(n8nWebhookUrl, {
             method: 'POST',
             headers: {

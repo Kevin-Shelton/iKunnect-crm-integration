@@ -1,6 +1,6 @@
 /**
  * GHL API Client - Direct API calls using OAuth 2.0 tokens
- * This replaces the n8n webhook approach with direct GHL API integration
+ * Provides direct integration with GoHighLevel API
  */
 
 import { getTokens } from './ghl-token-storage';

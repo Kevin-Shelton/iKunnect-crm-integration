@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Health check endpoint for GHL integration status
-// The actual GHL integration uses existing n8n workflows directly
+// The actual GHL integration uses existing external workflows directly
 
 export async function GET() {
   const endpoints = {
@@ -14,7 +14,7 @@ export async function GET() {
   
   return NextResponse.json({
     status: 'healthy',
-    service: 'GHL Integration (via existing n8n workflows)',
+    service: 'GHL Integration (via existing external workflows)',
     configured,
     endpoints: {
       chatHistory: !!endpoints.chatHistory,

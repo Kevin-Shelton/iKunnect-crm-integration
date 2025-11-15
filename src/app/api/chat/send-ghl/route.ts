@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendMessageToContact, sendMessage, sendInboundMessage, upsertContact, getDefaultLocationId } from '@/lib/ghl-api-client';
 
 /**
- * API route for sending messages via GHL API (replaces n8n webhook)
+ * API route for sending messages via GHL API
  */
 export async function POST(request: NextRequest) {
   try {

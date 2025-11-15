@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { PreChatIdentityForm } from '@/components/chat/pre-chat-identity-form';
+import { TypingIndicator } from '@/components/chat/typing-indicator';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Bot, User } from 'lucide-react';
 import { Send, MessageCircle } from 'lucide-react';
 
 type ChatState = 'IDENTITY_COLLECTION' | 'LOADING' | 'ACTIVE_CHAT';
@@ -98,14 +101,14 @@ export default function CustomerChatPage() {
 
 
   
-  const [messages, setMessages] = useState([
-    {
-      id: '1',
-      text: 'Hello! How can I help you today?',
-      sender: 'agent',
-      timestamp: new Date().toISOString()
-    }
-  ]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [isAgentTyping, setIsAgentTyping] = useState(false);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isAgentTyping]);
   const [newMessage, setNewMessage] = useState('');
   const [isConnected, setIsConnected] = useState(true);
 
@@ -125,9 +128,18 @@ export default function CustomerChatPage() {
               .map((msg: any) => ({
                 id: msg.id,
                 text: msg.text || '',
-                sender: msg.sender === 'customer' ? 'customer' : 'agent',
+                sender: msg.sender === 'customer' ? 'customer' : msg.sender,
                 timestamp: msg.timestamp
               }));
+            
+            // Check if new messages arrived (agent sent something)
+            const previousLength = messages.length;
+            const newLength = serverMessages.length;
+            
+            if (newLength > previousLength) {
+              // New message arrived, hide typing indicator
+              setIsAgentTyping(false);
+            }
             
             // Replace initial message with server messages
             setMessages(serverMessages);
@@ -160,6 +172,9 @@ export default function CustomerChatPage() {
     setMessages(prev => [...prev, message]);
     const messageText = newMessage;
     setNewMessage('');
+    
+    // Show typing indicator after customer sends message
+    setTimeout(() => setIsAgentTyping(true), 500);
 
     try {
       // Get customer details from session storage
@@ -285,27 +300,61 @@ export default function CustomerChatPage() {
       <div className="flex-1 max-w-4xl mx-auto w-full flex flex-col bg-white shadow-sm">
         {/* Messages Area */}
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.sender === 'customer' ? 'justify-start' : 'justify-end'}`}
-            >
+          {messages.map((message) => {
+            const isCustomer = message.sender === 'customer';
+            const isAgent = message.sender === 'agent' || message.sender === 'ai_agent' || message.sender === 'human_agent';
+            
+            return (
               <div
-                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                  message.sender === 'customer'
-                    ? 'bg-gray-200 text-gray-900'
-                    : 'bg-blue-600 text-white'
-                }`}
+                key={message.id}
+                className={`flex items-end space-x-2 ${isCustomer ? 'justify-end' : 'justify-start'} animate-fade-in`}
               >
-                <p className="text-sm">{message.text}</p>
-                <p className={`text-xs mt-1 ${
-                  message.sender === 'customer' ? 'text-gray-500' : 'text-blue-100'
-                }`}>
-                  {new Date(message.timestamp).toLocaleTimeString()}
-                </p>
+                {/* Avatar for agent messages (left side) */}
+                {isAgent && (
+                  <Avatar className="w-8 h-8 bg-blue-600 text-white flex-shrink-0">
+                    <AvatarFallback className="bg-blue-600 text-white">
+                      <Bot className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+                
+                {/* Message bubble */}
+                <div className="flex flex-col space-y-1 max-w-xs lg:max-w-md">
+                  <div
+                    className={`px-4 py-2 rounded-lg ${
+                      isCustomer
+                        ? 'bg-blue-600 text-white rounded-br-sm'
+                        : 'bg-gray-100 text-gray-900 rounded-bl-sm'
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap break-words">{message.text}</p>
+                  </div>
+                  <p className={`text-xs px-1 ${
+                    isCustomer ? 'text-right text-gray-500' : 'text-left text-gray-400'
+                  }`}>
+                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+                
+                {/* Avatar for customer messages (right side) */}
+                {isCustomer && (
+                  <Avatar className="w-8 h-8 bg-gray-400 text-white flex-shrink-0">
+                    <AvatarFallback className="bg-gray-400 text-white">
+                      <User className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
+          
+          {/* Typing Indicator */}
+          {isAgentTyping && (
+            <TypingIndicator contactName="Support" isVisible={isAgentTyping} />
+          )}
+          
+          {/* Scroll anchor */}
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Input Area */}
