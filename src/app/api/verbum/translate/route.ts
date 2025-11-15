@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const VERBUM_API_KEY = process.env.VERBUM_API_KEY;
-const VERBUM_TRANSLATE_URL = 'https://sdk.verbum.ai/v1/translate';
+const VERBUM_TRANSLATE_URL = 'https://sdk.verbum.ai/v1/translator/translate';
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,17 +40,18 @@ export async function POST(request: NextRequest) {
       to: targetCode
     });
 
-    // Call Verbum API
+    // Call Verbum API with correct format
     const response = await fetch(VERBUM_TRANSLATE_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Key': VERBUM_API_KEY,
+        'x-api-key': VERBUM_API_KEY,
       },
       body: JSON.stringify({
-        text,
-        source_lang: sourceCode,
-        target_lang: targetCode,
+        texts: [{ text }],
+        from: sourceCode,
+        to: [targetCode],
+        model: 'default'
       }),
     });
 
@@ -72,10 +73,13 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
     
-    console.log('[Verbum] Translation successful');
+    console.log('[Verbum] Translation successful:', data);
+
+    // Extract translation from response array
+    const translation = data[0]?.translations?.[0]?.text || text;
 
     return NextResponse.json({
-      translation: data.translation || text,
+      translation,
       original: text,
       source_lang: sourceCode,
       target_lang: targetCode,
