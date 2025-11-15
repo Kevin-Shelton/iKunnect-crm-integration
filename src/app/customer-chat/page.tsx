@@ -139,7 +139,7 @@ export default function CustomerChatPage() {
             const customerLanguage = sessionStorage.getItem('customer_language') || 'en';
             
             // Translate agent messages to customer language
-            const serverMessages = await Promise.all(
+            const translatedMessages = await Promise.all(
               data.messages
                 // Filter out "initiating chat" trigger messages
                 .filter((msg: any) => msg.text.toLowerCase() !== 'initiating chat')
@@ -175,16 +175,17 @@ export default function CustomerChatPage() {
                     timestamp: msg.timestamp
                   };
                 })
-            )
-              // Deduplicate messages by text content and sender
-              // If the exact same text from the same sender appears multiple times, only show once
-              .filter((msg: any, index: number, self: any[]) => 
-                index === self.findIndex((m) => 
-                  m.text === msg.text && 
-                  m.sender === msg.sender && 
-                  Math.abs(new Date(m.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 5000 // Within 5 seconds
-                )
-              );
+            );
+            
+            // Deduplicate messages by text content and sender
+            // If the exact same text from the same sender appears multiple times, only show once
+            const serverMessages = translatedMessages.filter((msg: any, index: number, self: any[]) => 
+              index === self.findIndex((m) => 
+                m.text === msg.text && 
+                m.sender === msg.sender && 
+                Math.abs(new Date(m.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 5000 // Within 5 seconds
+              )
+            );
             
             // Check if new messages arrived (agent sent something)
             const previousLength = messages.length;
