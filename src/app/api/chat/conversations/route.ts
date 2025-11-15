@@ -25,7 +25,7 @@ export async function GET() {
         id: c.id,
         messageCount: c.messageCount,
         status: c.status?.status || 'waiting',
-        lastMessageText: c.lastMessage?.text?.substring(0, 30)
+        lastMessageText: c.lastMessage?.text?.substring(0, 100) || ''
       }))
     });
 

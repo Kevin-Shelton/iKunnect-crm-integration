@@ -123,17 +123,20 @@ export async function updateConversationStatus(
 }
 
 // Get all conversations with their status from Supabase
-export async function getAllConversationsWithStatus() {
+export async function getAllConversationsWithStatus(limit: number = 100, offset: number = 0) {
   if (!supabaseService) {
     throw new Error('Supabase service not available');
   }
 
   try {
     // Get all chat events to build conversation list
+    // Use a subquery approach: get distinct conversations first, then get their messages
+    // This is more efficient than loading ALL events
     const { data: events, error: eventsError } = await supabaseService
       .from('chat_events')
       .select('conversation_id, created_at, type, text, message_id, payload')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(limit * 10); // Get enough events to cover multiple messages per conversation
 
     if (eventsError) {
       console.error('[Supabase] Error getting chat events:', eventsError);

@@ -214,9 +214,27 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
     );
   }
 
+  // Deduplicate messages by ID and text to prevent showing duplicates
+  const deduplicatedMessages = messages.reduce((acc: Message[], current) => {
+    // Check if this message already exists in the accumulator
+    const isDuplicate = acc.some(msg => 
+      msg.id === current.id || 
+      (msg.text === current.text && msg.sender === current.sender && 
+       Math.abs(new Date(msg.timestamp).getTime() - new Date(current.timestamp).getTime()) < 1000)
+    );
+    
+    if (!isDuplicate) {
+      acc.push(current);
+    } else {
+      console.log('[SimpleMessages] Filtered duplicate message:', current.id, current.text.substring(0, 50));
+    }
+    
+    return acc;
+  }, []);
+
   return (
     <div className={`flex-1 overflow-y-auto ${compact ? 'p-2 space-y-2' : 'p-4 space-y-4'} ${className}`}>
-      {messages.map((message) => {
+      {deduplicatedMessages.map((message) => {
         // Determine if message is from any agent type
         const isAgent = message.sender === 'agent' || message.sender === 'ai_agent' || message.sender === 'human_agent';
         const isAI = message.sender === 'ai_agent';

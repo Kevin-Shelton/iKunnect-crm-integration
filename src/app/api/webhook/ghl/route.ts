@@ -80,6 +80,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'ignored', reason: 'missing message text' });
     }
 
+    // Filter out GHL system messages that shouldn't be stored
+    const systemMessages = [
+      'Customer started a new chat',
+      'Customer started a new chat.',
+      'Conversation started',
+      'Chat started'
+    ];
+    
+    if (systemMessages.some(sysMsg => messageText.toLowerCase().includes(sysMsg.toLowerCase()))) {
+      console.log('[GHL Webhook] Skipping system message:', messageText);
+      return NextResponse.json({ status: 'ignored', reason: 'system message filtered' });
+    }
+
     // Generate a fallback message ID if not provided by GHL
     const effectiveMessageId = messageId || `msg_${extractedContact.id}_${Date.now()}_${messageText.substring(0, 20).replace(/\s/g, '_')}`;
     console.log('[GHL Webhook] Message ID:', effectiveMessageId, '(original:', messageId, ')');
