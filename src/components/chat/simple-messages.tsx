@@ -8,7 +8,7 @@ import { AlertCircle, Database, Settings } from 'lucide-react';
 interface Message {
   id: string;
   text: string;
-  sender: 'customer' | 'agent' | 'ai_agent' | 'human_agent';
+  sender: 'customer' | 'agent' | 'ai_agent' | 'human_agent' | 'system';
   timestamp: string;
 }
 
@@ -82,13 +82,15 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
         
         const newMessages = (data.messages || []).map((msg: any) => {
           // Map sender types for display
-          let displaySender: 'customer' | 'agent' | 'ai_agent' | 'human_agent';
+          let displaySender: 'customer' | 'agent' | 'ai_agent' | 'human_agent' | 'system';
           if (msg.sender === 'contact' || msg.sender === 'customer') {
             displaySender = 'customer';
           } else if (msg.sender === 'ai_agent') {
             displaySender = 'ai_agent';
           } else if (msg.sender === 'human_agent') {
             displaySender = 'human_agent';
+          } else if (msg.sender === 'system') {
+            displaySender = 'system'; // System greeting messages
           } else {
             displaySender = 'agent'; // fallback for legacy 'agent' type
           }
@@ -239,6 +241,23 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
         const isAgent = message.sender === 'agent' || message.sender === 'ai_agent' || message.sender === 'human_agent';
         const isAI = message.sender === 'ai_agent';
         const isHuman = message.sender === 'human_agent';
+        const isSystem = message.sender === 'system';
+        
+        // System messages get special centered styling
+        if (isSystem) {
+          return (
+            <div key={message.id} className="flex justify-center my-2">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 max-w-lg">
+                <p className="text-xs text-gray-500 text-center italic">{message.text}</p>
+                {!compact && (
+                  <p className="text-xs text-gray-400 text-center mt-1">
+                    {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        }
         
         return (
         <div

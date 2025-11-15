@@ -162,11 +162,22 @@ export async function getAllConversationsWithStatus(limit: number = 100, offset:
           contact_id: contactId,
           customer_name: contactName,
           customer_email: contactEmail,
-          customer_phone: contactPhone
+          customer_phone: contactPhone,
+          hasCustomerMessage: event.type === 'inbound', // Track if customer has sent a message
+          systemGreetingOnly: event.type === 'admin' // Track if only system greeting exists
         });
       } else {
         const conv = conversationMap.get(event.conversation_id);
         conv.messageCount++;
+        
+        // Update flags based on message type
+        if (event.type === 'inbound') {
+          conv.hasCustomerMessage = true;
+          conv.systemGreetingOnly = false;
+        }
+        if (event.type !== 'admin') {
+          conv.systemGreetingOnly = false;
+        }
         // Update contact info if this event has it and current doesn't
         if (contactName && !conv.customer_name) {
           conv.customer_name = contactName;
@@ -183,7 +194,16 @@ export async function getAllConversationsWithStatus(limit: number = 100, offset:
       }
     });
 
-    const conversations = Array.from(conversationMap.values());
+    const conversations = Array.from(conversationMap.values())
+      .filter(conv => {
+        // Only show conversations where customer has sent at least one message
+        // Hide conversations that only have system greetings
+        if (conv.systemGreetingOnly && !conv.hasCustomerMessage) {
+          console.log('[Supabase] Filtering greeting-only conversation:', conv.id);
+          return false;
+        }
+        return true;
+      });
 
     // Get status for all conversations
     const { data: statuses, error: statusError } = await supabaseService

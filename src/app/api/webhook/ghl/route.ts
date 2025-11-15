@@ -81,16 +81,29 @@ export async function POST(request: NextRequest) {
     }
 
     // Filter out GHL system messages that shouldn't be stored
-    const systemMessages = [
+    const systemMessagesToFilter = [
       'Customer started a new chat',
       'Customer started a new chat.',
       'Conversation started',
       'Chat started'
     ];
     
-    if (systemMessages.some(sysMsg => messageText.toLowerCase().includes(sysMsg.toLowerCase()))) {
+    if (systemMessagesToFilter.some(sysMsg => messageText.toLowerCase().includes(sysMsg.toLowerCase()))) {
       console.log('[GHL Webhook] Skipping system message:', messageText);
       return NextResponse.json({ status: 'ignored', reason: 'system message filtered' });
+    }
+
+    // Detect system greeting messages (automated welcome messages)
+    // These should be stored but marked as 'system' type for special styling
+    const isSystemGreeting = 
+      messageText.toLowerCase().includes('thank you for visiting') ||
+      messageText.toLowerCase().includes('while we direct you to') ||
+      messageText.toLowerCase().includes('how can we help you') ||
+      (messageText.toLowerCase().includes('hi ') && messageText.toLowerCase().includes('thank you')) ||
+      (direction === 'outbound' && !userId && messageText.length > 50 && messageText.includes('?'));
+    
+    if (isSystemGreeting) {
+      console.log('[GHL Webhook] Detected system greeting message:', messageText.substring(0, 50));
     }
 
     // Generate a fallback message ID if not provided by GHL
@@ -180,8 +193,14 @@ export async function POST(request: NextRequest) {
     let sender: 'contact' | 'human_agent' | 'ai_agent' | 'system' = 'contact';
     let eventType = 'inbound';
     
-    // If direction is provided, use it
-    if (direction === 'outbound') {
+    // Override sender for system greeting messages
+    if (isSystemGreeting) {
+      sender = 'system';
+      eventType = 'outbound';
+    }
+    
+    // If direction is provided, use it (unless already set as system greeting)
+    else if (direction === 'outbound') {
       // Outbound messages could be from AI agent or human agent
       if (userId) {
         sender = 'human_agent';
@@ -229,13 +248,15 @@ export async function POST(request: NextRequest) {
       console.log('[GHL Webhook] ✅ Message is new, proceeding with insert');
 
       // Determine event type based on sender
-      let dbType: 'inbound' | 'agent_send' | 'ai_agent_send' | 'human_agent_send';
+      let dbType: 'inbound' | 'agent_send' | 'ai_agent_send' | 'human_agent_send' | 'admin';
       if (sender === 'contact') {
         dbType = 'inbound';
       } else if (sender === 'ai_agent') {
         dbType = 'ai_agent_send';
       } else if (sender === 'human_agent') {
         dbType = 'human_agent_send';
+      } else if (sender === 'system') {
+        dbType = 'admin'; // Use 'admin' type for system greetings
       } else {
         dbType = 'agent_send'; // fallback
       }

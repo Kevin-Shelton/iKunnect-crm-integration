@@ -57,17 +57,20 @@ export async function GET(
         event.type === 'inbound' || 
         event.type === 'agent_send' || 
         event.type === 'ai_agent_send' || 
-        event.type === 'human_agent_send'
+        event.type === 'human_agent_send' ||
+        event.type === 'admin' // Include system greeting messages
       )
       .map((event: any) => {
         // Determine sender type
-        let sender: 'customer' | 'agent' | 'ai_agent' | 'human_agent';
+        let sender: 'customer' | 'agent' | 'ai_agent' | 'human_agent' | 'system';
         if (event.type === 'inbound') {
           sender = 'customer';
         } else if (event.type === 'ai_agent_send') {
           sender = 'ai_agent';
         } else if (event.type === 'human_agent_send') {
           sender = 'human_agent';
+        } else if (event.type === 'admin') {
+          sender = 'system'; // System greeting messages
         } else {
           sender = 'agent'; // fallback for legacy 'agent_send' type
         }
