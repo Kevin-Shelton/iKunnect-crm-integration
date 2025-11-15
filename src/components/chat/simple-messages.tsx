@@ -235,16 +235,18 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
     .filter(msg => msg.text.toLowerCase() !== 'initiating chat')
     .reduce((acc: Message[], current) => {
     // Check if this message already exists in the accumulator
+    // More aggressive deduplication: check by ID first, then by text+sender within 5 seconds
     const isDuplicate = acc.some(msg => 
       msg.id === current.id || 
-      (msg.text === current.text && msg.sender === current.sender && 
-       Math.abs(new Date(msg.timestamp).getTime() - new Date(current.timestamp).getTime()) < 1000)
+      (msg.text.trim() === current.text.trim() && 
+       msg.sender === current.sender && 
+       Math.abs(new Date(msg.timestamp).getTime() - new Date(current.timestamp).getTime()) < 5000)
     );
     
     if (!isDuplicate) {
       acc.push(current);
     } else {
-      console.log('[SimpleMessages] Filtered duplicate message:', current.id, current.text.substring(0, 50));
+      console.log('[SimpleMessages] Filtered duplicate message:', current.id, current.text.substring(0, 30));
     }
     
     return acc;
@@ -252,12 +254,15 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
 
   return (
     <div className={`flex-1 overflow-y-auto ${className}`}>
-      {/* Language Indicator */}
+      {/* Language Indicator - Always show if not English */}
       {customerLanguage && customerLanguage !== 'en' && (
-        <div className="sticky top-0 z-10 bg-blue-50 border-b border-blue-200 px-3 py-2 flex items-center justify-center space-x-2">
-          <Globe className="h-4 w-4 text-blue-600" />
-          <span className="text-xs font-medium text-blue-700">
+        <div className="sticky top-0 z-20 bg-gradient-to-r from-blue-50 to-blue-100 border-b-2 border-blue-300 px-4 py-2.5 flex items-center justify-center space-x-2 shadow-sm">
+          <Globe className="h-4 w-4 text-blue-700" />
+          <span className="text-sm font-semibold text-blue-800">
             Customer Language: {SUPPORTED_LANGUAGES.find(l => l.code === customerLanguage)?.name || customerLanguage.toUpperCase()}
+          </span>
+          <span className="text-xs text-blue-600 bg-blue-200 px-2 py-0.5 rounded-full">
+            Messages shown in English
           </span>
         </div>
       )}

@@ -197,8 +197,8 @@ export default function CustomerChatPage() {
             const newLength = serverMessages.length;
             
             if (newLength > previousLength) {
-              // New message arrived, hide typing indicator
-              setIsAgentTyping(false);
+              // New message arrived, keep typing indicator for a bit longer for realism
+              setTimeout(() => setIsAgentTyping(false), 800); // Keep typing indicator for 800ms after message arrives
             }
             
             // Replace initial message with server messages
@@ -233,8 +233,8 @@ export default function CustomerChatPage() {
     const messageText = newMessage;
     setNewMessage('');
     
-    // Show typing indicator after customer sends message
-    setTimeout(() => setIsAgentTyping(true), 500);
+    // Show typing indicator after customer sends message (realistic delay)
+    setTimeout(() => setIsAgentTyping(true), 1000); // Wait 1 second before showing typing
 
     try {
       // Get customer details and language from session storage
@@ -246,7 +246,11 @@ export default function CustomerChatPage() {
       
       // Translate message if customer language is different from agent language
       let translatedText = messageText;
+      console.log('[Customer Chat] Sending message - Language:', customerLanguage, '-> Agent:', agentLanguage);
+      console.log('[Customer Chat] Original message:', messageText);
+      
       if (customerLanguage !== agentLanguage) {
+        console.log('[Customer Chat] Translation needed, calling API...');
         try {
           const translationResponse = await fetch('/api/verbum/translate', {
             method: 'POST',
@@ -260,12 +264,19 @@ export default function CustomerChatPage() {
           if (translationResponse.ok) {
             const translationData = await translationResponse.json();
             translatedText = translationData.translation || messageText;
+            console.log('[Customer Chat] Translation successful:', translatedText);
+          } else {
+            console.error('[Customer Chat] Translation API failed:', translationResponse.status);
           }
         } catch (err) {
-          console.error('Translation failed:', err);
+          console.error('[Customer Chat] Translation error:', err);
           // Continue with original text if translation fails
         }
+      } else {
+        console.log('[Customer Chat] No translation needed (same language)');
       }
+      
+      console.log('[Customer Chat] Sending to iKunnect CRM:', translatedText);
       
       // Use the new iKunnect CRM API route that uses OAuth tokens
       const response = await fetch('/api/chat/send-ghl', {

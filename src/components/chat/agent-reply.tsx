@@ -31,11 +31,11 @@ export function AgentReply({ conversationId, contactId, onMessageSent, onRefresh
         clearTimeout(typingTimeout);
       }
       
-      // Set new timeout to stop typing indicator
+      // Set new timeout to stop typing indicator after 2 seconds of no typing
       if (value.length > 0) {
         const timeout = setTimeout(() => {
           onTyping(false);
-        }, 1000);
+        }, 2000); // Stop typing indicator after 2 seconds of inactivity
         setTypingTimeout(timeout);
       }
     }
