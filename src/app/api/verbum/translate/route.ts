@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const VERBUM_API_KEY = process.env.VERBUM_API_KEY;
-const VERBUM_TRANSLATE_URL = 'https://verbum.ai/api/v1/translate';
+const VERBUM_TRANSLATE_URL = 'https://sdk.verbum.ai/v1/translate';
 
 export async function POST(request: NextRequest) {
   try {
