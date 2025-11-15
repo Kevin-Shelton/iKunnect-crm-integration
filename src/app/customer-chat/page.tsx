@@ -27,6 +27,7 @@ export default function CustomerChatPage() {
       if (existingConvId && existingContactId && (existingContactEmail || existingContactPhone)) {
         setConversationId(existingConvId);
         setCustomerId(existingContactId);
+        setCustomerName(existingContactName || '');
         // No need to set email/phone state here, as they are only needed for the Agent Desk
         setChatState('ACTIVE_CHAT');
       } else {
@@ -64,6 +65,7 @@ export default function CustomerChatPage() {
       
       setConversationId(result.conversationId);
       setCustomerId(result.contactId);
+      setCustomerName(result.contactName || data.fullName);
       
       // --- NEW LOGIC: Send Initial Message to Trigger Webhook ---
       if (result.initialMessage) {
@@ -103,7 +105,18 @@ export default function CustomerChatPage() {
   
   const [messages, setMessages] = useState<any[]>([]);
   const [isAgentTyping, setIsAgentTyping] = useState(false);
+  const [customerName, setCustomerName] = useState<string>('');
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  
+  // Helper function to get initials from name
+  const getInitials = (name: string) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
   
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -130,7 +143,11 @@ export default function CustomerChatPage() {
                 text: msg.text || '',
                 sender: msg.sender === 'customer' ? 'customer' : msg.sender,
                 timestamp: msg.timestamp
-              }));
+              }))
+              // Deduplicate messages by ID
+              .filter((msg: any, index: number, self: any[]) => 
+                index === self.findIndex((m) => m.id === msg.id)
+              );
             
             // Check if new messages arrived (agent sent something)
             const previousLength = messages.length;
@@ -339,8 +356,8 @@ export default function CustomerChatPage() {
                 {/* Avatar for customer messages (right side) */}
                 {isCustomer && (
                   <Avatar className="w-8 h-8 bg-gray-400 text-white flex-shrink-0">
-                    <AvatarFallback className="bg-gray-400 text-white">
-                      <User className="h-4 w-4" />
+                    <AvatarFallback className="bg-gray-400 text-white text-xs font-semibold">
+                      {getInitials(customerName)}
                     </AvatarFallback>
                   </Avatar>
                 )}
