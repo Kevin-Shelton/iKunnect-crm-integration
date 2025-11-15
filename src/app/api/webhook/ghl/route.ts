@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Filter out GHL system messages that shouldn't be stored
+    // NOTE: "initiating chat" is NOT filtered - it's needed to trigger the workflow
     const systemMessagesToFilter = [
       'Customer started a new chat',
       'Customer started a new chat.',
@@ -88,9 +89,17 @@ export async function POST(request: NextRequest) {
       'Chat started'
     ];
     
-    if (systemMessagesToFilter.some(sysMsg => messageText.toLowerCase().includes(sysMsg.toLowerCase()))) {
+    // Allow "initiating chat" through - it triggers the greeting workflow
+    if (messageText.toLowerCase() !== 'initiating chat' && 
+        systemMessagesToFilter.some(sysMsg => messageText.toLowerCase().includes(sysMsg.toLowerCase()))) {
       console.log('[GHL Webhook] Skipping system message:', messageText);
       return NextResponse.json({ status: 'ignored', reason: 'system message filtered' });
+    }
+    
+    // Special handling for "initiating chat" - store it but mark it for filtering in UI
+    const isInitiatingMessage = messageText.toLowerCase() === 'initiating chat';
+    if (isInitiatingMessage) {
+      console.log('[GHL Webhook] Detected initiating chat message - will store but hide from UI');
     }
 
     // Detect system greeting messages (automated welcome messages)

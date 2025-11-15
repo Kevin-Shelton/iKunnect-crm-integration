@@ -217,7 +217,10 @@ export function SimpleMessages({ conversationId, className = '', onNewMessage, c
   }
 
   // Deduplicate messages by ID and text to prevent showing duplicates
-  const deduplicatedMessages = messages.reduce((acc: Message[], current) => {
+  // Also filter out "initiating chat" trigger messages
+  const deduplicatedMessages = messages
+    .filter(msg => msg.text.toLowerCase() !== 'initiating chat')
+    .reduce((acc: Message[], current) => {
     // Check if this message already exists in the accumulator
     const isDuplicate = acc.some(msg => 
       msg.id === current.id || 

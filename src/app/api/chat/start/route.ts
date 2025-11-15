@@ -51,7 +51,7 @@ export async function POST(request: Request) {
         locationId,
         conversationId,
         contactId,
-        message: 'Customer started a new chat.',
+        message: 'initiating chat',
         type: 'Live_Chat',
       });
       console.log('[Chat Start] Initial Live_Chat message sent to GHL');
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       contactName: fullName || 'New Contact',
       contactEmail: email,
       contactPhone: phone,
-      initialMessage: 'Customer started a new chat.'
+      initialMessage: 'initiating chat'
     });
 
   } catch (error) {
