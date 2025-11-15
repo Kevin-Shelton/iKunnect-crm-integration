@@ -144,9 +144,14 @@ export default function CustomerChatPage() {
                 sender: msg.sender === 'customer' ? 'customer' : msg.sender,
                 timestamp: msg.timestamp
               }))
-              // Deduplicate messages by ID
+              // Deduplicate messages by text content and sender
+              // If the exact same text from the same sender appears multiple times, only show once
               .filter((msg: any, index: number, self: any[]) => 
-                index === self.findIndex((m) => m.id === msg.id)
+                index === self.findIndex((m) => 
+                  m.text === msg.text && 
+                  m.sender === msg.sender && 
+                  Math.abs(new Date(m.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 5000 // Within 5 seconds
+                )
               );
             
             // Check if new messages arrived (agent sent something)
