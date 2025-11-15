@@ -73,17 +73,22 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
     
-    console.log('[Verbum] Translation successful:', data);
+    console.log('[Verbum] Translation successful:', JSON.stringify(data));
 
-    // Extract translation from response array
-    const translation = data[0]?.translations?.[0]?.text || text;
+    // Extract translation from response
+    // Format: { translations: [ [ { text: "translated", to: "es" } ] ] }
+    const translation = data.translations?.[0]?.[0]?.text || text;
+    
+    if (!data.translations?.[0]?.[0]?.text) {
+      console.warn('[Verbum] Unexpected response format, using original text');
+    }
 
     return NextResponse.json({
       translation,
       original: text,
       source_lang: sourceCode,
       target_lang: targetCode,
-      fallback: false
+      fallback: !data.translations?.[0]?.[0]?.text
     });
 
   } catch (error) {
