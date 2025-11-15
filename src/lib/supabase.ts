@@ -41,7 +41,7 @@ export const supabaseService = hasValidSupabaseConfig
 export interface ChatEvent {
   id?: string;
   conversation_id: string;
-  type: 'inbound' | 'agent_send' | 'suggestions' | 'admin';
+  type: 'inbound' | 'agent_send' | 'ai_agent_send' | 'human_agent_send' | 'suggestions' | 'admin';
   message_id?: string;
   text?: string;
   items?: Array<{
