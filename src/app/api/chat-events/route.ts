@@ -27,6 +27,11 @@ export async function POST(request: NextRequest) {
     }
 
     tapPush({ t: nowIso(), route: '/api/chat-events', traceId, note: 'received', data: { payload } });
+    
+    // Log full payload for debugging
+    console.log('[Chat Events] ========== FULL PAYLOAD ==========');
+    console.log(JSON.stringify(payload, null, 2));
+    console.log('[Chat Events] ========================================');
 
     // Extract conversation ID with proper type handling
     const payloadObj = payload as Record<string, unknown>;
