@@ -119,12 +119,15 @@ export default function CustomerChatPage() {
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.messages && data.messages.length > 0) {
-            const serverMessages = data.messages.map((msg: any) => ({
-              id: msg.id,
-              text: msg.text || '',
-              sender: msg.sender === 'customer' ? 'customer' : 'agent',
-              timestamp: msg.timestamp
-            }));
+            const serverMessages = data.messages
+              // Filter out "initiating chat" trigger messages
+              .filter((msg: any) => msg.text.toLowerCase() !== 'initiating chat')
+              .map((msg: any) => ({
+                id: msg.id,
+                text: msg.text || '',
+                sender: msg.sender === 'customer' ? 'customer' : 'agent',
+                timestamp: msg.timestamp
+              }));
             
             // Replace initial message with server messages
             setMessages(serverMessages);

@@ -43,6 +43,10 @@ export async function GET() {
         customerName: customerName
       });
       
+      // Filter out "initiating chat" from preview
+      const lastMessageText = conv.lastMessage?.text || '';
+      const displayLastMessage = lastMessageText.toLowerCase() === 'initiating chat' ? '' : lastMessageText;
+      
       return {
         id: conv.id,
         contactId: contactId,
@@ -50,7 +54,7 @@ export async function GET() {
         fullName: customerName,
         email: conv.customer_email || undefined,
         phone: conv.customer_phone || undefined,
-        lastMessageBody: conv.lastMessage?.text || '',
+        lastMessageBody: displayLastMessage,
         lastMessageDate: conv.lastMessage?.created_at || new Date().toISOString(),
         unreadCount: conv.messageCount,
         status: conv.status?.status || 'waiting',
