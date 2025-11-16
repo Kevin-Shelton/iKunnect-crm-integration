@@ -18,6 +18,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Conversation, ConversationQueue } from '@/lib/types';
 import { EnhancedWaitingQueue } from '@/components/chat/enhanced-waiting-queue';
 import { RejectedChatQueue } from '@/components/chat/rejected-chat-queue';
+import { ModernConversationCard } from '@/components/queue/modern-conversation-card';
 
 interface SidebarProps {
   conversations: ConversationQueue;
@@ -78,108 +79,16 @@ export function Sidebar({
   };
 
   const ConversationItem = ({ conversation }: { conversation: Conversation }) => (
-    <div
+    <ModernConversationCard
       key={conversation.id}
-      className={`p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
-        selectedConversation === conversation.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
-      }`}
-      onClick={() => handleConversationClick(conversation.id)}
-    >
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center space-x-2 flex-1 min-w-0">
-          <div className="text-blue-500">
-            {getChannelIcon(conversation.channel || 'chat')}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">
-              {conversation.contactName}
-            </p>
-            <p className="text-xs text-gray-500">
-              {(() => {
-                try {
-                  const dateValue = conversation.lastMessageDate;
-                  if (!dateValue) return 'No messages';
-                  const date = new Date(dateValue);
-                  if (isNaN(date.getTime())) return 'Invalid date';
-                  return formatDistanceToNow(date, { addSuffix: true });
-                } catch (error) {
-                  return 'Unknown time';
-                }
-              })()}
-            </p>
-          </div>
-          {(conversation.unreadCount ?? 0) > 0 && (
-            <Badge variant="default" className="bg-blue-500 text-white text-xs px-1.5 py-0.5">
-              {conversation.unreadCount}
-            </Badge>
-          )}
-        </div>
-        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-          <MoreVertical className="h-3 w-3" />
-        </Button>
-      </div>
-
-      <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-        {conversation.lastMessageBody}
-      </p>
-
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-1 flex-wrap gap-1">
-          {/* Language badge - only show if non-English */}
-          {conversation.customerLanguage && conversation.customerLanguage !== 'en' && (
-            <Badge variant="outline" className="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-700 border-blue-200">
-              {(() => {
-                const { getLanguageFlag, getLanguageName } = require('@/lib/language-utils');
-                return `${getLanguageFlag(conversation.customerLanguage)} ${getLanguageName(conversation.customerLanguage)}`;
-              })()}
-            </Badge>
-          )}
-          {/* Sentiment badge */}
-          {conversation.sentiment && (
-            <Badge variant="outline" className={`text-xs px-1.5 py-0.5 ${(() => {
-              const { getSentimentBadgeColor } = require('@/lib/language-utils');
-              return getSentimentBadgeColor(conversation.sentiment);
-            })()}`}>
-              {(() => {
-                const { getSentimentEmoji } = require('@/lib/language-utils');
-                return getSentimentEmoji(conversation.sentiment);
-              })()} {conversation.sentiment}
-            </Badge>
-          )}
-          {/* Tags */}
-          {(conversation.tags || []).slice(0, 1).map((tag) => (
-            <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0.5">
-              {tag}
-            </Badge>
-          ))}
-          {(conversation.tags || []).length > 1 && (
-            <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-              +{(conversation.tags || []).length - 1}
-            </Badge>
-          )}
-        </div>
-
-      </div>
-
-      {activeTab === 'waiting' && (
-        <div className="mt-2">
-          <Button
-            size="sm"
-            className="w-full text-xs"
-            onClick={(e) => handleClaimClick(e, conversation.id)}
-          >
-            Claim Chat
-          </Button>
-        </div>
-      )}
-
-      {conversation.assignedTo && (
-        <div className="mt-2 flex items-center text-xs text-gray-500">
-          <User className="h-3 w-3 mr-1" />
-          Assigned to {conversation.assignedTo}
-        </div>
-      )}
-    </div>
+      conversation={conversation}
+      isSelected={selectedConversation === conversation.id}
+      activeTab={activeTab}
+      onSelect={() => handleConversationClick(conversation.id)}
+      onClaim={() => onConversationClaim?.(conversation.id)}
+      onPass={() => console.log('Pass:', conversation.id)}
+      onReject={() => console.log('Reject:', conversation.id)}
+    />
   );
 
   return (
