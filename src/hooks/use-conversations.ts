@@ -24,6 +24,7 @@ export function useConversations(): UseConversationsReturn {
     waiting: [],
     assigned: [],
     rejected: [],
+    completed: [],
     all: []
   });
   const [isLoading, setIsLoading] = useState(true);
