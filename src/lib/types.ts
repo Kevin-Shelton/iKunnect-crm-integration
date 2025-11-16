@@ -307,6 +307,7 @@ export interface ConversationQueue {
   waiting: Conversation[];
   assigned: Conversation[];
   rejected: Conversation[];
+  completed: Conversation[];
   all: Conversation[];
 }
 
