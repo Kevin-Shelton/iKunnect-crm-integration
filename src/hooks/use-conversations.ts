@@ -48,6 +48,7 @@ export function useConversations(): UseConversationsReturn {
         waiting: Array.isArray(data?.waiting) ? data.waiting : [],
         assigned: Array.isArray(data?.assigned) ? data.assigned : [],
         rejected: Array.isArray(data?.rejected) ? data.rejected : [],
+        completed: Array.isArray(data?.completed) ? data.completed : [],
         all: Array.isArray(data?.all) ? data.all : []
       };
       
