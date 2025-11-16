@@ -16,8 +16,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Conversation, ConversationQueue } from '@/lib/types';
-import { EnhancedWaitingQueue } from '@/components/chat/enhanced-waiting-queue';
-import { RejectedChatQueue } from '@/components/chat/rejected-chat-queue';
+
 import { TailwindConversationCard } from '@/components/queue/tailwind-conversation-card';
 
 interface SidebarProps {
@@ -130,23 +129,25 @@ export function Sidebar({
       <ScrollArea className="flex-1">
         <Tabs value={activeTab}>
           <TabsContent value="waiting" className="mt-0">
-            <EnhancedWaitingQueue
-              conversations={(conversations?.waiting || []).map(conv => ({
-                id: conv.id,
-                contactName: conv.contactName || `Customer ${conv.id.slice(-4)}`,
-                lastMessageBody: conv.lastMessageBody || '',
-                lastMessageDate: conv.lastMessageDate || new Date().toISOString(),
-                unreadCount: conv.unreadCount || 0,
-                priority: 'normal' as const,
-                tags: conv.tags || [],
-                waitTime: formatDistanceToNow(new Date(conv.lastMessageDate || new Date()), { addSuffix: true })
-              }))}
-              onClaim={(conversationId) => onConversationClaim?.(conversationId)}
-              onPass={(conversationId) => onConversationPass?.(conversationId)}
-              onReject={(conversationId) => onConversationReject?.(conversationId)}
-              maxVisible={5}
-              isLoading={isLoading}
-            />
+            {(conversations?.waiting?.length || 0) === 0 ? (
+              <div className="p-4 text-center text-gray-500">
+                <MessageSquare className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm">No waiting conversations</p>
+              </div>
+            ) : (
+              (conversations?.waiting || []).map((conversation) => (
+                <TailwindConversationCard
+                  key={conversation.id}
+                  conversation={conversation}
+                  isSelected={selectedConversation === conversation.id}
+                  activeTab="waiting"
+                  onSelect={() => handleConversationClick(conversation.id)}
+                  onClaim={() => onConversationClaim?.(conversation.id)}
+                  onPass={() => onConversationPass?.(conversation.id)}
+                  onReject={() => onConversationReject?.(conversation.id)}
+                />
+              ))
+            )}
           </TabsContent>
 
           <TabsContent value="assigned" className="mt-0">
@@ -163,25 +164,25 @@ export function Sidebar({
           </TabsContent>
 
           <TabsContent value="rejected" className="mt-0">
-            <RejectedChatQueue
-              conversations={(conversations?.rejected || []).map(conv => ({
-                id: conv.id,
-                contactName: conv.contactName || `Customer ${conv.id.slice(-4)}`,
-                lastMessageBody: conv.lastMessageBody || '',
-                lastMessageDate: conv.lastMessageDate || new Date().toISOString(),
-                rejectedAt: conv.rejectedAt || new Date().toISOString(),
-                rejectedBy: conv.rejectedBy || 'Unknown',
-                rejectionReason: conv.rejectionReason || 'No reason provided',
-                originalPriority: 'normal' as const,
-                tags: conv.tags || [],
-                messageCount: conv.messageCount || 0
-              }))}
-              onRestore={(conversationId) => onConversationRestore?.(conversationId)}
-              onPermanentDelete={(conversationId) => onConversationDelete?.(conversationId)}
-              onView={(conversationId) => onConversationView?.(conversationId)}
-              maxVisible={10}
-              isLoading={isLoading}
-            />
+            {(conversations?.rejected?.length || 0) === 0 ? (
+              <div className="p-4 text-center text-gray-500">
+                <MessageSquare className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm">No rejected conversations</p>
+              </div>
+            ) : (
+              (conversations?.rejected || []).map((conversation) => (
+                <TailwindConversationCard
+                  key={conversation.id}
+                  conversation={conversation}
+                  isSelected={selectedConversation === conversation.id}
+                  activeTab="rejected"
+                  onSelect={() => handleConversationClick(conversation.id)}
+                  onClaim={() => onConversationRestore?.(conversation.id)}
+                  onPass={() => onConversationDelete?.(conversation.id)}
+                  onReject={() => {}}
+                />
+              ))
+            )}
           </TabsContent>
 
           <TabsContent value="all" className="mt-0">
