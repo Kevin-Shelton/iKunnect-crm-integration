@@ -15,7 +15,7 @@ export default function Home() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [selectedContact, setSelectedContact] = useState<any>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [activeTab, setActiveTab] = useState<'waiting' | 'assigned' | 'all' | 'rejected'>('waiting');
+  const [activeTab, setActiveTab] = useState<'waiting' | 'assigned' | 'all' | 'rejected' | 'completed'>('waiting');
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   // Check authorization status on load
