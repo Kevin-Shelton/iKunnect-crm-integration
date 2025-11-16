@@ -157,6 +157,11 @@ export interface Conversation {
   
   // Message count for display
   messageCount?: number;
+  
+  // Translation and sentiment properties
+  customerLanguage?: string; // Customer's selected language (e.g., 'es', 'pt', 'fr')
+  sentiment?: string; // Customer's sentiment (e.g., 'positive', 'negative', 'neutral')
+  sentimentConfidence?: number; // Confidence score for sentiment analysis
 }
 
 export interface ConversationSearchResponse {
