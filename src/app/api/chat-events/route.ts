@@ -163,12 +163,16 @@ export async function POST(request: NextRequest) {
         messageText = payloadObj.body as string;
       }
       
+      // Extract customer language if provided
+      const customerLanguage = payloadObj.customer_language as string | undefined;
+      
       console.log('[Chat Events] Message type detection:', {
         eventType,
         direction,
         source,
         detectedType: validType,
-        messageText: messageText.substring(0, 50)
+        messageText: messageText.substring(0, 50),
+        customerLanguage
       });
         
       await insertChatEvent({
@@ -176,6 +180,7 @@ export async function POST(request: NextRequest) {
         type: validType,
         message_id: (payloadObj.messageId as string) || `evt_${Date.now()}`,
         text: messageText,
+        customer_language: customerLanguage,
         payload: payloadObj
       });
       eventCount++;

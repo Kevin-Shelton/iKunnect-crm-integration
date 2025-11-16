@@ -335,6 +335,7 @@ export default function CustomerChatPage() {
               email: sessionStorage.getItem('customer_contact_email') || undefined,
               phone: sessionStorage.getItem('customer_contact_phone') || undefined,
             },
+            customer_language: customerLanguage, // Include customer's selected language
             timestamp: new Date().toISOString(),
             source: 'customer_chat'
           })

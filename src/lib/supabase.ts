@@ -44,6 +44,7 @@ export interface ChatEvent {
   type: 'inbound' | 'agent_send' | 'ai_agent_send' | 'human_agent_send' | 'suggestions' | 'admin';
   message_id?: string;
   text?: string;
+  customer_language?: string; // Customer's selected language (e.g., 'es', 'pt', 'fr')
   items?: Array<{
     text: string;
     reason?: string | null;
