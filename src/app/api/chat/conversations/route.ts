@@ -67,6 +67,9 @@ export async function GET() {
         passedBy: conv.status?.passed_by,
         restoredAt: conv.status?.restored_at,
         restoredBy: conv.status?.restored_by,
+        customerLanguage: conv.customer_language || 'en', // Customer's selected language
+        sentiment: conv.sentiment || null, // Customer's sentiment
+        sentimentConfidence: conv.sentiment_confidence || null,
         priority: 'normal',
         tags: [],
         messages: []

@@ -124,15 +124,37 @@ export function Sidebar({
       </p>
 
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-1">
-          {(conversation.tags || []).slice(0, 2).map((tag) => (
+        <div className="flex items-center space-x-1 flex-wrap gap-1">
+          {/* Language badge - only show if non-English */}
+          {conversation.customerLanguage && conversation.customerLanguage !== 'en' && (
+            <Badge variant="outline" className="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-700 border-blue-200">
+              {(() => {
+                const { getLanguageFlag, getLanguageName } = require('@/lib/language-utils');
+                return `${getLanguageFlag(conversation.customerLanguage)} ${getLanguageName(conversation.customerLanguage)}`;
+              })()}
+            </Badge>
+          )}
+          {/* Sentiment badge */}
+          {conversation.sentiment && (
+            <Badge variant="outline" className={`text-xs px-1.5 py-0.5 ${(() => {
+              const { getSentimentBadgeColor } = require('@/lib/language-utils');
+              return getSentimentBadgeColor(conversation.sentiment);
+            })()}`}>
+              {(() => {
+                const { getSentimentEmoji } = require('@/lib/language-utils');
+                return getSentimentEmoji(conversation.sentiment);
+              })()} {conversation.sentiment}
+            </Badge>
+          )}
+          {/* Tags */}
+          {(conversation.tags || []).slice(0, 1).map((tag) => (
             <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0.5">
               {tag}
             </Badge>
           ))}
-          {(conversation.tags || []).length > 2 && (
+          {(conversation.tags || []).length > 1 && (
             <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-              +{(conversation.tags || []).length - 2}
+              +{(conversation.tags || []).length - 1}
             </Badge>
           )}
         </div>
@@ -161,7 +183,7 @@ export function Sidebar({
   );
 
   return (
-    <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
+    <div className="w-[360px] bg-white border-r border-gray-200 flex flex-col">
       {/* Sidebar Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-3">

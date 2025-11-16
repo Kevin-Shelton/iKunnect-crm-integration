@@ -134,7 +134,7 @@ export async function getAllConversationsWithStatus(limit: number = 100, offset:
     // This is more efficient than loading ALL events
     const { data: events, error: eventsError } = await supabaseService
       .from('chat_events')
-      .select('conversation_id, created_at, type, text, message_id, payload')
+      .select('conversation_id, created_at, type, text, message_id, payload, customer_language, sentiment, sentiment_confidence')
       .order('created_at', { ascending: false })
       .limit(limit * 10); // Get enough events to cover multiple messages per conversation
 
@@ -163,6 +163,9 @@ export async function getAllConversationsWithStatus(limit: number = 100, offset:
           customer_name: contactName,
           customer_email: contactEmail,
           customer_phone: contactPhone,
+          customer_language: event.customer_language || null, // Customer's selected language
+          sentiment: event.sentiment || null, // Customer's sentiment
+          sentiment_confidence: event.sentiment_confidence || null,
           hasCustomerMessage: event.type === 'inbound', // Track if customer has sent a message
           systemGreetingOnly: event.type === 'admin' // Track if only system greeting exists
         });
@@ -174,6 +177,14 @@ export async function getAllConversationsWithStatus(limit: number = 100, offset:
         if (event.type === 'inbound') {
           conv.hasCustomerMessage = true;
           conv.systemGreetingOnly = false;
+          // Update language and sentiment from most recent customer message
+          if (event.customer_language && !conv.customer_language) {
+            conv.customer_language = event.customer_language;
+          }
+          if (event.sentiment && !conv.sentiment) {
+            conv.sentiment = event.sentiment;
+            conv.sentiment_confidence = event.sentiment_confidence;
+          }
         }
         if (event.type !== 'admin') {
           conv.systemGreetingOnly = false;
