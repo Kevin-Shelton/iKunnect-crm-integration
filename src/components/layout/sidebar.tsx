@@ -18,7 +18,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Conversation, ConversationQueue } from '@/lib/types';
 import { EnhancedWaitingQueue } from '@/components/chat/enhanced-waiting-queue';
 import { RejectedChatQueue } from '@/components/chat/rejected-chat-queue';
-import { ModernConversationCard } from '@/components/queue/modern-conversation-card';
+import { TailwindConversationCard } from '@/components/queue/tailwind-conversation-card';
 
 interface SidebarProps {
   conversations: ConversationQueue;
@@ -79,7 +79,7 @@ export function Sidebar({
   };
 
   const ConversationItem = ({ conversation }: { conversation: Conversation }) => (
-    <ModernConversationCard
+    <TailwindConversationCard
       key={conversation.id}
       conversation={conversation}
       isSelected={selectedConversation === conversation.id}
@@ -92,7 +92,7 @@ export function Sidebar({
   );
 
   return (
-    <div className="w-[360px] bg-white border-r border-gray-200 flex flex-col">
+    <div className="w-[360px] bg-gray-50 border-r border-gray-200 flex flex-col">
       {/* Sidebar Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-3">
